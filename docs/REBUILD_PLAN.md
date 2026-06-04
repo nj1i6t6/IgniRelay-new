@@ -11,7 +11,7 @@
 
 - 現有 app 是「災難**資源媒合 + 物資 + 聊天 + 社群**」產品(Mode A 手機對手機 BLE mesh)。
 - 白皮書要的是「**被看見、SOS、最後足跡、危險、公告、點名**」的場域型離線中繼 App。
-- **傳輸層(BLE mesh + 同步 + 去重 + HLC + crypto + 優先佇列 + 離線地圖)兩者共用且最難重寫 → 保留。**
+- **傳輸層(BLE mesh + 同步 + 去重 + HLC + crypto + 優先佇列)兩者共用且最難重寫 → 保留。**(離線地圖**降為 optional/future**,MVP 走 mapless 位置證據模型,見 §3.6)
 - **語意事件模型 + services/repos + 整個 UI 跟新產品不符 → 砍掉重做。**
 - 切線:`MeshTransport` 介面 + wire 信封(現以 v2 `EventEnvelopeV2` 為準)以下全留;語意事件 payload 以上全換。
 
@@ -22,6 +22,7 @@
 1. **本 repo 的 Phase 0b/1 是 App 軟體核心驗證（software-core proof），不是白皮書定義的 MVP。** App-only / Android 雙機驗證只證明軟體核心,不等於場域 MVP。
 2. **白皮書 MVP exit 必須是 Mode B:Field Node + LoRa + Gateway + 本地事件後台/匯出。** 這些是 out-of-repo sibling work（見 §7.1）,本 App repo 不負責,但計畫不得低估 MVP 全貌。
 3. **`field_id` 單獨不足以做場域 scope。** 場域隔離必須由「被簽章/MAC 綁定的事件 scope」強制（進 `EventEnvelopeV2` canonical 簽章位元組,見 §3.1/§3.4）;BLE/GATT service-data 預過濾只是**附加最佳化**,不可取代 wire-level scope。
+4. **MVP 是「位置證據產品」,不是「地圖產品」。** App 端 P0 不內建離線地圖、不打包 MBTiles;定位走「節點 anchor + GPS + 相對位置 + 可信度」(§3.6)。基礎離線地圖降為 P1+ optional/future module。
 
 > 對外一律稱「App repo Phase 0b」,不要稱「做白皮書 MVP」,以免偏航。
 
@@ -59,7 +60,7 @@
 | 原生 iOS | `ios/Runner/{BlePlugin, IBLT, Chunker, Reassembler, IgniRelayConstants}.swift` | CoreBluetooth 對位（**code-wired,未真機驗證** — 見風險 R3） |
 | 時鐘/合併 | `lib/app/crdt/{hlc, conflict_resolver}.dart` | HLC 排序、CRDT 合併 |
 | 身分/簽章 | `lib/app/crypto/{identity_manager, crypto_utils}.dart` | 匿名 pubkey 身分、事件簽章 |
-| 離線地圖 | `lib/app/map/*`、`assets/maps/*`、`assets/geodata/*` | MBTiles 向量圖、POI、村里界 |
+| ~~離線地圖~~ → **optional/future** | `lib/app/map/*`、`assets/maps/*` | **MVP 不內建地圖、不打包 MBTiles**（產品決策,見 §3.6）。code 保留為 future module、deps 於 Phase 0b 從 `pubspec` 移除;`assets/geodata/*`(村里界/POI 名稱解析)視 §3.6 定位需求決定去留 |
 | Wire 信封 | **v2(live)**:`event_envelope_v2.dart` + `canonical_encoder_v2.dart` + `signer.dart`;v1(legacy 參考):`proto/mesh_protocol` 的 `MeshEvent`/`BloomFilterSync` | 保留信封機制;只換內層 payload + 加 `field_id`(綁 v2 簽章) |
 | Event log 儲存 | `lib/app/db/database_helper.dart` 的 `Event_Logs` 表 + `lib/app/services/event_store.dart` | 事件 log 持久化 |
 
@@ -113,7 +114,7 @@ MeshEvent {
 | 100–129 | protocol/control 保留 | HELLO / Bloom-sync / ACK 等控制框 | — | — |
 | 1000+ | experimental 保留 | — | — | — |
 
-優先級沿用信封 `urgency` + `TriageQueue`(P0–P4)現成機制,不必改佇列。
+優先級沿用信封 `urgency` + `TriageQueue`(P0–P4)現成機制,不必改佇列。PRESENCE/SOS/CHECKPOINT 的位置欄位統一改用 §3.6 `LocationEvidence`(observer/subject frame)。
 
 ### 3.3 payload 設計原則（MCU 友善,為 Mode B）
 
@@ -144,6 +145,42 @@ MeshEvent {
 
 ---
 
+### 3.6 定位模型：mapless「位置證據」而非「地圖產品」（產品決策 2026-06-04）
+
+**決策:MVP App 端不內建離線地圖、不打包 MBTiles。** 預設 UI 不走 map-first,改走「節點座標 + GPS + 相對位置 + 可信度」。理由:更貼白皮書核心(§5.3「被看見 / 最後足跡」,不是手機要畫地圖)、砍掉 200MB bundle / 地圖授權 / mbtiles+sqlite 風險、P0 更輕更準焦。基礎離線地圖降為 **P1+ optional/future module**。
+
+**定位原則（5 條）**
+1. 手機 GPS 可用 → 以 GPS 為準,evidence 帶 lat/lng/accuracy/source=GPS。
+2. 無 GPS 但靠近 Field Node → 以節點設定座標為 anchor,source=FIELD_NODE,顯示「最後看見:Node-07 / 時間 / RSSI / 可信半徑」。
+3. 離開節點短時間內 → 手機感測器 PDR/dead-reckoning 輔助,只能當**低可信推估**(「從 Node-07 往東北約 180m」),不可當精準定位。
+4. 全無 GPS/節點/可信 sensor → 退回 last known anchor,uncertainty 隨時間增加。
+5. UI **不說「人在這裡」**,而說「最後可信位置 / 推估方向距離 / 可信度 / 誤差半徑」。
+
+**資料模型**
+
+`LocationEvidence`（單筆原始觀測 — ★Claude:**這層上 wire**,小、可簽、可合併）
+- source: `GPS | FIELD_NODE | BLE_RSSI | PDR | MANUAL | UNKNOWN`
+- lat / lng、accuracy_m、observed_at
+- anchor_node_id / anchor_node_name、distance_from_anchor_m / bearing_deg
+
+`PositionEstimate`（融合後最佳推估 — ★Claude:**這層不上 wire**,UI 由一組 evidence 即時推導）
+- 由多筆 evidence 融合;confidence: `HIGH | MEDIUM | LOW`、uncertainty 半徑
+- ★Claude 建議:**confidence 與 uncertainty 不存於 wire,顯示時依 evidence 年齡即時計算**(原則 #4「隨時間增加」);存進事件的 HIGH,30 分鐘後就是謊言。
+
+`FieldNodeConfig`
+- node_id、display_name、lat/lng、install_accuracy_m、場域內位置描述
+- 可選 neighbor graph:`[{neighbor_node_id, edge_distance_m, edge_label}]`
+
+**Topological position（拓樸位置 — future-friendly）**
+白皮書多數場域不是直線距離,要的是「在 CP-03 到 CP-04 之間」。`PositionEstimate` 應允許 topological 形式 `on_edge {from, to, progress 0..1}`,與 geometric 形式並存。Phase 0b 先把資料模型留好,即使只渲染清單。
+
+> **★Claude 三點 refinement（標記給下輪 GPT 審）**
+> 1. **Evidence vs Estimate 分層**:wire 只搬 `LocationEvidence`(觀測),`PositionEstimate`(融合)是 UI 本地推導。否則把融合演算法凍進 wire 契約,而各裝置 evidence 歷史不同。Field Node MCU 只產 evidence(「我在 T 時以 RSSI -70 看到 X」),不算 estimate。
+> 2. **observer-frame vs subject-frame 分清**:`GPS`=主體自報(高可信、subject frame);`FIELD_NODE`/`BLE_RSSI`=觀測者看到(可信度受 RSSI→距離 + anchor 精度限制,observer frame)。兩者 anti-spoof 與 confidence 數學不同,PRESENCE/SOS 的位置欄位要標明是哪一種。
+> 3. **P1 空間視圖用 no-tiles schematic**:`CustomPaint` 把 FieldNodeConfig 畫成 node-link 示意圖(點=節點、線=edge、高亮最後 anchor),零地圖相依就有空間直覺。P0=清單、P1=schematic、真地圖=future optional。
+
+---
+
 ## 4. Phase 0b：剝上層 + 換事件模型（接著要做的，但等審）
 
 目標:把 fork 出來的程式從「資源媒合 app」剝成「乾淨的傳輸層 + 新事件骨架」,跑到綠燈 + 手機對手機能發 PRESENCE/SOS。
@@ -153,8 +190,9 @@ MeshEvent {
 2. **砍語意層**:刪 §2.2 的 events / proto payload / services / repos / UI。`check_layers` 與 analyze 必須維持綠。
 3. **重定事件 schema（v2 為主改點）**:先改 `EventEnvelopeV2` + `canonical_encoder_v2` + `signer` 加 `field_id`(綁簽章) + 新 `EventType` enum + 新 payload 訊息（§3.2）;同步更新 `docs/specs` 契約;legacy proto `MeshEvent` 只在遷移收尾期同步(非主改點),需要時才 `protoc`（`scripts/gen_proto.*`）。
 4. **改 publish/handle API 面**:`event_manager` / `mesh_event_handler` 的語意方法換成新事件（§2.3）。
-5. **最小 UI**:一個 debug 畫面 — 啟動 mesh、發 PRESENCE beacon、發 SOS、列出收到的事件（沿用現有 survival-mode debug 面板精神）。
+5. **最小 UI(mapless)**:debug 畫面 — 啟動 mesh、發 PRESENCE beacon、發 SOS、**事件列表 + 最後可信位置 / anchor 節點 / 距離方位 / 可信度**(§3.6);**不做地圖畫面**。
 6. **DB**:`Event_Logs` 保留;drop match/station 表;migration 重置（新網路,無歷史包袱）。
+7. **砍地圖 asset/deps**:`pubspec.yaml` 移除 `assets/maps/`(避免 ignored 的 200MB mbtiles 被打包) + `flutter_map`/`flutter_map_marker_cluster`/`vector_map_tiles*`/`vector_tile*`/`mbtiles`/`sqlite3`+`sqlite3_flutter_libs`(後兩者只為 mbtiles;`Event_Logs` 用 `sqflite` 保留);`lib/app/map/*` 標 optional/future,依編譯影響決定移除或隔離。順手:移除 AndroidManifest 的 Impeller-disable(地圖沒了可重開 Impeller)、移除 `health` 依賴 + Health Connect 權限(medical card 降級)。
 
 **Exit gate（Phase 0b）**：
 - `dart run tool/check_layers.dart --strict` 綠、`flutter analyze` 0 errors、`flutter test --exclude-tags golden` 綠。
@@ -168,10 +206,10 @@ MeshEvent {
 - `FieldSession`/`FieldConfig` + 掃碼/代碼加入 + 場域金鑰 scope（§3.4）。
 - **SOS UX**(白皮書 §13.4):長按 + 二次確認 + 倒數取消 + 誤報回報;P0/P1 插隊。
 - `HAZARD`(類型 + severity)、`ADMIN_BROADCAST`(scope/expiresAt)。
-- 離線地圖呈現「最後足跡」(沿用 `flutter_map` + mbtiles + self/peer marker layer)。
+- **位置呈現(mapless,§3.6)**:事件列表 + 節點相對位置 + 距離方位 + 可信度;可加 no-tiles node-graph schematic。真離線地圖 = future optional module。
 - 模組化載入:依場域類型顯示不同功能組合。
 
-**Exit gate**：單場域 demo — 加入場域 → beacon → 收 admin 公告 → 發 SOS/HAZARD → 地圖看到足跡與危險點。
+**Exit gate**：單場域 demo — 加入場域 → beacon → 收 admin 公告 → 發 SOS/HAZARD → **清單/示意圖看到最後可信位置 + 危險點(含 anchor / 距離方位 / 可信度)**。
 
 ## 6. Phase 2：點名 / 心跳 + 契約凍結
 

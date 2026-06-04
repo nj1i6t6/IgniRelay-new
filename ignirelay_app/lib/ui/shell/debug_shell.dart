@@ -45,9 +45,14 @@ class _DebugShellState extends State<DebugShell> {
     _state = _runtime.transportActive
         ? TransportState.running
         : TransportState.stopped;
-    _stateSub = _runtime.transportStateChanges.listen((s) {
-      if (mounted) setState(() => _state = s);
-    });
+    try {
+      _stateSub = _runtime.transportStateChanges.listen((s) {
+        if (mounted) setState(() => _state = s);
+      });
+    } catch (_) {
+      // transport 尚未注入（例如 widget test 未 attachTransport）：
+      // transportActive / transportStats 仍 null-safe,略過狀態訂閱即可。
+    }
     _logSub = _events.anyEventChanges.listen((_) => _refresh());
     _refresh();
   }

@@ -60,7 +60,7 @@
 | 時鐘/合併 | `lib/app/crdt/{hlc, conflict_resolver}.dart` | HLC 排序、CRDT 合併 |
 | 身分/簽章 | `lib/app/crypto/{identity_manager, crypto_utils}.dart` | 匿名 pubkey 身分、事件簽章 |
 | 離線地圖 | `lib/app/map/*`、`assets/maps/*`、`assets/geodata/*` | MBTiles 向量圖、POI、村里界 |
-| Wire 信封 | `lib/app/proto/mesh_protocol`：`MeshEvent`、`BloomFilterSync`、`MeshEnvelope` | **通用,保留**;只換內層 payload 訊息集 |
+| Wire 信封 | **v2(live)**:`event_envelope_v2.dart` + `canonical_encoder_v2.dart` + `signer.dart`;v1(legacy 參考):`proto/mesh_protocol` 的 `MeshEvent`/`BloomFilterSync` | 保留信封機制;只換內層 payload + 加 `field_id`(綁 v2 簽章) |
 | Event log 儲存 | `lib/app/db/database_helper.dart` 的 `Event_Logs` 表 + `lib/app/services/event_store.dart` | 事件 log 持久化 |
 
 ### 2.2 砍除（跟新產品不符）
@@ -93,28 +93,31 @@ MeshEvent {
   int ttl; int chunkIndex; int totalChunks;
   bytes payload; bytes signature;
   double receivedLat/Lng; double originLat/Lng;
-  bytes field_id;          // ★新增:場域 scope（見 §3.4 場域金鑰）
-}
+}   // v1 legacy — 僅欄位語意參考;field_id 與新 EventType 改在 v2 EventEnvelopeV2
 ```
 
-### 3.2 新 EventType（wire 自由,重新編號;預留 gap）
+### 3.2 新 EventType（非連續編號 — GPT Q1 定案）
+
+`0` 留 `UNSPECIFIED`;主事件用 10 的倍數、之間留 gap,之後加 `SOS_CANCELLED`、`PRESENCE_LOST`、`CHECKPOINT_MISSED` 不破壞編號。
 
 | # | EventType | payload 重點欄位 | urgency | 白皮書 |
 |---|---|---|---|---|
-| 0 | `PRESENCE` | anonUserId, nodeId, rssi, batteryHint | P3 | 最後足跡 |
-| 1 | `SOS` | anonUserId, level(YELLOW/RED), lastNodeId, note? | P0(RED)/P1(YELLOW) | 求救 |
-| 2 | `HAZARD` | hazardType, severity, nodeId? | P2 | 危險標記 |
-| 3 | `ADMIN_BROADCAST` | scope, message, expiresAt | P1 | 公告 |
-| 4 | `CHECKPOINT` | anonUserId, checkpointId | P3 | 點名/檢查點 |
-| 5 | `NODE_HEARTBEAT` | nodeId, battery, solar, storage, rssiAvg, firmware | P4 | 節點心跳 |
-| 6 | `SENSOR`（保留,Phase 2/3） | sensorId, sensorType, rawPayload | 可變 | 433MHz RF |
-| 7–15 | 保留 | — | — | 未來擴充 |
+| 0 | `UNSPECIFIED` | —（proto3 default,收到即拒） | — | — |
+| 10 | `PRESENCE` | anonUserId, nodeId, rssi, batteryHint | P3 | 最後足跡 |
+| 20 | `SOS` | anonUserId, level(YELLOW/RED), lastNodeId, note? | P0(RED)/P1(YELLOW) | 求救 |
+| 30 | `HAZARD` | hazardType, severity, nodeId? | P2 | 危險標記 |
+| 40 | `ADMIN_BROADCAST` | scope, message, expiresAt | P1 | 公告 |
+| 50 | `CHECKPOINT` | anonUserId, checkpointId | P3 | 點名/檢查點 |
+| 60 | `NODE_HEARTBEAT` | nodeId, battery, solar, storage, rssiAvg, firmware | P4 | 節點心跳 |
+| 70 | `SENSOR`（保留,Phase 2/3） | sensorId, sensorType, rawPayload | 可變 | 433MHz RF |
+| 100–129 | protocol/control 保留 | HELLO / Bloom-sync / ACK 等控制框 | — | — |
+| 1000+ | experimental 保留 | — | — | — |
 
 優先級沿用信封 `urgency` + `TriageQueue`(P0–P4)現成機制,不必改佇列。
 
 ### 3.3 payload 設計原則（MCU 友善,為 Mode B）
 
-- 保持**小而固定**;白皮書 §8.1 建議 binary/CBOR。App 端續用 protobuf,但 Field Node MCU 端用 **nanopb**(protobuf C)即可共用同一份 `.proto`。
+- 保持**小而固定**;白皮書 §8.1 建議 binary/CBOR。**v2 信封是 canonical 手寫編碼(MCU 比照 Kotlin/Swift parity 實作,非 protoc 生成)**;內層 payload 用 protobuf,Field Node MCU 端以 **nanopb** 共用同一份 payload `.proto`。
 - 避免長字串/巢狀;`message`、`note` 設長度上限。
 - 一律可離線保存、可延遲同步、可去重(eventId)、可合併(HLC/CRDT)。
 
@@ -134,7 +137,7 @@ MeshEvent {
 1. GATT service / characteristic UUID（`IgniRelayConstants.kt/.swift`）。
 2. Chunk framing（`Chunker`）。
 3. IBLT Bloom 差量同步格式（`IBLT`）。
-4. `MeshEvent` 信封 binary layout（含新增 `field_id`）+ 新 EventType 編號。
+4. **v2 `EventEnvelopeV2`** canonical binary layout（含 `field_id`）+ 新 EventType 編號（legacy `MeshEvent` 僅遷移參照）。
 5. 簽章 / 場域金鑰 MAC 演算法。
 
 現有 `docs/specs/{native_transport_v1, envelope_v2_spec, wire_conformance_v1.json}` 是契約基礎,**新事件集定稿後要同步更新**,並用現有的 wire-conformance 測試（Dart oracle ↔ Kotlin/Swift parity）守住。**契約 v0 草案要在 Phase 1 結束前產出（不等 Phase 2),讓硬體/後端 sibling 團隊並行起步。**
@@ -148,7 +151,7 @@ MeshEvent {
 步驟：
 1. **凍結保留層**:確認 §2.1 清單編譯獨立可用(暫時 stub 掉上層依賴)。
 2. **砍語意層**:刪 §2.2 的 events / proto payload / services / repos / UI。`check_layers` 與 analyze 必須維持綠。
-3. **重定 `.proto`**:`EventType` enum + 新 payload 訊息（§3.2）;`MeshEvent` 加 `field_id`;重新 `protoc`（`scripts/gen_proto.*`）。
+3. **重定事件 schema（v2 為主改點）**:先改 `EventEnvelopeV2` + `canonical_encoder_v2` + `signer` 加 `field_id`(綁簽章) + 新 `EventType` enum + 新 payload 訊息（§3.2）;同步更新 `docs/specs` 契約;legacy proto `MeshEvent` 只在遷移收尾期同步(非主改點),需要時才 `protoc`（`scripts/gen_proto.*`）。
 4. **改 publish/handle API 面**:`event_manager` / `mesh_event_handler` 的語意方法換成新事件（§2.3）。
 5. **最小 UI**:一個 debug 畫面 — 啟動 mesh、發 PRESENCE beacon、發 SOS、列出收到的事件（沿用現有 survival-mode debug 面板精神）。
 6. **DB**:`Event_Logs` 保留;drop match/station 表;migration 重置（新網路,無歷史包袱）。
@@ -207,20 +210,20 @@ MeshEvent {
 |---|---|---|
 | R1 | 本 repo 只有 App-only 手機對手機 BLE(=Mode A),**沒有 LoRa/Field Node/Gateway** | fork 只給 App 地基;Mode B/C 需硬體側另做。計畫已分 Phase 3 隔離 |
 | R2 | App↔Field Node 是一份協定契約,不是免費 | §3.5 要凍結;MCU 端用 nanopb 共用 `.proto` |
-| R3 | **iOS BLE code-wired,未真機驗證** | Android 是穩路;iOS 列為後續 gate（macOS build + XCTest + 裝置對） |
-| R4 | 切縫上有 `EventManager`/`MeshEventHandler` 等 singleton 殘留(原 repo 正在 v0.2.5 facade 化 + v1→v2 mesh 遷移到一半) | fork 凍結在 `CoReM@f2d227f`,要決定:沿用 singleton 還是趁 fork 一次改注入 |
+| R3 | **iOS BLE code-wired,未真機驗證** | Q6 定案:iOS 保留不刪、**不當 Phase 0b gate**;先打通 Android 雙機 + v2 wire + Field Node 契約草案,Phase 2 前再做 macOS build + XCTest + 裝置對。**但 Swift IBLT/Chunker source parity 要持續編譯不退化**(靠 wire-conformance corpus),免得 iOS 上線變重寫 |
+| R4 | 切縫上有 `EventManager`/`MeshEventHandler` 等 singleton 殘留(原 repo 正在 v0.2.5 facade 化 + v1→v2 mesh 遷移到一半) | Q5 定案:**不一次清**。Phase 0b 第一刀只求新事件骨架綠 + Android 雙機;legacy singleton 暫包在 adapter 裡,**新 public API 一律 DI、不得新增 singleton**(已是 CLAUDE.md 治理);第二刀(事件模型穩後)再清內部 singleton |
 | R5 | 新事件信封改動(加 `field_id`、改 EventType 編號)會打斷舊 wire | 已確認「全新獨立網路」,可自由改;但要一次定稿,避免 Phase 間反覆 |
 | R6 | `database_helper.dart` 是單檔大型 helper,含待砍的 match/station 邏輯 | Phase 0b 要小心切,別動到 `Event_Logs` |
 
-**已由 GPT 審查定案：**
+**已由 GPT 審查定案（全數收斂）：**
+- **Q1 → 定案** EventType 用**非連續編號**:`0=UNSPECIFIED`、主事件 10 的倍數(10/20/…/70)、`100–129` 控制框保留、`1000+` experimental。見 §3.2。
+- **Q2 → 部分定案** 場域金鑰必須是「簽章/MAC 綁定」的 wire-level scope;HMAC vs 非對稱簽章待 MCU 功耗實測。
 - **Q3 → 定案** `field_id` 進 v2 信封並綁進 canonical 簽章;GATT service-data 預過濾為附加最佳化,不取代 wire scope。
 - **Q4 → 定案** medical card 降級,不留主線;只保留 SOS 時窄版可選揭露緊急身份/備註。
-- **Q2 → 部分定案** 場域金鑰必須是「簽章/MAC 綁定」的 wire-level scope;HMAC vs 非對稱簽章的選擇仍待 MCU 功耗實測。
+- **Q5 → 定案** singleton **不一次清**:Phase 0b 只求新事件骨架綠 + Android 雙機;legacy singleton 暫包 adapter,新 API 一律 DI;第二刀再清。見 R4。
+- **Q6 → 定案** iOS 延後、保留不刪、不當 Phase 0b gate;先 Android 雙機 + v2 wire + Field Node 契約草案,Phase 2 前再做 iOS。見 R3。
 
-**仍開放（待下一輪 GPT / 場域實測）：**
-- **Q1** EventType 是否該用非連續編號 / 預留更多 gap,降低未來 wire 破壞風險？
-- **Q5** Phase 0b 是否順手把 singleton（`EventManager`/`MeshEventHandler`）→ DI 一次清掉(R4),還是先維持現狀求快？
-- **Q6** iOS 是否延後到 Phase 2 之後,先打通 Android 雙機 + Field Node？
+**Phase 0b 第一刀範圍(收斂後)**:剝上層 → 定 v2 事件 schema(含 `field_id` 綁簽章 + 非連續 EventType) → 最小 debug UI → `check_layers`/`analyze`/`test` 綠 + Android 雙機 PRESENCE/SOS 行為驗證。**singleton 清理、iOS、Field Node 真機都不在第一刀。**
 
 ---
 

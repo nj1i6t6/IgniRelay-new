@@ -1,5 +1,7 @@
 # 烽傳 IgniRelay / `ignirelay_app`
 
+> ⚠️ **Fork baseline** — 以下描述 fork 起點的舊產品(物資媒合 / 聊天 / 醫療卡)。重建方向(精實場域型 SOS / 足跡中繼)以 [`../docs/REBUILD_PLAN.md`](../docs/REBUILD_PLAN.md) 為準。
+
 離線 BLE Mesh 災難應變 Flutter App。這個專案不是一般的 CRUD App，而是把以下能力放在同一個行動端產品中：
 
 - 離線地圖與在地 POI 查詢

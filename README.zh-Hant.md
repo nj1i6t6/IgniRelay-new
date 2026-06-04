@@ -19,6 +19,10 @@
 
 ---
 
+> ⚠️ **Fork baseline 提醒** — 本 README 描述的是 fork 起點的**舊產品**(物資媒合 / 聊天室 / 醫療卡)。
+> 重建方向(精實場域型 SOS / 最後足跡中繼,依白皮書)以 [`docs/REBUILD_PLAN.md`](docs/REBUILD_PLAN.md) 為準;
+> 現況意圖請信計畫書,不要信本 README。
+
 > **English TL;DR** — IgniRelay is an offline-first, event-sourced disaster-response mobile app.
 > When cellular and internet are down, phones form a **Bluetooth-LE mesh** that signs, stores,
 > relays and replays emergency events (SOS / hazards / supply matching / geofenced chat) across

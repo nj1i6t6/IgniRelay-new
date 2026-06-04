@@ -19,6 +19,11 @@ When cell towers fall and the internet goes dark, phones still relay messages, S
 
 ---
 
+> ⚠️ **Fork-baseline notice** — This README describes the **legacy resource-matching app**
+> (supply matching / chat / medical card) as inherited at the fork point. The **rebuild
+> direction** — a lean field-node / SOS / last-footprint relay per the whitepaper — lives in
+> [`docs/REBUILD_PLAN.md`](docs/REBUILD_PLAN.md). For current intent, trust the plan over this README.
+
 > **TL;DR** — IgniRelay is an offline-first, event-sourced disaster-response mobile app.
 > When cellular and internet are down, nearby phones form a **Bluetooth-LE mesh** that signs,
 > stores, relays and replays emergency events (SOS / hazards / supply matching / geofenced chat)

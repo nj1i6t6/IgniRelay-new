@@ -1,0 +1,10 @@
+# Claude Code local working dir & per-machine settings — never track
+/.claude/
+
+# OS / editor cruft
+.DS_Store
+*.swp
+*.log
+
+# Flutter build artifacts & large map binaries are ignored inside
+# ignirelay_app/.gitignore (the Flutter project root).

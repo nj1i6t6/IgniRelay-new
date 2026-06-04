@@ -1,0 +1,5 @@
+# 烽傳 Ignirelay layer-boundary baseline
+# 由 `dart run tool/check_layers.dart --update-baseline` 產生
+# 格式：<rule>\t<file>\t<detail>（detail 為 importUri 或符號片段；行號刻意不記錄）
+# v0.2.5 Stage 3 起應為空（僅註解），CI 以 --strict 鎖死
+

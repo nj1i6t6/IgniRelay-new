@@ -1,0 +1,78 @@
+name: ignirelay_app
+description: 烽傳 IgniRelay - Offline Mesh Emergency Rescue System
+publish_to: 'none'
+
+version: 0.2.5+31
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: any
+
+  # ── UI & Maps ─────────────────────────────────────────────
+  flutter_map: ^7.0.2
+  # Marker clustering (Stage 2 dep-check; Stage 4d 會實際啟用叢集)
+  flutter_map_marker_cluster: ^1.4.0
+  # Vector tile rendering for bundled MBTiles (OpenMapTiles schema)
+  vector_map_tiles: ^8.0.0
+  vector_map_tiles_mbtiles: ^1.2.0
+  vector_tile_renderer: ^5.2.1
+  vector_tile: ^2.0.1
+  mbtiles: ^0.4.2
+  latlong2: ^0.9.0
+  path_provider: ^2.1.4
+
+  # ── BLE Mesh Networking ────────────────────────────────────
+  # Android: Nordic BLE Library via MethodChannel
+  # iOS: CoreBluetooth via MethodChannel
+
+  # ── State Management & Utils ───────────────────────────────
+  provider: ^6.1.2
+  uuid: ^4.4.2
+  collection: ^1.18.0
+
+  # ── Storage ───────────────────────────────────────────────
+  sqflite: ^2.3.3+1
+  path: ^1.9.0
+  shared_preferences: ^2.2.3
+  flutter_secure_storage: ^9.2.4
+  # Native SQLite3 shared library (required by mbtiles on Android/iOS)
+  sqlite3: ^2.9.0
+  sqlite3_flutter_libs: ^0.5.24
+
+  # ── Cryptography ──────────────────────────────────────────
+  cryptography: ^2.7.0
+  crypto: ^3.0.3
+
+  # ── Protobuf ──────────────────────────────────────────────
+  protobuf: ^3.1.0
+  fixnum: ^1.1.0
+
+  # ── Health Connect (醫療卡匯入) ──────────────────────────────
+  health: ^13.1.4
+
+  # ── GPS Location ──────────────────────────────────────────
+  geolocator: ^11.1.0
+
+  # ── Permissions ───────────────────────────────────────────
+  permission_handler: ^11.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.2
+  protoc_plugin: ^21.1.1
+  sqflite_common_ffi: ^2.3.3
+
+flutter:
+  generate: true
+  uses-material-design: true
+  assets:
+    - assets/maps/
+    - assets/style/
+    - assets/geodata/

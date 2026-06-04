@@ -25,6 +25,9 @@
 4. **MVP 是「位置證據產品」,不是「地圖產品」。** App 端 P0 不內建離線地圖、不打包 MBTiles;定位走「節點 anchor + GPS + 相對位置 + 可信度」(§3.6)。基礎離線地圖降為 P1+ optional/future module。
 
 > 對外一律稱「App repo Phase 0b」,不要稱「做白皮書 MVP」,以免偏航。
+>
+> **手機對手機 BLE 角色**:保留手機↔手機 BLE exchange / mesh / Data Mule,作為 App repo 的 software proof、fallback relay、近距離補充同步與 Data Mule path;**保留但不定位為白皮書 MVP 主線**(主線仍是 Mode B:Field Node + LoRa + Gateway)。
+> *EN:* Phone-to-phone BLE remains as the App repo's software proof, fallback relay, and Data Mule path; it is retained, but not positioned as the whitepaper MVP backbone.
 
 ---
 
@@ -171,6 +174,8 @@ MeshEvent {
 - node_id、display_name、lat/lng、install_accuracy_m、場域內位置描述
 - 可選 neighbor graph:`[{neighbor_node_id, edge_distance_m, edge_label}]`
 
+地名 context(可選,且**非地圖**):現有 `lib/app/geo/village_geofence.dart` + `admin_name_resolver`(讀 `assets/geodata`,用 `sqlite3`)可把 anchor/位置標成「在 XX 村/區」,屬 mapless 定位的可信 context — 故 `sqlite3` **不隨地圖一起砍**(見 §4 step 7,以 compile/test 為準)。
+
 **Topological position（拓樸位置 — future-friendly）**
 白皮書多數場域不是直線距離,要的是「在 CP-03 到 CP-04 之間」。`PositionEstimate` 應允許 topological 形式 `on_edge {from, to, progress 0..1}`,與 geometric 形式並存。Phase 0b 先把資料模型留好,即使只渲染清單。
 
@@ -192,7 +197,12 @@ MeshEvent {
 4. **改 publish/handle API 面**:`event_manager` / `mesh_event_handler` 的語意方法換成新事件（§2.3）。
 5. **最小 UI(mapless)**:debug 畫面 — 啟動 mesh、發 PRESENCE beacon、發 SOS、**事件列表 + 最後可信位置 / anchor 節點 / 距離方位 / 可信度**(§3.6);**不做地圖畫面**。
 6. **DB**:`Event_Logs` 保留;drop match/station 表;migration 重置（新網路,無歷史包袱）。
-7. **砍地圖 asset/deps**:`pubspec.yaml` 移除 `assets/maps/`(避免 ignored 的 200MB mbtiles 被打包) + `flutter_map`/`flutter_map_marker_cluster`/`vector_map_tiles*`/`vector_tile*`/`mbtiles`/`sqlite3`+`sqlite3_flutter_libs`(後兩者只為 mbtiles;`Event_Logs` 用 `sqflite` 保留);`lib/app/map/*` 標 optional/future,依編譯影響決定移除或隔離。順手:移除 AndroidManifest 的 Impeller-disable(地圖沒了可重開 Impeller)、移除 `health` 依賴 + Health Connect 權限(medical card 降級)。
+7. **砍地圖 asset/deps（以 compile/test 為準,別誤砍）**:
+   - **可砍(map-only)**:`assets/maps/`(避免 ignored 的 200MB mbtiles 被打包)、`flutter_map`、`flutter_map_marker_cluster`、`vector_map_tiles*`、`vector_tile*`、`mbtiles`。rg 確認集中在 map UI(`ui/screens/map/*`、`navigation_screen`、map widgets、theme/sprites)。
+   - **⚠️ `sqlite3` / `sqlite3_flutter_libs` 不是只為 mbtiles**(已用 rg 對程式碼確認):也用於 `lib/app/geo/village_geofence.dart`(村里界/地名解析,**非地圖**)、`lib/app/map/poi_query.dart` 及數個 geo test。**以編譯/測試為準**:保留 geodata 地名/相對位置 → 留 `sqlite3`;若砍掉 geodata 後只剩 test 需要 → 移 `dev_dependencies` 或改測試 fixture。**不要為砍 map 一次砍壞非地圖定位資料。**
+   - `Event_Logs` 用 `sqflite`(與 `sqlite3` 不同套件),不受影響。
+   - `lib/app/map/*` 標 optional/future,依編譯影響決定移除或隔離。
+   - 順手:移除 AndroidManifest 的 Impeller-disable(地圖沒了可重開 Impeller)、移除 `health` 依賴 + Health Connect 權限(medical card 降級)。
 
 **Exit gate（Phase 0b）**：
 - `dart run tool/check_layers.dart --strict` 綠、`flutter analyze` 0 errors、`flutter test --exclude-tags golden` 綠。

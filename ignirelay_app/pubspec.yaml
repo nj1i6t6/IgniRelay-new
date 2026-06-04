@@ -73,6 +73,9 @@ flutter:
   generate: true
   uses-material-design: true
   assets:
-    - assets/maps/
+    # Phase 0b: MVP 走 mapless（不打包地圖）。移除 assets/maps/ 以避免本機
+    # ignored 的 200MB taiwan_ignirelay.mbtiles 被打包進 APK/IPA。地圖屬
+    # optional/future module,見 docs/REBUILD_PLAN.md §3.6。assets/geodata/
+    # 保留：village_geofence 仍用它做地名/相對位置 context（非地圖）。
     - assets/style/
     - assets/geodata/

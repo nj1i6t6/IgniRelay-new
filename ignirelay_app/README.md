@@ -1,4 +1,4 @@
-# 烽傳 IgniRelay / `resqmesh_app`
+# 烽傳 IgniRelay / `ignirelay_app`
 
 離線 BLE Mesh 災難應變 Flutter App。這個專案不是一般的 CRUD App，而是把以下能力放在同一個行動端產品中：
 
@@ -17,7 +17,7 @@
 |---|---|
 | App 名稱 | 烽傳 IgniRelay |
 | `pubspec.yaml` 名稱 | `ignirelay_app` |
-| 資料夾名稱 | `resqmesh_app` |
+| 資料夾名稱 | `ignirelay_app` |
 | 版本 | `0.2.5+31` |
 | 主要平台 | Android、iOS |
 | 核心技術 | Flutter、SQLite、Ed25519、HLC、BLE GATT、離線 MBTiles |
@@ -565,7 +565,7 @@ dart run tool/check_layers.dart --strict
 ## 專案目錄導讀
 
 ```text
-resqmesh_app/
+ignirelay_app/
 |- lib/
 |  |- main.dart
 |  |- app/

@@ -1,8 +1,7 @@
-gradle-wrapper.jar
+# Gradle wrapper (gradlew, gradlew.bat, gradle-wrapper.jar) is TRACKED on purpose
+# so a fresh clone can build without a local Gradle install (Android device gate).
 /.gradle
 /captures/
-/gradlew
-/gradlew.bat
 /local.properties
 GeneratedPluginRegistrant.java
 .cxx/

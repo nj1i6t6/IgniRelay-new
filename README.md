@@ -91,7 +91,7 @@ log keeps the raw mesh events for provenance and as a second line of dedup defen
 
 ## Project structure (monorepo)
 
-The repo root is the governance entrypoint; the Flutter app lives in `resqmesh_app/`.
+The repo root is the governance entrypoint; the Flutter app lives in `ignirelay_app/`.
 
 ```text
 .
@@ -100,7 +100,7 @@ The repo root is the governance entrypoint; the Flutter app lives in `resqmesh_a
 ├── SECURITY.md            # Security policy / vulnerability reporting
 ├── README.md              # English (shown by default on GitHub)
 ├── README.zh-Hant.md      # Traditional Chinese
-└── resqmesh_app/          # Flutter app
+└── ignirelay_app/          # Flutter app
     ├── lib/
     │   ├── main.dart      # Staged startup sequence
     │   ├── app/           # application / services / mesh / crypto / db / proto …
@@ -136,7 +136,7 @@ The code keeps a clear four-layer separation, with import boundaries enforced by
 ## Quick start
 
 ```bash
-cd resqmesh_app
+cd ignirelay_app
 
 # Install dependencies
 flutter pub get
@@ -148,7 +148,7 @@ flutter run
 ### iOS extra step
 
 ```bash
-cd resqmesh_app/ios
+cd ignirelay_app/ios
 pod install   # requires Flutter/Generated.xcconfig to exist first
 ```
 
@@ -165,7 +165,7 @@ flutter build apk --release --dart-define=BUILD_TIMESTAMP=1777334400000
 ## Testing & quality checks
 
 ```bash
-cd resqmesh_app
+cd ignirelay_app
 
 # All tests
 flutter test
@@ -180,7 +180,7 @@ dart run tool/check_layers.dart --strict
 ```
 
 Tests fall into three tiers: pure Dart, `sqflite_ffi` in-memory DB, and integration tests that need
-geodata or a real device. See `resqmesh_app/test/TEST_INDEX.md` for the overview.
+geodata or a real device. See `ignirelay_app/test/TEST_INDEX.md` for the overview.
 
 ## Deeper documentation
 
@@ -188,7 +188,7 @@ This README is the entrypoint. For the **full technical anatomy** (startup seque
 the mesh receive pipeline, routing strategy, native integration, known gaps & risks, and a suggested
 reading order), see:
 
-📖 **[`resqmesh_app/README.md`](resqmesh_app/README.md)**
+📖 **[`ignirelay_app/README.md`](ignirelay_app/README.md)**
 
 ## Project status
 

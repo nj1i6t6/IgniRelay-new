@@ -3,3 +3,9 @@
 # so the checkout is identical on every platform (CI Windows runners default to
 # core.autocrlf=true, which would otherwise rewrite it to CRLF and break the test).
 docs/specs/wire_conformance_v1.json text eol=lf
+
+# Gradle wrapper: the POSIX launcher must stay LF (CRLF breaks it on Linux/macOS);
+# the .bat launcher stays CRLF for Windows cmd; the jar is binary.
+gradlew text eol=lf
+*.bat text eol=crlf
+gradle-wrapper.jar binary

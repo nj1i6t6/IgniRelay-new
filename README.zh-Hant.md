@@ -85,7 +85,7 @@ UI **不直接靠 protobuf 原始事件畫畫面**，而是查詢 projection tab
 
 ## 專案結構（Monorepo）
 
-本 repo 根目錄是治理入口，Flutter App 在 `resqmesh_app/`。
+本 repo 根目錄是治理入口，Flutter App 在 `ignirelay_app/`。
 
 ```text
 .
@@ -94,7 +94,7 @@ UI **不直接靠 protobuf 原始事件畫畫面**，而是查詢 projection tab
 ├── SECURITY.md            # 安全政策 / 漏洞回報窗口
 ├── README.md              # 英文（GitHub 預設顯示）
 ├── README.zh-Hant.md      # 繁體中文（你正在看的這份）
-└── resqmesh_app/          # Flutter App
+└── ignirelay_app/          # Flutter App
     ├── lib/
     │   ├── main.dart      # 分階段啟動序列
     │   ├── app/           # 應用 / 服務 / mesh / 加密 / DB / proto …
@@ -130,7 +130,7 @@ UI **不直接靠 protobuf 原始事件畫畫面**，而是查詢 projection tab
 ## 快速開始
 
 ```bash
-cd resqmesh_app
+cd ignirelay_app
 
 # 安裝依賴
 flutter pub get
@@ -142,7 +142,7 @@ flutter run
 ### iOS 額外步驟
 
 ```bash
-cd resqmesh_app/ios
+cd ignirelay_app/ios
 pod install   # 前提：先有 Flutter/Generated.xcconfig
 ```
 
@@ -159,7 +159,7 @@ flutter build apk --release --dart-define=BUILD_TIMESTAMP=1777334400000
 ## 測試與品質檢查
 
 ```bash
-cd resqmesh_app
+cd ignirelay_app
 
 # 全部測試
 flutter test
@@ -174,14 +174,14 @@ dart run tool/check_layers.dart --strict
 ```
 
 測試分為純 Dart、`sqflite_ffi` in-memory DB、以及需要 geodata 或實機的 integration 類型。
-總覽見 `resqmesh_app/test/TEST_INDEX.md`。
+總覽見 `ignirelay_app/test/TEST_INDEX.md`。
 
 ## 深入文件
 
 根目錄 README 是入口；**完整的技術解剖**（啟動流程、資料表、mesh 收包管線、路由策略、原生整合、
 已知缺口與風險、建議閱讀順序）請見：
 
-📖 **[`resqmesh_app/README.md`](resqmesh_app/README.md)**
+📖 **[`ignirelay_app/README.md`](ignirelay_app/README.md)**
 
 ## 目前狀態
 

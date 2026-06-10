@@ -10,10 +10,11 @@
 //
 // 另外強制「UI 不得直接建構 app-layer 依賴」的符號規則：
 //   - lib/ui/**   禁止直接呼叫 facade / repo / manager / legacy singleton
-//                 的建構式（IdentityManager / NegotiationManager /
-//                 NegotiationRepo / MatchRepository / EventManager /
-//                 MeshEventHandler / DatabaseHelper / LocationService /
-//                 ChatService）。唯一允許的建構點是 main.dart 的 Provider
+//                 的建構式（IdentityManager / EventManager / MeshEventHandler /
+//                 DatabaseHelper / LocationService）。Phase 0b #3B-3/#3B-4 後
+//                 NegotiationManager / NegotiationRepo / MatchRepository /
+//                 ChatService 已刪除，故自清單移除。
+//                 唯一允許的建構點是 main.dart 的 Provider
 //                 wiring；UI 一律 context.read<T>() 或由 controller 建構式
 //                 注入。清單見 `_uiForbiddenConstructors`。
 //
@@ -131,14 +132,10 @@ class _SymbolRule {
 /// 對應 CLAUDE.md「Rules」一節列舉的 entry point 清單。
 const _uiForbiddenConstructors = <String>[
   'IdentityManager',
-  'NegotiationManager',
-  'NegotiationRepo',
-  'MatchRepository',
   'EventManager',
   'MeshEventHandler',
   'DatabaseHelper',
   'LocationService',
-  'ChatService',
 ];
 
 final _symbolRules = <_SymbolRule>[

@@ -271,8 +271,8 @@ class BleManager {
   /// IBLT Fast Path 同步嘗試
   ///
   /// 流程：
-  /// 1. 建構本機 IBLT（排除聊天事件）
-  /// 2. 取得本機聊天水位線（Chat_Messages 的最大 hlc_timestamp）
+  /// 1. 建構本機 IBLT
+  /// 2. 聊天水位線（Phase 0b #3B-4 後固定 0；保留封包 8-byte slot）
   /// 3. 打包 517 byte 封包：[0x01](1B) + [watermark](8B) + [IBLT](504B) + [padding](4B)
   /// 4. 寫入對端，等待對端 IBLT 回應
   /// 5. 做 IBLT 相減並嘗試 peel
@@ -280,19 +280,19 @@ class BleManager {
   /// 7. 失敗 → 回傳 false，由呼叫端 fallback 到 Bloom-based Slow Path
   Future<bool> _tryIBLTSync(String deviceId) async {
     try {
-      // ── 1. 建構本機 IBLT（排除聊天事件）──
+      // ── 1. 建構本機 IBLT ──
       final handler = MeshEventHandler();
-      final localEventIds = await handler.getLocalEventIds(excludeChat: true);
+      final localEventIds = await handler.getLocalEventIds();
       final localIblt = IBLT();
       for (final id in localEventIds) {
         localIblt.insert(id);
       }
 
-      // ── 2. 取得聊天水位線 ──
-      final db = await DatabaseHelper().database;
-      final wmResult = await db.rawQuery(
-          'SELECT MAX(hlc_timestamp) as wm FROM Chat_Messages');
-      final chatWatermark = (wmResult.first['wm'] as int?) ?? 0;
+      // ── 2. 聊天水位線 ──
+      // Phase 0b #3B-4：chat 產品下線，Chat_Messages 表已不再建立。watermark
+      // 固定為 0，但仍保留封包中的 8-byte slot 以維持 IBLT sync packet layout
+      // 不變（不改 wire 格式）。
+      const chatWatermark = 0;
 
       // ── 3. 打包封包：control(1) + watermark(8) + iblt(504) = 513 ──
       final ibltBytes = localIblt.toBytes();

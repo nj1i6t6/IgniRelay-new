@@ -655,10 +655,10 @@ class MeshEventHandler {
       'Event_Logs',
       columns: ['event_id'],
       // 排除 v2 投影列：它們無 v1 簽章，不可進 v1 wire 廣告/同步。
-      // 排除 CHAT_MESSAGE：聊天已遷移成 v2-only，不參與 v1 Bloom 對帳
-      // （IBLT getLocalEventIds / getEventsByKeyHashes 也同樣排除）。
-      where: 'event_id NOT LIKE ? AND event_type != ?',
-      whereArgs: ['$v2ProjectionIdPrefix%', EventType.chatMessage],
+      // （Phase 0b #3B-4：原本還排除 CHAT_MESSAGE，chat 產品下線後 filter
+      // 形同 no-op，已移除；getLocalEventIds / getEventsByKeyHashes 同步處理。）
+      where: 'event_id NOT LIKE ?',
+      whereArgs: ['$v2ProjectionIdPrefix%'],
       orderBy: 'hlc_timestamp DESC',
       limit: limit,
     );
@@ -666,15 +666,13 @@ class MeshEventHandler {
     return buildBitVectorBloom(ids);
   }
 
-  /// 取得本機事件 ID 集合（供 IBLT 同步使用）
-  /// [excludeChat] 為 true 時排除聊天訊息事件
-  Future<Set<String>> getLocalEventIds({bool excludeChat = true}) async {
+  /// 取得本機事件 ID 集合（供 IBLT 同步使用）。
+  /// Phase 0b #3B-4：原 [excludeChat] 參數已移除（chat 產品下線，filter 形同
+  /// no-op）；一律只排除 v2 投影列（無 v1 簽章，不可進 IBLT 對帳/送出）。
+  Future<Set<String>> getLocalEventIds() async {
     final db = await DatabaseHelper().database;
-    // 排除 v2 投影列（無 v1 簽章，不可進 IBLT 對帳/送出）。
-    final clauses = <String>["event_id NOT LIKE '$v2ProjectionIdPrefix%'"];
-    if (excludeChat) clauses.add('event_type != ${EventType.chatMessage}');
-    final where = 'WHERE ${clauses.join(' AND ')}';
-    final rows = await db.rawQuery('SELECT event_id FROM Event_Logs $where');
+    final rows = await db.rawQuery(
+        "SELECT event_id FROM Event_Logs WHERE event_id NOT LIKE '$v2ProjectionIdPrefix%'");
     return rows.map((r) => r['event_id'] as String).toSet();
   }
 
@@ -704,8 +702,8 @@ class MeshEventHandler {
       ],
       // 排除 v2 投影列（無 v1 簽章，不可被 IBLT fast-path 當原始事件送出）。
       // 排除 ttl<=0：已耗盡 hop budget 的事件不再被 fast-path 當原始事件送出。
+      // （Phase 0b #3B-4：原本還排除 CHAT_MESSAGE，chat 下線後形同 no-op，已移除。）
       where: 'hlc_timestamp > ? AND ttl > 0 '
-          'AND event_type != ${EventType.chatMessage} '
           "AND event_id NOT LIKE '$v2ProjectionIdPrefix%'",
       whereArgs: [cutoff24h],
       orderBy: 'urgency DESC, hlc_timestamp DESC',

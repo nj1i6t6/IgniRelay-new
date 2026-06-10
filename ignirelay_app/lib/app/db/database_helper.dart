@@ -71,43 +71,10 @@ class DatabaseHelper {
           'ALTER TABLE Event_Logs ADD COLUMN origin_lng REAL');
     }
     if (oldVersion < 5) {
-      // v5: 據點額度追蹤 + 聊天室
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS Station_Quotas (
-          station_resource_id TEXT NOT NULL,
-          user_pub_key BLOB NOT NULL,
-          category TEXT NOT NULL,
-          used_quantity INTEGER NOT NULL DEFAULT 0,
-          total_used INTEGER NOT NULL DEFAULT 0,
-          last_reset_at INTEGER NOT NULL,
-          PRIMARY KEY (station_resource_id, user_pub_key, category)
-        )
-      ''');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS Chat_Rooms (
-          room_id TEXT PRIMARY KEY,
-          room_name TEXT NOT NULL,
-          room_type TEXT NOT NULL,
-          rate_limit_seconds INTEGER NOT NULL DEFAULT 180,
-          admin_only INTEGER NOT NULL DEFAULT 0,
-          join_token_hash TEXT,
-          joined_at INTEGER NOT NULL,
-          last_read_hlc INTEGER NOT NULL DEFAULT 0
-        )
-      ''');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS Chat_Messages (
-          event_id TEXT PRIMARY KEY,
-          room_id TEXT NOT NULL,
-          sender_pub_key BLOB NOT NULL,
-          content TEXT NOT NULL,
-          reply_to TEXT,
-          hlc_timestamp INTEGER NOT NULL,
-          FOREIGN KEY (room_id) REFERENCES Chat_Rooms(room_id)
-        )
-      ''');
-      await db.execute(
-          'CREATE INDEX IF NOT EXISTS idx_chat_messages_room ON Chat_Messages(room_id, hlc_timestamp)');
+      // v5: 原為據點額度（Station_Quotas）+ 聊天室（Chat_Rooms / Chat_Messages）。
+      // Phase 0b #3B-4：此 migration block 只服務這三張舊產品表，產品下線後整段
+      // 移除（不再於 upgrade 路徑建立）。既有 dev DB 留 harmless unused tables；
+      // 不做 DROP migration。
     }
     if (oldVersion < 6) {
       // v6: Debug_Logs 持久化（24h TTL，正式版移除）
@@ -497,20 +464,8 @@ class DatabaseHelper {
     await db.execute(
         'CREATE INDEX idx_event_logs_hlc ON Event_Logs(hlc_timestamp, hlc_counter)');
 
-    // Materials_State (物資狀態投影表 CRDT)
-    await db.execute('''
-      CREATE TABLE Materials_State (
-        resource_id TEXT PRIMARY KEY,
-        status TEXT NOT NULL,
-        hlc_timestamp INTEGER NOT NULL,
-        hlc_counter INTEGER NOT NULL,
-        matched_request_id TEXT,
-        match_expires_at INTEGER,
-        payload BLOB,
-        total_qty REAL,
-        delivery_mode TEXT
-      )
-    ''');
+    // Phase 0b #3B-4：舊產品表 Materials_State（物資投影）不再 fresh-install
+    // 建立（物資/媒合產品已下線）。既有 dev DB 留 harmless unused table。
 
     // Hazards_State (動態危險圖層投影表)
     await db.execute('''
@@ -542,48 +497,9 @@ class DatabaseHelper {
       )
     ''');
 
-    // Station_Quotas (據點個人申請額度)
-    await db.execute('''
-      CREATE TABLE Station_Quotas (
-        station_resource_id TEXT NOT NULL,
-        user_pub_key BLOB NOT NULL,
-        category TEXT NOT NULL,
-        used_quantity INTEGER NOT NULL DEFAULT 0,
-        total_used INTEGER NOT NULL DEFAULT 0,
-        last_reset_at INTEGER NOT NULL,
-        PRIMARY KEY (station_resource_id, user_pub_key, category)
-      )
-    ''');
-
-    // Chat_Rooms (聊天室)
-    await db.execute('''
-      CREATE TABLE Chat_Rooms (
-        room_id TEXT PRIMARY KEY,
-        room_name TEXT NOT NULL,
-        room_type TEXT NOT NULL,
-        rate_limit_seconds INTEGER NOT NULL DEFAULT 180,
-        admin_only INTEGER NOT NULL DEFAULT 0,
-        join_token_hash TEXT,
-        joined_at INTEGER NOT NULL,
-        last_read_hlc INTEGER NOT NULL DEFAULT 0
-      )
-    ''');
-
-    // Chat_Messages (聊天訊息)
-    await db.execute('''
-      CREATE TABLE Chat_Messages (
-        event_id TEXT PRIMARY KEY,
-        room_id TEXT NOT NULL,
-        sender_pub_key BLOB NOT NULL,
-        content TEXT NOT NULL,
-        reply_to TEXT,
-        hlc_timestamp INTEGER NOT NULL,
-        FOREIGN KEY (room_id) REFERENCES Chat_Rooms(room_id)
-      )
-    ''');
-
-    await db.execute(
-        'CREATE INDEX idx_chat_messages_room ON Chat_Messages(room_id, hlc_timestamp)');
+    // Phase 0b #3B-4：舊產品表 Station_Quotas（據點配額）/ Chat_Rooms /
+    // Chat_Messages（聊天）不再 fresh-install 建立（據點/聊天產品已下線）。
+    // 既有 dev DB 留 harmless unused tables。
 
     // Debug_Logs (除錯日誌持久化，24h TTL，正式版移除)
     await db.execute('''
@@ -624,44 +540,8 @@ class DatabaseHelper {
       )
     ''');
 
-    // Match_Negotiations (媒合協商追蹤表)
-    await db.execute('''
-      CREATE TABLE Match_Negotiations (
-        negotiation_id TEXT PRIMARY KEY,
-        resource_id TEXT NOT NULL,
-        request_id TEXT NOT NULL,
-        initiator_role TEXT NOT NULL,
-        provider_pub_key BLOB NOT NULL,
-        requester_pub_key BLOB NOT NULL,
-        offered_qty REAL NOT NULL,
-        requested_qty REAL NOT NULL,
-        agreed_qty REAL,
-        status TEXT NOT NULL DEFAULT 'PENDING',
-        provider_lat REAL,
-        provider_lng REAL,
-        requester_lat REAL,
-        requester_lng REAL,
-        actual_delivered_qty REAL,
-        handshake_method TEXT,
-        created_at INTEGER NOT NULL,
-        expires_at INTEGER NOT NULL,
-        responded_at INTEGER,
-        navigating_at INTEGER,
-        completed_at INTEGER,
-        match_score REAL
-      )
-    ''');
-    await db.execute('''
-      CREATE UNIQUE INDEX idx_active_negotiation
-      ON Match_Negotiations (resource_id, request_id)
-      WHERE status IN ('PENDING', 'ACCEPTED', 'NAVIGATING')
-    ''');
-    await db.execute(
-        'CREATE INDEX idx_negotiation_status ON Match_Negotiations (status)');
-    await db.execute(
-        'CREATE INDEX idx_negotiation_resource ON Match_Negotiations (resource_id, status)');
-    await db.execute(
-        'CREATE INDEX idx_negotiation_request ON Match_Negotiations (request_id, status)');
+    // Phase 0b #3B-4：舊產品表 Match_Negotiations（媒合協商）不再 fresh-install
+    // 建立（媒合產品已下線）。既有 dev DB 留 harmless unused table。
 
     // 初始化 GeoContext
     await db.execute('''

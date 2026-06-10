@@ -31,8 +31,10 @@ enum IgniRelayConstants {
     // sibling files.
     // ═══════════════════════════════════════════════════════════════════
 
-    /// Wire protocol version. v0.3 uses EventEnvelope v2.
-    static let PROTOCOL_VERSION_V2 = 2
+    /// Wire protocol version. Phase 0b #4-3 bumped EventEnvelope to v3
+    /// (field_id + field_mac, 141-byte canonical, spec §21); #4-3b aligns
+    /// the native siblings with Dart's kProtocolVersionV3.
+    static let PROTOCOL_VERSION_V3 = 3
 
     /// Hard cap on serialized envelope size (NORMAL priority cap).
     static let MAX_ENVELOPE_BYTES = 2048

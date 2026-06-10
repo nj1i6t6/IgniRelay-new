@@ -65,7 +65,7 @@ final class WireConformanceTests: XCTestCase {
 
     func testCorpusMetadata() throws {
         let corpus = try loadCorpus()
-        XCTAssertEqual(corpus["corpus_revision"] as? String, "v0.3-stage0c-wave3d-1")
+        XCTAssertEqual(corpus["corpus_revision"] as? String, "v0.3-phase0b-4-3-1")
         XCTAssertEqual(corpus["spec_date"] as? String, "2026-05-13")
         XCTAssertNil(corpus["generated_at_iso"],
                      "corpus must be deterministic; live timestamp leaked in")

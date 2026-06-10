@@ -29,10 +29,9 @@ const String _swiftPath = 'ios/Runner/IgniRelayConstants.swift';
 /// underscores allowed). Values that are durations use `_MS` suffix; budgets
 /// are bare integers.
 final List<_ConstSpec> _specs = <_ConstSpec>[
-  // PROTOCOL_VERSION parity is DEFERRED to Phase 0b #4-3b: Dart bumped to
-  // kProtocolVersionV3 = 3 in 4-3; the Kotlin/Swift siblings (PROTOCOL_VERSION_V2)
-  // bump to V3 in the cross-platform parity wave. Re-add the entry there as
-  // _ConstSpec('PROTOCOL_VERSION_V3', dartName: 'kProtocolVersionV3').
+  // Phase 0b #4-3b: all three platforms declare protocol v3 (spec §21.8).
+  _ConstSpec('PROTOCOL_VERSION_V3',
+      dartName: 'kProtocolVersionV3'),
   _ConstSpec('MAX_ENVELOPE_BYTES',
       dartName: 'kMaxEnvelopeBytes'),
   _ConstSpec('CHUNK_HEADER_SIZE',

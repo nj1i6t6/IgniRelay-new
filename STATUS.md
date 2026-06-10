@@ -37,3 +37,29 @@
   - `flutter test test/conformance/wire_conformance_corpus_test.dart` → exit 0，+21 全綠
 - deviations: none
 - next: A1（Kotlin/Swift v3 parity）
+
+---
+
+## [2026-06-10] A1 PARTIAL（D3 遞延 A11，依計畫允許）
+
+- repo/commit: IgniRelay @ （見本 commit）
+- 執行者: Claude（主理 AI）
+- 變更:
+  - `IgniRelayConstants.kt` / `IgniRelayConstants.swift`：`PROTOCOL_VERSION_V2 = 2`
+    → `PROTOCOL_VERSION_V3 = 3`（原生程式碼無其他引用點，純宣告改名）。
+  - `tool/check_constants_parity.dart`：移除 4-3b 遞延註解，加回
+    `PROTOCOL_VERSION_V3` 條目（13 個常數）。
+  - `WireConformanceInstrumentationTest.kt` / `WireConformanceTests.swift`：
+    corpus_revision 斷言 `v0.3-stage0c-wave3d-1` → `v0.3-phase0b-4-3-1`
+    （= 現行 `wire_conformance_v1.json` 實值；數量門檻不變：
+    envelope 104≥100 / chunking 20 / iblt 52≥50 / bloom 30 / negative 11≥10）。
+- DoD: D1 ✅ / D2 ✅ / D3 ❌（無實體裝置：`adb devices` 空清單；依 A1 DoD 規定
+  記 PARTIAL，D3 併入 A11 USER-GATE 執行）/ D4 ✅（Swift source parity 完成；
+  Windows 無法編譯 iOS — R3 既知限制，已註記）
+- gates:
+  - `dart run tool/check_constants_parity.dart` → exit 0，
+    `check_constants_parity: OK (13 constants in sync)`
+  - `gradlew.bat :app:assembleDebugAndroidTest` → exit 0，`BUILD SUCCESSFUL in 2m 42s`
+  - `flutter analyze` → exit 0（Dart 端僅 parity 工具變更）
+- deviations: D3 遞延（計畫 A1 DoD 明文允許之 PARTIAL 路徑）
+- next: 設計語言規範 + Web 範本（DL 任務），再 A4/A5/A12/B1 細化

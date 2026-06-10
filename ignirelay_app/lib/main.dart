@@ -533,17 +533,9 @@ class _StartupRouterState extends State<_StartupRouter> {
         _deferLocationInit();
       }
 
-      // ── 階段 5：Mesh 服務（失敗不影響 UI）──
-      try {
-        if (mounted) {
-          context
-              .read<EventPublisher>()
-              .expireStaleMatches()
-              .catchError((_) {});
-        }
-      } catch (e) {
-        debugPrint('[Init] EventPublisher expireStaleMatches failed: $e');
-      }
+      // ── 階段 5：（已移除）Mesh 服務啟動清理 ──
+      // Phase 0b #3B-2：原本在此呼叫 EventPublisher.expireStaleMatches() 清過期
+      // match negotiation（舊媒合產品）— 已隨 send path 一併下線。
 
       // ── 階段 6：BLE ──
       bool btOn = false;

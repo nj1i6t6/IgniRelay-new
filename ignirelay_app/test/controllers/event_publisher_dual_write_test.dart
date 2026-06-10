@@ -93,42 +93,6 @@ void main() {
     expect(map['severity'], 3);
     expect(map['schema'], 'hazard_marker_v0_3_json_shim');
   });
-
-  test('publishChatMessage keeps legacy write and dual-writes chat payload',
-      () async {
-    final spy = _SpyEventPublisherV2Facade();
-    addTearDown(spy.dispose);
-    final publisher = EventPublisher(
-      eventManager: EventManager(),
-      v2Facade: spy,
-    );
-
-    final eventId = await publisher.publishChatMessage(
-      roomId: 'room-1',
-      roomType: 'group',
-      content: 'hello',
-      replyTo: 'prev-1',
-    );
-
-    final db = await DatabaseHelper().database;
-    final chatRows = await db.query(
-      'Chat_Messages',
-      where: 'event_id = ?',
-      whereArgs: [eventId],
-    );
-    expect(chatRows.length, 1);
-    expect(chatRows.first['room_id'], 'room-1');
-    expect(chatRows.first['content'], 'hello');
-
-    expect(spy.chatPayloads.length, 1);
-    final map = jsonDecode(
-      utf8.decode(spy.chatPayloads.single),
-    ) as Map<String, dynamic>;
-    expect(map['room_id'], 'room-1');
-    expect(map['room_type'], 'group');
-    expect(map['content'], 'hello');
-    expect(map['reply_to'], 'prev-1');
-  });
 }
 
 class _StatusCall {
@@ -146,7 +110,6 @@ class _StatusCall {
 class _SpyEventPublisherV2Facade extends EventPublisherV2Facade {
   final List<_StatusCall> statusCalls = <_StatusCall>[];
   final List<Uint8List> hazardPayloads = <Uint8List>[];
-  final List<Uint8List> chatPayloads = <Uint8List>[];
 
   _SpyEventPublisherV2Facade()
       : super(
@@ -175,14 +138,6 @@ class _SpyEventPublisherV2Facade extends EventPublisherV2Facade {
     int priority = PriorityV2.alert,
   }) {
     hazardPayloads.add(Uint8List.fromList(payload));
-    return Future<BroadcastOutcome>.value(BroadcastOutcome.noActivePeers());
-  }
-
-  @override
-  Future<BroadcastOutcome> publishChatMessage({
-    required Uint8List payload,
-  }) {
-    chatPayloads.add(Uint8List.fromList(payload));
     return Future<BroadcastOutcome>.value(BroadcastOutcome.noActivePeers());
   }
 }

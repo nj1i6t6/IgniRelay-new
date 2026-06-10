@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import 'package:ignirelay_app/app/services/medical_card_repo.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -10,7 +9,6 @@ class DatabaseHelper {
   DatabaseHelper._internal();
 
   Database? _db;
-  late final MedicalCardRepo _medicalCardRepo = MedicalCardRepo(this);
 
   /// Stage 5-fix：測試專用 DB 路徑覆蓋。
   ///
@@ -29,7 +27,7 @@ class DatabaseHelper {
     _db = null;
   }
 
-  /// Exposed for MedicalCardRepo (and other repos) to access the DB.
+  /// Exposed for repos/services to access the DB.
   Future<Database> get database async {
     if (_db != null) return _db!;
     _db = await _initDb();
@@ -743,10 +741,6 @@ class DatabaseHelper {
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
-  /// 儲存醫療卡 (JSON 字串) — delegates to MedicalCardRepo
-  Future<void> saveMedicalCard(List<int> pubKey, String medicalCardJson) =>
-      _medicalCardRepo.saveMedicalCard(pubKey, medicalCardJson);
-
   /// 寫入除錯日誌。
   ///
   /// 預設 fire-and-forget（呼叫端不需 await，效能不受影響）；
@@ -779,8 +773,4 @@ class DatabaseHelper {
     return db.delete('Debug_Logs',
         where: 'timestamp < ?', whereArgs: [cutoff]);
   }
-
-  /// 讀取醫療卡 (JSON 字串) — delegates to MedicalCardRepo
-  Future<String?> getMedicalCard(List<int> pubKey) =>
-      _medicalCardRepo.getMedicalCard(pubKey);
 }

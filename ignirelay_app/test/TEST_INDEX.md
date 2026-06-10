@@ -42,13 +42,6 @@ flutter test --reporter=expanded
 | [hlc_extended_test.dart](crdt/hlc_extended_test.dart) | now() 單調性、merge() 行為、compareTo()、equality/hashCode | 15 |
 | [crdt_test.dart](../test/crdt_test.dart) *(原有)* | HLC merge、衝突解析 | 5 |
 
-### `test/medical/` — 醫療卡模型
-
-| 檔案 | 測試項目 | 測試數量 |
-|------|---------|---------|
-| [medical_card_test.dart](medical/medical_card_test.dart) | hasData、序列化 roundtrip、applyPreset、AllergyEntry、EmergencyContact、MedicalField metadata | 22 |
-| [medical_payload_test.dart](medical/medical_payload_test.dart) | buildMedicalPayload flag filtering → Protobuf MedicalSummary 欄位驗證 | 10 |
-
 ### `test/routing/` — 路由決策
 
 | 檔案 | 測試項目 | 測試數量 |
@@ -66,7 +59,7 @@ flutter test --reporter=expanded
 
 | 檔案 | 測試項目 | 測試數量 |
 |------|---------|---------|
-| [event_manager_test.dart](event/event_manager_test.dart) | publishEvent/Supply/Hazard → DB + TriageQueue、completeHandoff/cancelHandoff、rate limit、confirmHazard、getRecentEvents | 17 |
+| [event_manager_test.dart](event/event_manager_test.dart) | publishEvent/Hazard → DB + TriageQueue、rate limit、confirmHazard、getActiveHazards、getRecentEvents、geo 欄位 null/explicit | 15 |
 
 ### `test/` — 原有測試（維持不動）
 
@@ -88,13 +81,11 @@ flutter test --reporter=expanded
 │   ├── triage_queue_test       ← TriageQueue priority / overflow
 │   ├── dedup_test              ← MeshEventHandler._seenEvents
 │   ├── hlc_extended_test       ← HLC state machine
-│   ├── medical_card_test       ← MedicalCard model
-│   ├── medical_payload_test    ← buildMedicalPayload
 │   └── routing_extended_test   ← MeshRouter exemption paths
 │
 ├── sqflite_ffi（in-memory DB）
 │   ├── up_pipeline_test        ← handleIncomingData → DB + stream
-│   └── event_manager_test      ← publishEvent/Supply/Hazard → DB + queue
+│   └── event_manager_test      ← publishEvent/Hazard → DB + queue
 │
 └── Integration（需 VillageGeofence geodata + 實機）[SKIP]
     ├── 行政區距離路由測試         ← routing_test.dart (skipped)

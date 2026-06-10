@@ -21,6 +21,8 @@ class EventTypeV2 {
   // 1-19 personal/status
   static const int statusUpdate = 1;
   static const int batteryStatus = 2;
+  static const int presence = 3; // whitepaper: last footprint (LWW by anon_user_id)
+  static const int checkpoint = 4; // whitepaper: roll-call crossing (event, NOT LWW)
 
   // 20-49 coordination
   static const int supplyRequest = 20;
@@ -38,6 +40,7 @@ class EventTypeV2 {
   // 80-99 official
   static const int officialAlertCap = 80;
   static const int officialAlertSummary = 81;
+  static const int adminBroadcast = 82; // whitepaper: field/all authority broadcast
 
   // 100-129 control
   static const int protocolHello = 100;
@@ -60,6 +63,10 @@ class EventTypeV2 {
         return 6;
       case batteryStatus:
         return 4;
+      case presence:
+        return 4; // short reach — footprints are near-field
+      case checkpoint:
+        return 6; // short/mid reach
       case supplyRequest:
         return 8;
       case supplyOffer:
@@ -81,6 +88,8 @@ class EventTypeV2 {
         return 12;
       case officialAlertSummary:
         return 8;
+      case adminBroadcast:
+        return 12; // broad reach — authority broadcast
       case protocolHello:
         return 0; // §11.4 — never relayed
       case protocolNotice:
@@ -100,6 +109,8 @@ class EventTypeV2 {
     switch (v) {
       case statusUpdate:
       case batteryStatus:
+      case presence:
+      case checkpoint:
       case supplyRequest:
       case supplyOffer:
       case matchIntent:
@@ -111,6 +122,7 @@ class EventTypeV2 {
       case shelterStatus:
       case officialAlertCap:
       case officialAlertSummary:
+      case adminBroadcast:
       case protocolHello:
       case protocolNotice:
       case heartbeat:

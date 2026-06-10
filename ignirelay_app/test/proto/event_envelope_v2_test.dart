@@ -438,5 +438,25 @@ void main() {
       expect(out.expiresAt.msSinceEpoch, 0);
     });
   });
+
+  group('EventTypeV2 new whitepaper types (4-2)', () {
+    test('constants have the locked values', () {
+      expect(EventTypeV2.presence, 3);
+      expect(EventTypeV2.checkpoint, 4);
+      expect(EventTypeV2.adminBroadcast, 82);
+    });
+
+    test('isKnown recognizes the new types', () {
+      expect(EventTypeV2.isKnown(EventTypeV2.presence), true);
+      expect(EventTypeV2.isKnown(EventTypeV2.checkpoint), true);
+      expect(EventTypeV2.isKnown(EventTypeV2.adminBroadcast), true);
+    });
+
+    test('maxHopsDefault: presence 4 / checkpoint 6 / admin 12', () {
+      expect(EventTypeV2.maxHopsDefault(EventTypeV2.presence), 4);
+      expect(EventTypeV2.maxHopsDefault(EventTypeV2.checkpoint), 6);
+      expect(EventTypeV2.maxHopsDefault(EventTypeV2.adminBroadcast), 12);
+    });
+  });
 }
 // ignore_for_file: prefer_const_constructors, prefer_const_declarations, no_leading_underscores_for_local_identifiers

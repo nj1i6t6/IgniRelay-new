@@ -88,6 +88,21 @@ class PriorityMatrixV2 {
           downgradeTo: PriorityV2.status,
         );
 
+      case EventTypeV2.presence:
+        // High-volume "last footprint"; never let it claim a higher slot.
+        return _allowedOrDowngrade(
+          priority,
+          allowed: const {PriorityV2.normal},
+          downgradeTo: PriorityV2.normal,
+        );
+
+      case EventTypeV2.checkpoint:
+        return _allowedOrDowngrade(
+          priority,
+          allowed: const {PriorityV2.status, PriorityV2.normal},
+          downgradeTo: PriorityV2.status,
+        );
+
       case EventTypeV2.supplyRequest:
         if (priority == PriorityV2.sosYellow || priority == PriorityV2.resource) {
           return const MatrixDecision.accept();
@@ -171,6 +186,19 @@ class PriorityMatrixV2 {
           priority,
           allowed: const {PriorityV2.alert, PriorityV2.normal},
           reason: 'priority-mismatch',
+        );
+
+      case EventTypeV2.adminBroadcast:
+        // Authority broadcast: ALERT (urgent) or STATUS (routine). SOS is a
+        // masquerade attempt → DROP (an admin message must not jump the SOS
+        // queue). Lower-than-STATUS mis-tags downgrade to STATUS (the floor).
+        if (_isSos(priority)) {
+          return const MatrixDecision.drop('priority-mismatch');
+        }
+        return _allowedOrDowngrade(
+          priority,
+          allowed: const {PriorityV2.alert, PriorityV2.status},
+          downgradeTo: PriorityV2.status,
         );
 
       case EventTypeV2.protocolHello:

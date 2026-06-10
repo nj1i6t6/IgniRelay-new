@@ -118,20 +118,23 @@ sig_input(124) = u32le(pv) ‖ u8(16)‖envelope_id ‖ u32le(event_type) ‖ u3
 
 純加常數 + matrix 條目，不碰既有值（additive、低風險）：
 
-| 新值 | 名稱 | range | payload | priority（matrix） | max_hops |
-|---|---|---|---|---|---|
-| 3 | `PRESENCE` | status 1–19 | `PresenceData`（§3.2） | NORMAL（可被 §6 matrix downgrade） | 4–6（待定） |
-| 4 | `CHECKPOINT` | status 1–19 | `CheckpointData`（§3.2） | NORMAL/STATUS | 4–6 |
-| 82 | `ADMIN_BROADCAST` | official 80–99 | `AdminBroadcastData`（§3.2） | ALERT/STATUS | 8–12 |
+| 新值 | 名稱 | range | payload | priority（matrix） | max_hops | LWW? |
+|---|---|---|---|---|---|---|
+| 3 | `PRESENCE` | status 1–19 | `PresenceData`（§3.2） | NORMAL（其餘 downgrade→NORMAL） | **4** | **yes（by anon_user_id）** |
+| 4 | `CHECKPOINT` | status 1–19 | `CheckpointData`（§3.2） | STATUS/NORMAL（其餘→STATUS） | **6** | no（每次穿越都是 event） |
+| 82 | `ADMIN_BROADCAST` | official 80–99 | `AdminBroadcastData`（§3.2） | ALERT/STATUS（SOS→DROP、低→STATUS） | **12** | no（多則指令並存，靠 expires） |
 
-落地點（全部 additive）：
-- `EventTypeV2`：加 3 個常數 + `maxHopsDefault()` switch 條目 + `isKnown()` 條目。
-- `PriorityMatrixV2`：加 (event_type × priority) 允許/降級條目。
-- `EventTypeV2.maxHopsDefault`：PRESENCE/CHECKPOINT 較短 hop（足跡是近場）、ADMIN 較長。
+落地點（全部 additive，**已於 4-2 落地 commit**）：
+- `EventTypeV2`：加 3 個常數 + `maxHopsDefault()` switch 條目（4/6/12）+ `isKnown()` 條目。
+- `PriorityMatrixV2`：加 (event_type × priority) 允許/降級條目（ADMIN 對 SOS 走 DROP 防偽裝）。
+- `EnvelopeStoreV2._lwwKeyComponentFor`：PRESENCE → LWW by `anon_user_id`（bytes key，空/壞 → author_key
+  fallback）；CHECKPOINT/ADMIN 非 LWW（return null）。store 層即可,**不動 dispatcher**。
+- spec `envelope_v2_spec` §4.1/§4.2/§6.1/§10.2/§11.2 同步更新,spec 與 code 一致。
 
-> CHECKPOINT 與 PRESENCE 語意接近（都是「某人在某 anchor 出現」）。**選項 A**：分開（CHECKPOINT 帶
-> 明確點名語意 checkpoint_id）；**選項 B**：CHECKPOINT = PRESENCE + `checkpoint_id` 欄位，省一個
-> type。本文先列 A，待 GPT。SENSOR 延後到 Phase 3。
+> **已拍板（4-2）**：CHECKPOINT 採**選項 A**（獨立 type，帶 checkpoint_id 點名語意；不併入 PRESENCE）。
+> ADMIN_BROADCAST 採新 type 82（非複用 OFFICIAL_ALERT_SUMMARY）。SENSOR 仍延後到 Phase 3。
+> **未接線**（留 4-4+）：publisher/dispatcher/projector/debug UI 都還沒發/收這些事件；本刀只讓系統
+> 「認得」新類型 + store 層 LWW 預備。
 
 ---
 
@@ -285,15 +288,15 @@ conformance 衝擊），讓 4-3 聚焦在 canonical/簽章/版本。
 
 ## 7. 待 GPT 拍板清單（彙整）
 
-1. **EventType 策略**：接受「沿用並擴充 `EventTypeV2`」、把 REBUILD_PLAN §3.2 標 superseded？
+1. **EventType 策略**：~~接受「沿用並擴充 `EventTypeV2`」、把 REBUILD_PLAN §3.2 標 superseded？~~ ✅ **已拍板（GPT review #2）並於 4-2 落地：沿用並擴充，§3.2 已標 superseded。**
 2. **field_id 形態**：16-byte 定長 opaque？canonical 插在 envelope_id 之後？control range zero-field_id
    豁免 field-scope？
 3. **場域金鑰綁定**：HMAC vs 純 Ed25519（白皮書 §13.3 / Q2，MCU 功耗實測待補）。
-4. **CHECKPOINT**：獨立 type（選項 A）vs PRESENCE+checkpoint_id（選項 B）？
+4. **CHECKPOINT**：~~獨立 type（選項 A）vs PRESENCE+checkpoint_id（選項 B）？~~ ✅ **4-2 拍板：選項 A（獨立 type=4，非 LWW）。**
 5. **SOS 位置**：`StatusUpdateData` 加 `location`（A）vs PRESENCE 配對（B）？
 6. **LocationEvidence 精度**：lat/lng 用 sint64 1e7 fixed-point（跨平台 parity）OK？
 7. **protocol_version**：直接切 v3、不做 v2/v3 並存（全新獨立網路）OK？
-8. **ADMIN_BROADCAST**：新增 type 82（A）vs 複用 `OFFICIAL_ALERT_SUMMARY`（B）？
+8. **ADMIN_BROADCAST**：~~新增 type 82（A）vs 複用 `OFFICIAL_ALERT_SUMMARY`（B）？~~ ✅ **4-2 拍板：新增 type 82（A，非 LWW，SOS→DROP 防偽裝）。**
 9. **HELLO 協商版本**（Amendment §8.1）：envelope 升 v3 時，HELLO `protocolVersion` 是否一併升 v3
    （讓不相容 peer 在握手就被擋，而非下游默默 drop）？
 10. **場域金鑰綁定時程**（Amendment §8.2）：HMAC / field-scoped key / membership proof 的選型是否

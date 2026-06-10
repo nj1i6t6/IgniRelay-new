@@ -273,6 +273,18 @@ class EnvelopeStoreV2 {
       case EventTypeV2.batteryStatus:
       case EventTypeV2.heartbeat:
         return envelope.authorKey; // (author_key, event_type)
+      case EventTypeV2.presence:
+        // LWW by anon_user_id — newest footprint per person wins (spec §10.2).
+        // anon_user_id is raw bytes (not a UTF-8 id), so use it directly as the
+        // key rather than the string-keyed payload helper below. Empty/malformed
+        // → author_key fallback (same correctness-preserving rule as the rest).
+        try {
+          final data = PresenceData.decode(envelope.payload);
+          if (data.anonUserId.isEmpty) return envelope.authorKey;
+          return data.anonUserId;
+        } catch (_) {
+          return envelope.authorKey;
+        }
       case EventTypeV2.shelterStatus:
         return _payloadKeyOrAuthorFallback(
           envelope: envelope,

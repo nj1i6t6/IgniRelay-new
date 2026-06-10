@@ -107,6 +107,49 @@ void main() {
       );
     });
 
+    test('PRESENCE accepts NORMAL and downgrades anything higher to NORMAL', () {
+      expect(
+        PriorityMatrixV2.check(EventTypeV2.presence, PriorityV2.normal).outcome,
+        MatrixOutcome.accept,
+      );
+      final d = PriorityMatrixV2.check(EventTypeV2.presence, PriorityV2.sosRed);
+      expect(d.outcome, MatrixOutcome.downgrade);
+      expect(d.downgradeTo, PriorityV2.normal);
+    });
+
+    test('CHECKPOINT accepts STATUS/NORMAL, downgrades higher to STATUS', () {
+      expect(
+        PriorityMatrixV2.check(EventTypeV2.checkpoint, PriorityV2.status).outcome,
+        MatrixOutcome.accept,
+      );
+      expect(
+        PriorityMatrixV2.check(EventTypeV2.checkpoint, PriorityV2.normal).outcome,
+        MatrixOutcome.accept,
+      );
+      final d = PriorityMatrixV2.check(EventTypeV2.checkpoint, PriorityV2.sosYellow);
+      expect(d.outcome, MatrixOutcome.downgrade);
+      expect(d.downgradeTo, PriorityV2.status);
+    });
+
+    test('ADMIN_BROADCAST: ALERT/STATUS accept, SOS drops, low downgrades to STATUS', () {
+      expect(
+        PriorityMatrixV2.check(EventTypeV2.adminBroadcast, PriorityV2.alert).outcome,
+        MatrixOutcome.accept,
+      );
+      expect(
+        PriorityMatrixV2.check(EventTypeV2.adminBroadcast, PriorityV2.status).outcome,
+        MatrixOutcome.accept,
+      );
+      // SOS masquerade must DROP, not downgrade.
+      final sos = PriorityMatrixV2.check(EventTypeV2.adminBroadcast, PriorityV2.sosRed);
+      expect(sos.outcome, MatrixOutcome.drop);
+      expect(sos.dropReason, 'priority-mismatch');
+      // Mis-tagged routine admin → downgrade to STATUS floor.
+      final low = PriorityMatrixV2.check(EventTypeV2.adminBroadcast, PriorityV2.normal);
+      expect(low.outcome, MatrixOutcome.downgrade);
+      expect(low.downgradeTo, PriorityV2.status);
+    });
+
     test('unknown event_type drops', () {
       final d = PriorityMatrixV2.check(9999, PriorityV2.normal);
       expect(d.outcome, MatrixOutcome.drop);

@@ -232,7 +232,9 @@ enum EventType {
   // ── 1-19: Personal / status ─────────────────────────────────────────
   EVENT_TYPE_STATUS_UPDATE        = 1;   // §5 snapshot payload
   EVENT_TYPE_BATTERY_STATUS       = 2;
-  reserved 3 to 19;                       // headroom for personal events
+  EVENT_TYPE_PRESENCE             = 3;   // whitepaper: last footprint; LWW by anon_user_id (§10.2)
+  EVENT_TYPE_CHECKPOINT           = 4;   // whitepaper: roll-call crossing; NOT LWW (each crossing is an event)
+  reserved 5 to 19;                       // headroom for personal events
 
   // ── 20-49: Request / supply / coordination ─────────────────────────
   EVENT_TYPE_SUPPLY_REQUEST       = 20;
@@ -253,7 +255,8 @@ enum EventType {
   // ── 80-99: Official alerts ─────────────────────────────────────────
   EVENT_TYPE_OFFICIAL_ALERT_CAP     = 80; // NCDR CAP-first; CWA is a provider
   EVENT_TYPE_OFFICIAL_ALERT_SUMMARY = 81; // chunkable summary (mesh-side)
-  reserved 82 to 99;                      // headroom for official channels
+  EVENT_TYPE_ADMIN_BROADCAST        = 82; // whitepaper: field/all authority broadcast; NOT LWW
+  reserved 83 to 99;                      // headroom for official channels
 
   // ── 100-129: Mesh / system / control ───────────────────────────────
   EVENT_TYPE_PROTOCOL_HELLO       = 100;  // 0b §3.3.4 capability declaration
@@ -279,7 +282,7 @@ enum EventType {
 
 ### 4.2 Naming convention
 
-All EventType values use the `EVENT_TYPE_<GROUP>_<NAME>` prefix. The four group prefixes are `STATUS`/`BATTERY`/`SUPPLY`/`MATCH`/`HAZARD`/`DISASTER`/`SHELTER`/`OFFICIAL_ALERT`/`PROTOCOL`/`HEARTBEAT`/`TRACE`/`RELAY` (i.e., the group is implied by the type name, not an extra token). The protobuf style guide preference for unambiguous prefixes is satisfied because `EVENT_TYPE_` is unique to this enum.
+All EventType values use the `EVENT_TYPE_<GROUP>_<NAME>` prefix. The group prefixes are `STATUS`/`BATTERY`/`PRESENCE`/`CHECKPOINT`/`SUPPLY`/`MATCH`/`HAZARD`/`DISASTER`/`SHELTER`/`OFFICIAL_ALERT`/`ADMIN_BROADCAST`/`PROTOCOL`/`HEARTBEAT`/`TRACE`/`RELAY` (i.e., the group is implied by the type name, not an extra token). The protobuf style guide preference for unambiguous prefixes is satisfied because `EVENT_TYPE_` is unique to this enum.
 
 ### 4.3 Reservation rationale
 
@@ -382,6 +385,8 @@ The receiver MUST validate `(event_type, priority)` against the matrix below on 
 |---|---|---|
 | `STATUS_UPDATE` | SOS_RED, SOS_YELLOW, STATUS | NORMAL/RESOURCE/ALERT → downgrade to STATUS |
 | `BATTERY_STATUS` | STATUS, NORMAL | SOS_*/ALERT → downgrade to STATUS |
+| `PRESENCE` | NORMAL | * → downgrade to NORMAL (footprints never claim a higher slot) |
+| `CHECKPOINT` | STATUS, NORMAL | SOS_*/ALERT/RESOURCE → downgrade to STATUS |
 | `SUPPLY_REQUEST` | SOS_YELLOW, RESOURCE | SOS_RED → downgrade to SOS_YELLOW; NORMAL → upgrade to RESOURCE |
 | `SUPPLY_OFFER` | RESOURCE | * → downgrade to RESOURCE |
 | `MATCH_INTENT` / `NEGOTIATION` | RESOURCE, NORMAL | SOS_*/ALERT → downgrade to RESOURCE |
@@ -391,6 +396,7 @@ The receiver MUST validate `(event_type, priority)` against the matrix below on 
 | `SHELTER_STATUS` | ALERT, STATUS | SOS_* → downgrade to ALERT |
 | `OFFICIAL_ALERT_CAP` | ALERT | SOS_* → downgrade to ALERT only if `source_trust == OFFICIAL_VERIFIED`; else DROP |
 | `OFFICIAL_ALERT_SUMMARY` | ALERT, NORMAL | SOS_* → DROP (unverified summary masquerading as SOS) |
+| `ADMIN_BROADCAST` | ALERT, STATUS | SOS_* → DROP (no SOS masquerade); RESOURCE/NORMAL → downgrade to STATUS |
 | `PROTOCOL_HELLO` | NORMAL | * → DROP |
 | `PROTOCOL_NOTICE` | ALERT | * → DROP (only vendor-signed; checked separately) |
 | `HEARTBEAT` | NORMAL | * → DROP |
@@ -625,6 +631,8 @@ Each EventType either participates in LWW (latest snapshot wins, prior supersede
 |---|---|---|---|
 | `STATUS_UPDATE` | yes | `(author_key, EVENT_TYPE_STATUS_UPDATE)` | latest `created_at_hlc`, then `envelope_id` ASC |
 | `BATTERY_STATUS` | yes | `(author_key, EVENT_TYPE_BATTERY_STATUS)` | latest `created_at_hlc`, then `envelope_id` ASC |
+| `PRESENCE` | yes | `(anon_user_id, EVENT_TYPE_PRESENCE)` | latest `created_at_hlc`, then `envelope_id` ASC |
+| `CHECKPOINT` | no | n/a (each crossing is a distinct event; all relevant) | n/a |
 | `SHELTER_STATUS` | yes | `(shelter_id, EVENT_TYPE_SHELTER_STATUS)` | trust tier (§10.3); then latest `created_at_hlc`; then `envelope_id` ASC |
 | `HAZARD_MARKER` | no | n/a (multiple hazards from same author are all relevant) | n/a |
 | `DISASTER_REPORT` | no | n/a (multiple reports relevant) | n/a |
@@ -635,6 +643,7 @@ Each EventType either participates in LWW (latest snapshot wins, prior supersede
 | `RELAY_TO_CONTACT` | no | n/a | n/a |
 | `OFFICIAL_ALERT_CAP` | yes | `(cap_identifier, EVENT_TYPE_OFFICIAL_ALERT_CAP)` | latest `created_at_hlc`; CAP sequence number breaks ties |
 | `OFFICIAL_ALERT_SUMMARY` | yes | `(cap_identifier, EVENT_TYPE_OFFICIAL_ALERT_SUMMARY)` | latest `created_at_hlc` |
+| `ADMIN_BROADCAST` | no | n/a (distinct directives coexist; lifecycle via `expires_at`) | n/a |
 | `PROTOCOL_HELLO` | local-only | n/a (handled by 0b connection layer) | n/a |
 | `PROTOCOL_NOTICE` | yes | `(notice_id, EVENT_TYPE_PROTOCOL_NOTICE)` | latest `created_at_hlc` |
 | `HEARTBEAT` | yes | `(author_key, EVENT_TYPE_HEARTBEAT)` | latest `created_at_hlc` |
@@ -675,6 +684,8 @@ Each EventType has two complementary expiry mechanisms:
 |---|---|---|---|
 | `STATUS_UPDATE` | 6 | 12 hours | Long enough to reach across a small-town mesh; short enough that stale status doesn't haunt the UI. |
 | `BATTERY_STATUS` | 4 | 2 hours | Battery state changes quickly. |
+| `PRESENCE` | 4 | 4 hours | Footprints are near-field and high-volume; LWW keeps only the latest per person, but last-known stays useful a few hours. |
+| `CHECKPOINT` | 6 | 12 hours | Roll-call record relevant for the duration of an operation. |
 | `SUPPLY_REQUEST` | 8 | 24 hours | Help requests may take time to find an offer; longer reach. |
 | `SUPPLY_OFFER` | 8 | 12 hours | Offers should not haunt UI when supplier is long gone. |
 | `MATCH_INTENT` / `NEGOTIATION` | 4 | 30 minutes | Tight negotiation timeline. |
@@ -684,6 +695,7 @@ Each EventType has two complementary expiry mechanisms:
 | `SHELTER_STATUS` | 8 | 6 hours | Shelter capacity changes; refresh expected. |
 | `OFFICIAL_ALERT_CAP` | 12 | 6 hours (or CAP-defined `expires` field, whichever is sooner) | Official alerts must reach far; respect CAP's own expiry. |
 | `OFFICIAL_ALERT_SUMMARY` | 8 | 6 hours | Same expiry semantics as CAP. |
+| `ADMIN_BROADCAST` | 12 | 6 hours (or payload `expires_at`, whichever sooner) | Authority broadcast must reach far; respects its own `expires_at`. |
 | `PROTOCOL_HELLO` | 0 (never relayed) | 30 seconds | Capability declaration is one-hop only. |
 | `PROTOCOL_NOTICE` | 12 | 7 days | Kill switch needs broad reach and persistence. |
 | `HEARTBEAT` | 2 | 5 minutes | Liveness signal; short-lived. |

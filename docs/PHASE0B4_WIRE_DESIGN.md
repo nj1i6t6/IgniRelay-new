@@ -258,7 +258,7 @@ Conformance 工具鏈（已定位）：
 |---|---|---|---|
 | **4-1** | payload structs（**不動信封/canonical**） | 加 `LocationEvidence` + `PresenceData` + `CheckpointData` + `HazardMarkerData` + `AdminBroadcastData` 手寫 encode/decode + 單元測試。**零 wire 信封變更 → 零 conformance 衝擊**。 | analyze/test 綠 |
 | **4-2** | EventType additive | 加 `PRESENCE`/`CHECKPOINT`/`ADMIN_BROADCAST` 常數 + `maxHopsDefault`/`isKnown` + priority matrix 條目。純加值。 | test 綠 |
-| **4-3** | **field_id + canonical + pv→3（核心 breaking 刀）** | `EventEnvelopeV2` 欄位 14 + 必填；`CanonicalEncoderV2` 124→141；`MessagePublisherV2` 簽章帶 field_id + pv=3；dispatcher `==3` + `field-scope-mismatch` + control-range 豁免；**重生 conformance corpus** + Dart corpus test + 負面案例；更新 `envelope_v2_spec`。 | **全 conformance（Dart）綠** |
+| **4-3** | **field_id + canonical + pv→3（核心 breaking 刀）** | `EventEnvelopeV2` 欄位 14 + 必填；`CanonicalEncoderV2` 124→141；`MessagePublisherV2` 簽章帶 field_id + pv=3；dispatcher `==3` + `field-scope-mismatch` + control-range 豁免；**重生 conformance corpus** + Dart corpus test + 負面案例；更新 `envelope_v2_spec`。**＋ HELLO negotiation 同步升 v3（完整 version-literal 落點見 §8.1）＋ purge 舊 pv=2 local wire state（見 §8.3）。前置決策：場域金鑰綁定須先拍板（§8.2）。** | **全 conformance（Dart）綠＋ HELLO 握手測試綠** |
 | **4-3b** | Kotlin/Swift parity | `WireConformanceInstrumentationTest.kt` + `WireConformanceTests.swift` 對齊新 corpus。 | Kotlin on-device 綠 / Swift 編譯 |
 | **4-4** | publish/receive PRESENCE | `EventPublisherV2Facade.publishPresence` + `V2InboundProjector` PRESENCE 投影 + read-model + debug shell「發 PRESENCE」接線。 | test +（雙機）|
 | **4-5** | HAZARD typed payload | facade `_dualWriteHazardMarker` 與 `_projectHazard` 從 JSON shim 換 typed `HazardMarkerData`。 | test 綠 |
@@ -268,6 +268,10 @@ Conformance 工具鏈（已定位）：
 每刀跑 `pub get / check_layers --strict / analyze / test --exclude-tags golden`；wire 刀（4-3/4-3b/4-6）
 另加 conformance parity。**4-3 是唯一 breaking wire 刀，刻意隔離**；4-1/4-2 先把 payload/enum 鋪好（零
 conformance 衝擊），讓 4-3 聚焦在 canonical/簽章/版本。
+
+> ⚠️ **4-3 的真實邊界比信封大**：升 envelope `protocol_version` 會連動「HELLO 協商版本」與「本機已存的
+> pv=2 wire state」。這兩條若不在同一刀處理，會出現「envelope 已 v3、但握手仍 v2 / DB 仍餵 v2」的半升級
+> 死角。完整落點與策略見 §8（Amendment A，pre-code 補強）。
 
 ---
 
@@ -282,5 +286,106 @@ conformance 衝擊），讓 4-3 聚焦在 canonical/簽章/版本。
 6. **LocationEvidence 精度**：lat/lng 用 sint64 1e7 fixed-point（跨平台 parity）OK？
 7. **protocol_version**：直接切 v3、不做 v2/v3 並存（全新獨立網路）OK？
 8. **ADMIN_BROADCAST**：新增 type 82（A）vs 複用 `OFFICIAL_ALERT_SUMMARY`（B）？
+9. **HELLO 協商版本**（Amendment §8.1）：envelope 升 v3 時，HELLO `protocolVersion` 是否一併升 v3
+   （讓不相容 peer 在握手就被擋，而非下游默默 drop）？
+10. **場域金鑰綁定時程**（Amendment §8.2）：HMAC / field-scoped key / membership proof 的選型是否
+    **必須在 4-3 前**定案（`field_id` 只是 signed scope label，不是完整成員驗證）？
+11. **舊 wire state 處理**（Amendment §8.3）：Envelopes_V2 / Outbox_V2 既有 `protocol_version=2` records
+    用 purge migration（A）/ dev DB reset（B）/ 兩者都做（C）？
 
 > 本輪 **docs-only**，未改任何 wire code / conformance corpus / spec。批准後才進 4-1。
+> 本次新增 **§8 Amendment A**（pre-code 補強 3 點：HELLO 連動、field_id 非成員驗證、舊 wire state 清理），
+> 同樣 docs-only。
+
+---
+
+## 8. Amendment A — pre-code 補強（GPT review #2 之前）
+
+> 觸發原因：第一版設計把「升 `protocol_version` 2→3」只當成 `EventEnvelopeV2` / dispatcher /
+> `MessagePublisherV2` 的事。重讀實際程式碼後，發現 **3 個缺口**會讓 4-3 變成「半升級死角」或留下安全
+> 誤解。以下全部對齊實際程式碼（行號為現況），仍 **docs-only**，不改 code。
+
+### 8.1 `protocol_version` v3 會連動 HELLO 協商，不只信封
+
+實際程式碼裡有 **兩個獨立的版本命名空間**，第一版設計只談到信封那個：
+
+- **信封版本**：`EventEnvelopeV2.protocolVersion`（決定 canonical 布局、簽章）。
+- **HELLO 協商版本**：`ProtocolHelloData.protocolVersion`（決定兩台 peer 在握手時要不要互相接受）。
+  位於 `event_envelope_v2.dart:598` 的 `ProtocolHelloData`，由 `ProtocolHelloValidator` 在
+  `protocol_hello_validator.dart:77` 檢查 `hello.protocolVersion != kProtocolVersionV2` → drop
+  （`hello-protocol-version-incompatible`）。
+
+**為什麼非處理不可**：若 4-3 只升信封到 v3、HELLO 仍停在 2，兩台 v3 build 的 peer 會在握手時「都自報
+HELLO=2、握手成功」，然後才在 envelope dispatcher 因 `protocol_version=3 != _acceptedProtocolVersion`
+互相 drop —— 變成「握得上手、卻一個事件都收不到」的死角，且 trace reason 會誤導（落在 dispatcher 而非
+握手）。正解：**HELLO 協商版本與信封版本在 4-3 同步升 v3**，讓不相容 peer 在握手階段就被乾淨擋下。
+
+**version-literal 完整落點（4-3 一個都不能漏；漏一個就半升級）**：
+
+| # | 檔案:行 | 現況 | 角色 | 4-3 動作 |
+|---|---|---|---|---|
+| 1 | `lib/app/mesh/mesh_constants.dart:78` | `kProtocolVersionV2 = 2` | HELLO 驗證用常數 | 升 3（建議同時更名/加 `kProtocolVersionV3`，避免常數名與值不符的誤導） |
+| 2 | `lib/app/services/protocol_hello_validator.dart:77,81` | `hello.protocolVersion != kProtocolVersionV2` | HELLO 握手 drop | 隨常數走；drop detail 字串同步 |
+| 3 | `lib/app/proto/event_envelope_v2.dart:610` | `ProtocolHelloData.protocolVersion = 2` 預設 | HELLO 送出端預設版本 | 升 3 |
+| 4 | `lib/app/proto/event_envelope_v2.dart:235` | `EventEnvelopeV2.protocolVersion = 2` 預設 | 信封建構預設 | 升 3 |
+| 5 | `lib/app/proto/event_envelope_v2.dart:377` | `decode()` 拒 `protocolVersion == 0` | 信封 decode 防呆 | 維持拒 0；註解 `==2` 改 `==3` |
+| 6 | `lib/app/controllers/envelope_dispatcher_v2.dart:118,185` | `_acceptedProtocolVersion = 2` | 信封 dispatcher 接受版本 | 升 3 |
+| 7 | `lib/app/controllers/message_publisher_v2.dart:120,137` | 硬寫 `protocolVersion: 2`（兩處） | 送出端寫入信封 | 升 3（已在 §1.2.5 記） |
+| 8 | `lib/app/services/protocol_hello_service.dart:167` | `ProtocolHelloData(...)` 建構（用預設版本） | HELLO 送出 | 確認吃到新預設（或顯式帶 3） |
+| 9 | `test/services/protocol_hello_test.dart:97-100` | `protocolVersion: 1` 當不相容案例 | HELLO 測試 | 重寫：`2` 變成被拒、`3` 變成接受 |
+| 10 | `test/services/ble_v2_bridge_test.dart` | 端到端 v2 握手＋傳輸 | bridge 整合測試 | 對齊 v3（握手＋至少一筆 v3 envelope 過關） |
+| 11 | conformance corpus `protocol_version` 欄 | 全部 = 2 | 跨平台契約 | 隨 §5 corpus 重生為 3 |
+
+> ⚠️ 第 6 點（`_acceptedProtocolVersion`）與第 1 點（`kProtocolVersionV2`）是**兩個分開的常數**，分別守
+> 信封與 HELLO；不要以為改一個就好。建議 4-3 把兩條版本軸一起推到 3，並在 commit message 明列上表 11 點
+> 已逐一處理。
+
+### 8.2 `field_id` 是「已簽章的 scope 標籤」，不是「成員身分驗證」
+
+把 `field_id` 綁進 Ed25519 簽章（§1.2）能防「中途竄改 field_id」—— 這是對的、必要的。但要寫明它的
+**安全邊界**，避免日後誤以為「有 field_id 就等於通過場域授權」：
+
+- `field_id` 會出現在 wire 上（明文 16 bytes），**任何人都看得到、抄得到**。簽章只證明「這個 author_key
+  簽的這筆事件聲稱屬於這個 field」，**不證明** author 真的是該場域的合法成員。
+- 一個惡意節點完全可以用自己的合法 `author_key`，填上一個它**偷看到**的 `field_id`，簽出一筆「看起來
+  屬於該場域」的事件注入進來。簽章會過、`field-scope-mismatch` 也不會擋（因為 field_id 對得上）。
+
+**結論（要寫進 spec）**：`field_id` = **signed scope label**（防竄改、可路由過濾），**≠ membership
+authentication**（防偽冒成員）。真正的場域授權還需要下列之一，且**必須在 4-3 拍板前選定**（因為它可能改變
+canonical 簽章輸入的形態 —— 例如 HMAC 會引入 field key 參與 MAC，等於動到簽章層，不能拖到 4-3 之後再補）：
+
+1. **field key + HMAC**：場域共享密鑰，事件附 `HMAC(field_key, canonical)`；MCU 友善但金鑰散佈/輪換要管。
+   （白皮書 §13.3 場域金鑰；REBUILD_PLAN Q2 的 MCU 功耗實測仍 open。）
+2. **field-scoped author key**：加入場域時派發/簽發一把該場域專用 author key（憑證鏈）；驗證端認簽發者。
+3. **join token / membership proof**：加入時取得短憑證，事件帶可驗證的成員證明。
+
+> ⚠️ 這題不能拖到 4-3 之後。若選 HMAC（方案 1），canonical / 簽章輸入要在 **4-3 當刀**就把 field-key
+> MAC 一起設計進去，否則 4-3 的 corpus 重生白做一次。Q3（§7）升級為 **4-3 前置硬決策**。
+
+### 8.3 直接 v2→v3、不做 coexist：要寫明舊 wire state 的清理策略
+
+「全新獨立網路、直接切 v3、不做 v2/v3 並存」可以接受。但**本機 dev DB 可能已存有 `protocol_version=2`
+的舊 wire records**，升級後若不處理會出問題。實際程式碼（`database_helper.dart`）：
+
+- `Envelopes_V2`（line 267 起）：**durable** 信封存儲，欄位 `protocol_version INTEGER NOT NULL`（line 269）。
+  舊列是 pv=2，且其 `signature` 是蓋在**舊 124-byte canonical** 上的 —— 在 v3 dispatcher 下，這些列若被
+  重新拿去 relay，會以 `unknown-protocol-version` 被丟（甚至更糟：被當 v3 重算 canonical → 簽章驗不過）。
+  **無法就地升級**（canonical 變了、沒有私鑰重簽他人事件）。
+- `Outbox_V2`（line 403 起）：依契約是 **ephemeral bounded queue**（line 236 註解），但升級瞬間若仍有
+  pending pv=2 待送列，會把不相容信封推上線。
+
+**策略（要寫進 4-3 migration 註記，三選一或組合）**：
+
+| 選項 | 做法 | 適用 |
+|---|---|---|
+| **A. purge migration** | 4-3 的 DB migration 內 `DELETE FROM Envelopes_V2`／`DROP/重建 Outbox_V2`（清掉所有 pv=2 列）。版本號 bump 觸發。 | 想保留同一顆 dev DB、自動清乾淨 |
+| **B. dev DB reset** | 文件明寫「v3 升級需清掉舊 app data / 重裝」；不寫 migration。 | fork 初期、dev 機少、最省事 |
+| **C. A+B** | migration 清 + 文件也提醒 reset（雙保險）。 | 最保守 |
+
+> 注意：現有測試都跑 **fresh in-memory DB → 只走 `onCreate`**，**不會**碰到 `onUpgrade`。所以無論選 A/B/C，
+> purge/upgrade 邏輯**在 CI 裡是測不到的**（既有風險，非本刀新增）。若選 A，建議 4-3 額外補一個**顯式建舊
+> schema → 塞 pv=2 列 → 跑 upgrade → 斷言已清空**的單元測試，把這條唯一會碰 `onUpgrade` 的路徑釘住。
+> 傾向 **C**（migration 清 + 文件提醒），最穩；最終由 GPT 拍板（§7 第 11 點）。
+
+> 本節同樣 **docs-only**：未改任何 code / schema / corpus。GPT review #2 通過後，4-3 的實作範圍以
+> §6 表 + §8 三節為準。

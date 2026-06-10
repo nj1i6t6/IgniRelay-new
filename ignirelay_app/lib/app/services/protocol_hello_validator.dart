@@ -53,7 +53,7 @@ class ProtocolHelloValidator {
   /// Decision §15.9 — drop the connection.
   static const String dropSelfDeclaredLegacy = 'hello-self-declared-legacy';
 
-  /// §5.7: HELLO with `protocol_version != 2`. Receiver disconnects.
+  /// §5.7: HELLO with `protocol_version != 3`. Receiver disconnects.
   static const String dropProtocolIncompatible =
       'hello-protocol-version-incompatible';
 
@@ -74,11 +74,11 @@ class ProtocolHelloValidator {
       );
     }
 
-    if (hello.protocolVersion != kProtocolVersionV2) {
+    if (hello.protocolVersion != kProtocolVersionV3) {
       return HelloValidationResult.dropped(
         dropProtocolIncompatible,
         'protocol_version=${hello.protocolVersion} '
-            'expected=$kProtocolVersionV2',
+        'expected=$kProtocolVersionV3',
       );
     }
 

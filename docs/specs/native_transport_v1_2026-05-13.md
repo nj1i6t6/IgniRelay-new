@@ -406,7 +406,7 @@ HELLO is written via `EVENT_CHAR` like any other envelope. DO NOT open a new GAT
 
 ```proto
 message ProtocolHelloData {
-  uint32 protocol_version          = 1;   // 2 in v0.3
+  uint32 protocol_version          = 1;   // 3 after Phase 0b field-auth
   PeerKind peer_kind               = 2;
   uint32 max_rx_envelope_bytes     = 3;   // peer's per-envelope receive cap
   bool   supports_iblt             = 4;
@@ -448,7 +448,7 @@ message ProtocolHelloData {
 
 - Peer sends no HELLO before timeout: receiver assumes `PhoneV1-legacy` and proceeds with conservative defaults. Trace logs the timeout.
 - Peer sends malformed HELLO or HELLO with invalid signature: receiver drops the connection/session. Do not silently downgrade, because that creates a downgrade attack.
-- Peer sends valid HELLO but with `protocol_version != 2`: receiver downgrades to the LOWER of the two protocol versions and uses the v1 (legacy) feature set. v0.3 has no v1 fallback in code; if `protocol_version < 2`, the receiver disconnects (treat as incompatible).
+- Peer sends valid HELLO but with `protocol_version != 3`: receiver drops the connection/session as incompatible. There is no v2 fallback once Phase 0b field-auth is active, because the canonical signature input changed from 124 to 141 bytes.
 - Peer sends valid HELLO but with `supports_chunking = false`: receiver MUST avoid sending envelopes that require chunking (i.e., > single-notify capacity at the negotiated MTU). Senders reject such envelopes at publish time per §4 with reason `peer-no-chunking`.
 - Peer sends valid HELLO with `peer_kind = PEER_KIND_PHONE_V1_LEGACY` (self-declares legacy): receiver treats this as a HELLO error and drops the connection. Rationale: the legacy profile means "no HELLO at all"; declaring it via HELLO is contradictory and may indicate a misconfigured / probing peer. Trace logs `drop_reason = hello-self-declared-legacy`.
 
@@ -723,7 +723,7 @@ When battery saver is enabled, the OS may further restrict BLE operations. The f
 
 `docs/specs/wire_conformance_v1.json` — the same single JSON file co-owned with 0a (envelope slice in 0a §17). The transport slice is 0b's responsibility.
 
-The corpus is **deterministic** (no live timestamp) and carries a `corpus_revision` string + `spec_date`; the current revision is `v0.3-stage0c-wave3d-1`. A `notes` object documents corpus-wide conventions (`bloom_hash_ascii_only`, `payload_generator_lcg_byte_pattern_v1`, `event_id_generator_ascii_seq_v1`, `iblt_peel_quirk`). Re-generating MUST produce a byte-identical file; the Dart `tool/generate_wire_conformance_v1.dart --check` mode enforces this.
+The corpus is **deterministic** (no live timestamp) and carries a `corpus_revision` string + `spec_date`; the current revision is `v0.3-phase0b-4-3-1`. A `notes` object documents corpus-wide conventions (`bloom_hash_ascii_only`, `payload_generator_lcg_byte_pattern_v1`, `event_id_generator_ascii_seq_v1`, `iblt_peel_quirk`). Re-generating MUST produce a byte-identical file; the Dart `tool/generate_wire_conformance_v1.dart --check` mode enforces this.
 
 #### 11.1.1 Size discipline (Stage 0c wave 3D decision)
 
@@ -929,7 +929,7 @@ The numbers in this table appear in both 0a and 0b. A change in either spec MUST
 | Single-notify capacity baseline | Derived from MTU=247 minus 18 B chunk header (§9) | MTU range matrix baseline (§7) | If 0b changes baseline, 0a re-derives byte budgets. |
 | Chunk header size = 18 B | Affects fixed envelope overhead derivation (§9) | Mandated by §4.5 (Option B always-wrap) | Single source of truth: 0b §4.2. |
 | `payload_hash` is NOT a wire field; computed locally as `SHA-256(payload)` and fed into signature canonical input | 0a §3.2, §7.1 #10, §8.2 | n/a (transport carries `payload` bytes; receiver hashes after reassembly) | Decision: save 34 B per envelope wire; binding to payload preserved via `signature-invalid` on tampering. |
-| `protocol_version = 2` | EventEnvelope.protocol_version (§3) | PROTOCOL_HELLO.protocol_version (§5.4) | Same value; HELLO declares the version of the envelope spec it speaks. |
+| `protocol_version = 3` | EventEnvelope.protocol_version (§3) | PROTOCOL_HELLO.protocol_version (§5.4) | Same value; HELLO declares the version of the envelope spec it speaks. |
 | `EVENT_TYPE_PROTOCOL_HELLO = 100` | EventType enum (§4.1) | This spec §5 | Single source of truth: 0a §4. |
 | `EVENT_TYPE_PROTOCOL_NOTICE = 101` | EventType enum (§4.1) | This spec §5.8, §13 | Single source of truth: 0a §4. |
 

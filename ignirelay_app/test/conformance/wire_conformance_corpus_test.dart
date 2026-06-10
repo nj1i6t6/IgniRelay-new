@@ -53,7 +53,7 @@ void main() {
 
   group('wire conformance corpus v1 — metadata', () {
     test('has corpus_revision + spec_date and NO generated_at_iso', () {
-      expect(corpus['corpus_revision'], 'v0.3-stage0c-wave3d-1');
+      expect(corpus['corpus_revision'], 'v0.3-phase0b-4-3-1');
       expect(corpus['spec_date'], '2026-05-13');
       expect(corpus.containsKey('generated_at_iso'), isFalse,
           reason: 'corpus must be deterministic; no live timestamp allowed');
@@ -68,8 +68,10 @@ void main() {
     });
 
     test('spec references point at the committed spec files', () {
-      expect(corpus['spec_envelope'], 'docs/specs/envelope_v2_spec_2026-05-13.md');
-      expect(corpus['spec_transport'], 'docs/specs/native_transport_v1_2026-05-13.md');
+      expect(
+          corpus['spec_envelope'], 'docs/specs/envelope_v2_spec_2026-05-13.md');
+      expect(corpus['spec_transport'],
+          'docs/specs/native_transport_v1_2026-05-13.md');
       expect(File('../${corpus['spec_envelope']}').existsSync(), isTrue);
       expect(File('../${corpus['spec_transport']}').existsSync(), isTrue);
     });
@@ -85,16 +87,15 @@ void main() {
           greaterThanOrEqualTo(20));
     });
     test('iblt_samples >= 50', () {
-      expect((corpus['iblt_samples'] as List).length,
-          greaterThanOrEqualTo(50));
+      expect((corpus['iblt_samples'] as List).length, greaterThanOrEqualTo(50));
     });
     test('bloom_samples >= 30', () {
-      expect((corpus['bloom_samples'] as List).length,
-          greaterThanOrEqualTo(30));
+      expect(
+          (corpus['bloom_samples'] as List).length, greaterThanOrEqualTo(30));
     });
     test('negative_cases >= 10', () {
-      expect((corpus['negative_cases'] as List).length,
-          greaterThanOrEqualTo(10));
+      expect(
+          (corpus['negative_cases'] as List).length, greaterThanOrEqualTo(10));
     });
   });
 
@@ -128,8 +129,7 @@ void main() {
         final pubKey = _hexDecode(s['derived_author_key_hex'] as String);
 
         final ed = Ed25519();
-        final publicKey =
-            SimplePublicKey(pubKey, type: KeyPairType.ed25519);
+        final publicKey = SimplePublicKey(pubKey, type: KeyPairType.ed25519);
         final ok = await ed.verify(
           sigInput,
           signature: Signature(sigBytes, publicKey: publicKey),
@@ -145,15 +145,15 @@ void main() {
       expect(unsigned, greaterThan(0));
     });
 
-    test('canonical sig input length is always 124 bytes', () {
+    test('canonical sig input length is always 141 bytes', () {
       final samples =
           (corpus['envelope_samples'] as List).cast<Map<String, dynamic>>();
       for (final s in samples) {
-        expect(s['expected_canonical_sig_input_bytes'], 124,
-            reason: 'sample "${s['name']}" has non-124-byte sig input');
+        expect(s['expected_canonical_sig_input_bytes'], 141,
+            reason: 'sample "${s['name']}" has non-141-byte sig input');
         expect(
           (s['expected_canonical_sig_input_hex'] as String).length,
-          124 * 2,
+          141 * 2,
           reason: 'sample "${s['name']}" sig input hex length mismatch',
         );
       }
@@ -211,7 +211,9 @@ void main() {
   });
 
   group('wire conformance corpus v1 — IBLT sample shape', () {
-    test('every IBLT sample byte hex is 504 chars (252B) or 1008 chars (504B hex)', () {
+    test(
+        'every IBLT sample byte hex is 504 chars (252B) or 1008 chars (504B hex)',
+        () {
       // 56 buckets × 9 bytes = 504 bytes = 1008 hex chars.
       final samples =
           (corpus['iblt_samples'] as List).cast<Map<String, dynamic>>();
@@ -277,8 +279,8 @@ void main() {
           envelopeBytes: Uint8List(100),
           mtu: 247,
         ),
-        throwsA(predicate(
-            (e) => e is ChunkingError && e.dropReason == 'invalid-envelope-id')),
+        throwsA(predicate((e) =>
+            e is ChunkingError && e.dropReason == 'invalid-envelope-id')),
       );
     });
 
@@ -338,8 +340,8 @@ void main() {
           envelopeBytes: Uint8List(envelopeBytesHexLength as int),
           mtu: mtu as int,
         ),
-        throwsA(predicate((e) =>
-            e is ChunkingError && e.dropReason == expectedDropReason)),
+        throwsA(predicate(
+            (e) => e is ChunkingError && e.dropReason == expectedDropReason)),
       );
     });
   });

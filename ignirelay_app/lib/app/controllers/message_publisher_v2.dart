@@ -23,6 +23,7 @@ import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:ignirelay_app/app/crypto/canonical_encoder_v2.dart';
+import 'package:ignirelay_app/app/crypto/field_auth_v2.dart';
 import 'package:ignirelay_app/app/mesh/chunker.dart';
 import 'package:ignirelay_app/app/proto/event_envelope_v2.dart';
 import 'package:ignirelay_app/app/services/mesh_trace_writer.dart';
@@ -88,6 +89,8 @@ class MessagePublisherV2 {
     required HlcTimestampV2 expiresAtHlc,
     required int maxHops,
     required int negotiatedMtu,
+    required Uint8List fieldId,
+    Uint8List? fieldMacKey,
     Uint8List? envelopeId,
     bool isExperimental = false,
   }) async {
@@ -114,11 +117,16 @@ class MessagePublisherV2 {
       throw PublishRejected('invalid-envelope-id', 'envelope_id must be 16 bytes');
     }
 
+    if (fieldId.length != 16) {
+      throw PublishRejected('invalid-field-id', 'field_id must be 16 bytes');
+    }
+
     // Compute signature over the FINAL field set the wire will carry.
     final payloadHash = await CanonicalEncoderV2.hashPayload(payload);
     final sigInput = CanonicalEncoderV2.buildSignatureInput(
-      protocolVersion: 2,
+      protocolVersion: 3,
       envelopeId: id,
+      fieldId: fieldId,
       eventType: eventType,
       priority: effectivePriority,
       createdAtHlcMs: createdAtHlc.msSinceEpoch,
@@ -133,8 +141,14 @@ class MessagePublisherV2 {
     final sig = await Ed25519().sign(sigInput, keyPair: _keyPair);
     final signature = Uint8List.fromList(sig.bytes);
 
+    // Field membership MAC over the SAME canonical bytes (§21.5). Control
+    // frames pass fieldMacKey == null and carry no MAC (§21.7).
+    final fieldMac = fieldMacKey == null
+        ? Uint8List(0)
+        : await FieldAuthV2.computeFieldMac(fieldMacKey, sigInput);
+
     final envelope = EventEnvelopeV2(
-      protocolVersion: 2,
+      protocolVersion: 3,
       envelopeId: id,
       eventType: eventType,
       priority: effectivePriority,
@@ -147,6 +161,8 @@ class MessagePublisherV2 {
       payload: payload,
       lastRelayId: '',
       isExperimental: isExperimental,
+      fieldId: fieldId,
+      fieldMac: fieldMac,
     );
     final wireBytes = envelope.encode();
 

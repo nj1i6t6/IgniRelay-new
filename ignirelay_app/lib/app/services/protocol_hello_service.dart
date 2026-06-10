@@ -18,6 +18,7 @@ import 'dart:typed_data';
 
 import 'package:ignirelay_app/app/controllers/envelope_dispatcher_v2.dart';
 import 'package:ignirelay_app/app/controllers/message_publisher_v2.dart';
+import 'package:ignirelay_app/app/crypto/field_auth_v2.dart';
 import 'package:ignirelay_app/app/proto/event_envelope_v2.dart';
 import 'package:ignirelay_app/app/services/peer_capability_registry.dart';
 
@@ -103,6 +104,9 @@ class ProtocolHelloService {
             HlcTimestampV2(msSinceEpoch: now + _helloTtlMs, counter: 0),
         maxHops: _helloMaxHops,
         negotiatedMtu: negotiatedMtu,
+        // PROTOCOL_HELLO is a control frame (§21.7): zero field_id, no
+        // field_mac. The dispatcher exempts the control range from field scope.
+        fieldId: FieldAuthV2.zeroFieldId(),
       );
     } on PublishRejected {
       // Sender-side rejection of our OWN HELLO is a programming bug — the

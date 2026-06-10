@@ -10,12 +10,18 @@ import 'package:cryptography/cryptography.dart';
 /// The signature is computed over a deterministic byte sequence that is NOT
 /// the protobuf serializer's output. This decouples signature stability from
 /// proto3 quirks (field order, default omission, unknown fields, repeated
-/// ordering). The result is a fixed 124-byte input for v2.
+/// ordering).
 ///
-/// Layout:
+/// v3 (Phase 0b #4-3, spec §21.4) inserts `u8(16) || field_id` immediately
+/// after the envelope_id block, taking the fixed input from 124 → 141 bytes.
+/// `field_mac` is NOT part of this input (it is an HMAC OVER it — including it
+/// would be circular, §21.4). v2 was 124 bytes without field_id.
+///
+/// Layout (v3):
 /// ```
 /// sig_input  = u32_le(protocol_version)              # 4
 ///            || u8(16) || envelope_id                 # 17
+///            || u8(16) || field_id                    # 17  ← NEW (v3)
 ///            || u32_le(event_type)                    # 4
 ///            || u32_le(priority)                      # 4
 ///            || u64_le(created_at_hlc.ms)             # 8
@@ -26,7 +32,7 @@ import 'package:cryptography/cryptography.dart';
 ///            || u8(32) || author_key                  # 33
 ///            || u8(sig_algo)                          # 1
 ///            || u8(32) || SHA-256(payload)            # 33
-/// total                                                # 124
+/// total                                                # 141
 /// ```
 ///
 /// `payload_hash` is computed locally; it is NOT a wire field. Both sender and
@@ -34,17 +40,20 @@ import 'package:cryptography/cryptography.dart';
 /// Any wire-level corruption of `payload` produces a different hash and the
 /// envelope is dropped with `drop_reason = signature-invalid`.
 class CanonicalEncoderV2 {
-  static const int sigInputBytes = 124;
+  /// v3 canonical input length (spec §21.4). v2 was 124.
+  static const int sigInputBytes = 141;
 
   static const int sigAlgoEd25519 = 0x01;
 
   /// Build the canonical signature input.
   ///
   /// `payloadHash` MUST be SHA-256(payload), 32 bytes. Use [hashPayload] to
-  /// compute it. `envelopeId` MUST be 16 bytes; `authorKey` MUST be 32 bytes.
+  /// compute it. `envelopeId` / `fieldId` MUST be 16 bytes; `authorKey` MUST be
+  /// 32 bytes. Control-frame envelopes pass an all-zero `fieldId` (§21.7).
   static Uint8List buildSignatureInput({
     required int protocolVersion,
     required Uint8List envelopeId,
+    required Uint8List fieldId,
     required int eventType,
     required int priority,
     required int createdAtHlcMs,
@@ -58,6 +67,9 @@ class CanonicalEncoderV2 {
   }) {
     if (envelopeId.length != 16) {
       throw ArgumentError('envelope_id must be 16 bytes; got ${envelopeId.length}');
+    }
+    if (fieldId.length != 16) {
+      throw ArgumentError('field_id must be 16 bytes; got ${fieldId.length}');
     }
     if (authorKey.length != 32) {
       throw ArgumentError('author_key must be 32 bytes; got ${authorKey.length}');
@@ -78,6 +90,11 @@ class CanonicalEncoderV2 {
 
     out[offset++] = 16;
     out.setRange(offset, offset + 16, envelopeId);
+    offset += 16;
+
+    // v3 (§21.4): field_id block, adjacent to envelope_id.
+    out[offset++] = 16;
+    out.setRange(offset, offset + 16, fieldId);
     offset += 16;
 
     view.setUint32(offset, eventType, Endian.little);

@@ -8,7 +8,7 @@ name: official_alert_cap
 description: OFFICIAL_ALERT_CAP at ALERT — chunked at MTU=185 and MTU=247.
 
 envelope:
-  protocol_version: 2
+  protocol_version: 3
   envelope_id_hex: "01890b1ad2dc7d3a8b9c4f8d63b21f50"
   event_type: 80                # EVENT_TYPE_OFFICIAL_ALERT_CAP
   priority: 3                   # PRIORITY_ALERT
@@ -30,7 +30,7 @@ test_signing:
   public_key_hex_must_match_author: true
 
 expected:
-  canonical_sig_input_bytes: 124
+  canonical_sig_input_bytes: 141
   chunk_count_at_mtu_247: 1
   chunk_count_at_mtu_185: 2
   chunk_count_at_mtu_512: 1

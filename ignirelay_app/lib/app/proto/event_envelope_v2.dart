@@ -1,3 +1,5 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 // Hand-written EventEnvelope v2 wire types (v0.3 Stage 0c second wave).
 //
 // Spec: docs/specs/envelope_v2_spec_2026-05-13.md §3, §4, §5.
@@ -21,8 +23,10 @@ class EventTypeV2 {
   // 1-19 personal/status
   static const int statusUpdate = 1;
   static const int batteryStatus = 2;
-  static const int presence = 3; // whitepaper: last footprint (LWW by anon_user_id)
-  static const int checkpoint = 4; // whitepaper: roll-call crossing (event, NOT LWW)
+  static const int presence =
+      3; // whitepaper: last footprint (LWW by anon_user_id)
+  static const int checkpoint =
+      4; // whitepaper: roll-call crossing (event, NOT LWW)
 
   // 20-49 coordination
   static const int supplyRequest = 20;
@@ -40,7 +44,8 @@ class EventTypeV2 {
   // 80-99 official
   static const int officialAlertCap = 80;
   static const int officialAlertSummary = 81;
-  static const int adminBroadcast = 82; // whitepaper: field/all authority broadcast
+  static const int adminBroadcast =
+      82; // whitepaper: field/all authority broadcast
 
   // 100-129 control
   static const int protocolHello = 100;
@@ -164,7 +169,8 @@ class HlcTimestampV2 {
 
   const HlcTimestampV2({required this.msSinceEpoch, required this.counter});
 
-  static const HlcTimestampV2 zero = HlcTimestampV2(msSinceEpoch: 0, counter: 0);
+  static const HlcTimestampV2 zero =
+      HlcTimestampV2(msSinceEpoch: 0, counter: 0);
 
   /// Stable order: ms ASC, counter ASC. Returns negative / zero / positive.
   int compareTo(HlcTimestampV2 other) {
@@ -190,11 +196,13 @@ class HlcTimestampV2 {
       final wire = tagWireType(tag);
       switch (field) {
         case 1:
-          if (wire != wireVarint) throw ProtoDecodeException('hlc.ms wire-type mismatch');
+          if (wire != wireVarint)
+            throw ProtoDecodeException('hlc.ms wire-type mismatch');
           ms = r.readUint64();
           break;
         case 2:
-          if (wire != wireVarint) throw ProtoDecodeException('hlc.counter wire-type mismatch');
+          if (wire != wireVarint)
+            throw ProtoDecodeException('hlc.counter wire-type mismatch');
           ctr = r.readUint32();
           break;
         default:
@@ -210,14 +218,14 @@ class HlcTimestampV2 {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class EventEnvelopeV2 {
-  /// Wire protocol version. v0.3 == 2.
+  /// Wire protocol version. Phase 0b field-auth bumps this to v3.
   final int protocolVersion;
 
   /// 16 bytes; UUIDv7 (locked §20.3).
   final Uint8List envelopeId;
 
   final int eventType; // EventTypeV2.*
-  final int priority;  // PriorityV2.*
+  final int priority; // PriorityV2.*
 
   final HlcTimestampV2 createdAtHlc;
   final HlcTimestampV2 expiresAtHlc;
@@ -243,8 +251,17 @@ class EventEnvelopeV2 {
   /// event_type >= 1000 MUST set true.
   final bool isExperimental;
 
+  /// v3 (§21.2) field 14. Scope label, 16 bytes. All-zero for control frames
+  /// (§21.7) and the "no field" default. Signed (part of canonical input §21.4).
+  final Uint8List fieldId;
+
+  /// v3 (§21.2) field 15. Membership HMAC, 16 bytes for non-control envelopes;
+  /// empty for control frames. NOT signed by Ed25519 (verified independently,
+  /// §21.6) and NOT part of the canonical input (§21.4).
+  final Uint8List fieldMac;
+
   EventEnvelopeV2({
-    this.protocolVersion = 2,
+    this.protocolVersion = 3,
     required this.envelopeId,
     required this.eventType,
     required this.priority,
@@ -257,7 +274,10 @@ class EventEnvelopeV2 {
     required this.payload,
     this.lastRelayId = '',
     this.isExperimental = false,
-  });
+    Uint8List? fieldId,
+    Uint8List? fieldMac,
+  })  : fieldId = fieldId ?? Uint8List(16),
+        fieldMac = fieldMac ?? Uint8List(0);
 
   /// Full proto3 wire-encode. The receiver gets exactly these bytes inside the
   /// chunk-framed body (per native_transport_v1 §4.5 Option B).
@@ -284,6 +304,11 @@ class EventEnvelopeV2 {
     w.writeBytesAlways(11, payload);
     w.writeString(12, lastRelayId);
     w.writeBool(13, isExperimental);
+    // v3 (§21.2): field_id is always present (16 bytes, zeros for control
+    // frames). field_mac is present only for non-control envelopes (16 bytes);
+    // empty → omitted on the wire (control frames carry no MAC, §21.7).
+    w.writeBytes(14, fieldId);
+    w.writeBytes(15, fieldMac);
     return w.toBytes();
   }
 
@@ -291,7 +316,7 @@ class EventEnvelopeV2 {
   /// `decode-required-field-missing` `drop_reason` (envelope_v2_spec §3.4).
   ///
   /// Required fields (any missing → throw ProtoDecodeException):
-  ///   protocol_version (MUST be present and non-zero; dispatcher checks `== 2`),
+  ///   protocol_version (MUST be present and non-zero; dispatcher checks `== 3`),
   ///   envelope_id (16 B), event_type (non-zero / not UNSPECIFIED),
   ///   priority (non-zero / not UNSPECIFIED),
   ///   created_at_hlc, expires_at_hlc, author_key (32 B),
@@ -319,6 +344,8 @@ class EventEnvelopeV2 {
     Uint8List? payload;
     var lastRelayId = '';
     var isExperimental = false;
+    Uint8List? fieldId;
+    Uint8List fieldMac = Uint8List(0);
 
     while (!r.isAtEnd) {
       final tag = r.readTag();
@@ -326,58 +353,81 @@ class EventEnvelopeV2 {
       final wire = tagWireType(tag);
       switch (field) {
         case 1:
-          if (wire != wireVarint) throw ProtoDecodeException('protocol_version wire-type');
+          if (wire != wireVarint)
+            throw ProtoDecodeException('protocol_version wire-type');
           protocolVersion = r.readUint32();
           protocolVersionSeen = true;
           break;
         case 2:
-          if (wire != wireLengthDelimited) throw ProtoDecodeException('envelope_id wire-type');
+          if (wire != wireLengthDelimited)
+            throw ProtoDecodeException('envelope_id wire-type');
           envelopeId = Uint8List.fromList(r.readLengthDelimited());
           break;
         case 3:
-          if (wire != wireVarint) throw ProtoDecodeException('event_type wire-type');
+          if (wire != wireVarint)
+            throw ProtoDecodeException('event_type wire-type');
           eventType = r.readUint32();
           break;
         case 4:
-          if (wire != wireVarint) throw ProtoDecodeException('priority wire-type');
+          if (wire != wireVarint)
+            throw ProtoDecodeException('priority wire-type');
           priority = r.readUint32();
           break;
         case 5:
-          if (wire != wireLengthDelimited) throw ProtoDecodeException('created_at_hlc wire-type');
+          if (wire != wireLengthDelimited)
+            throw ProtoDecodeException('created_at_hlc wire-type');
           createdAtHlc = HlcTimestampV2.decode(r.readLengthDelimited());
           break;
         case 6:
-          if (wire != wireLengthDelimited) throw ProtoDecodeException('expires_at_hlc wire-type');
+          if (wire != wireLengthDelimited)
+            throw ProtoDecodeException('expires_at_hlc wire-type');
           expiresAtHlc = HlcTimestampV2.decode(r.readLengthDelimited());
           break;
         case 7:
-          if (wire != wireVarint) throw ProtoDecodeException('max_hops wire-type');
+          if (wire != wireVarint)
+            throw ProtoDecodeException('max_hops wire-type');
           maxHops = r.readUint32();
           break;
         case 8:
-          if (wire != wireLengthDelimited) throw ProtoDecodeException('author_key wire-type');
+          if (wire != wireLengthDelimited)
+            throw ProtoDecodeException('author_key wire-type');
           authorKey = Uint8List.fromList(r.readLengthDelimited());
           break;
         case 9:
-          if (wire != wireVarint) throw ProtoDecodeException('sig_algo wire-type');
+          if (wire != wireVarint)
+            throw ProtoDecodeException('sig_algo wire-type');
           sigAlgo = r.readUint32();
           sigAlgoSeen = true;
           break;
         case 10:
-          if (wire != wireLengthDelimited) throw ProtoDecodeException('signature wire-type');
+          if (wire != wireLengthDelimited)
+            throw ProtoDecodeException('signature wire-type');
           signature = Uint8List.fromList(r.readLengthDelimited());
           break;
         case 11:
-          if (wire != wireLengthDelimited) throw ProtoDecodeException('payload wire-type');
+          if (wire != wireLengthDelimited)
+            throw ProtoDecodeException('payload wire-type');
           payload = Uint8List.fromList(r.readLengthDelimited());
           break;
         case 12:
-          if (wire != wireLengthDelimited) throw ProtoDecodeException('last_relay_id wire-type');
+          if (wire != wireLengthDelimited)
+            throw ProtoDecodeException('last_relay_id wire-type');
           lastRelayId = r.readString();
           break;
         case 13:
-          if (wire != wireVarint) throw ProtoDecodeException('is_experimental wire-type');
+          if (wire != wireVarint)
+            throw ProtoDecodeException('is_experimental wire-type');
           isExperimental = r.readBool();
+          break;
+        case 14:
+          if (wire != wireLengthDelimited)
+            throw ProtoDecodeException('field_id wire-type');
+          fieldId = Uint8List.fromList(r.readLengthDelimited());
+          break;
+        case 15:
+          if (wire != wireLengthDelimited)
+            throw ProtoDecodeException('field_mac wire-type');
+          fieldMac = Uint8List.fromList(r.readLengthDelimited());
           break;
         default:
           r.skipValue(wire);
@@ -388,7 +438,7 @@ class EventEnvelopeV2 {
     // §7.1 signed-field order so error messages map cleanly to spec.
     if (!protocolVersionSeen || protocolVersion == 0) {
       // Stage 0c wave 3E: decoder MUST reject missing/zero protocol_version.
-      // The dispatcher then enforces `== 2` and emits `unknown-protocol-version`
+      // The dispatcher then enforces `== 3` and emits `unknown-protocol-version`
       // for non-zero non-2 values, but `0` is a wire-format violation that
       // never round-trips a valid envelope and is caught here.
       throw ProtoDecodeException('protocol_version missing or zero');
@@ -428,6 +478,16 @@ class EventEnvelopeV2 {
       // The prior "fallback to Uint8List(0)" hid this from the dispatcher.
       throw ProtoDecodeException('payload field missing');
     }
+    // v3 (§21.2): field_id MUST be present and exactly 16 bytes for ALL
+    // envelopes (control frames carry 16 zero bytes). field_mac, when present,
+    // MUST be 16 bytes; control frames omit it. The "non-control MUST carry a
+    // field_mac" policy is enforced by the dispatcher (§21.6), not here.
+    if (fieldId == null || fieldId.length != 16) {
+      throw ProtoDecodeException('field_id missing or not 16 bytes');
+    }
+    if (fieldMac.isNotEmpty && fieldMac.length != 16) {
+      throw ProtoDecodeException('field_mac present but not 16 bytes');
+    }
     return EventEnvelopeV2(
       protocolVersion: protocolVersion,
       envelopeId: envelopeId,
@@ -442,6 +502,8 @@ class EventEnvelopeV2 {
       payload: payload,
       lastRelayId: lastRelayId,
       isExperimental: isExperimental,
+      fieldId: fieldId,
+      fieldMac: fieldMac,
     );
   }
 
@@ -526,7 +588,8 @@ class NeedEntry {
           r.skipValue(wire);
       }
     }
-    return NeedEntry(category: category, severity: severity, expiresAtHlc: expires);
+    return NeedEntry(
+        category: category, severity: severity, expiresAtHlc: expires);
   }
 }
 
@@ -619,7 +682,7 @@ class ProtocolHelloData {
   final int bgState;
 
   const ProtocolHelloData({
-    this.protocolVersion = 2,
+    this.protocolVersion = 3,
     required this.peerKind,
     required this.maxRxEnvelopeBytes,
     this.supportsIblt = false,
@@ -1082,11 +1145,13 @@ class LocationEvidence {
           frame = r.readUint32();
           break;
         case 3:
-          if (wire != wireVarint) throw ProtoDecodeException('location.lat wire-type');
+          if (wire != wireVarint)
+            throw ProtoDecodeException('location.lat wire-type');
           lat = r.readSint64();
           break;
         case 4:
-          if (wire != wireVarint) throw ProtoDecodeException('location.lng wire-type');
+          if (wire != wireVarint)
+            throw ProtoDecodeException('location.lng wire-type');
           lng = r.readSint64();
           break;
         case 5:

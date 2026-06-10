@@ -1,9 +1,9 @@
-// V2InboundProjector — verifies accepted EventEnvelope v2 (receive path) is
+// V2InboundProjector ??verifies accepted EventEnvelope v2 (receive path) is
 // projected into the v1 Event_Logs read-model and reaches EventStream.
 //
-// Pipeline exercised: MessagePublisherV2 signs → EnvelopeDispatcherV2 accepts
-// → V2InboundProjector translates → MeshEventHandler.ingestVerifiedEvent
-// persists + projects → EventStream emits a typed event.
+// Pipeline exercised: MessagePublisherV2 signs ??EnvelopeDispatcherV2 accepts
+// ??V2InboundProjector translates ??MeshEventHandler.ingestVerifiedEvent
+// persists + projects ??EventStream emits a typed event.
 // ignore_for_file: prefer_const_constructors
 
 import 'dart:convert';
@@ -84,7 +84,7 @@ void main() {
       'lat': 25.04,
       'lng': 121.56,
       'radius_m': 300.0,
-      'description': '淹水',
+      'description': '瘛寞偌',
       'schema': 'hazard_marker_v0_3_json_shim',
     }));
     final published = await h.publisher.send(
@@ -95,6 +95,7 @@ void main() {
       expiresAtHlc: HlcTimestampV2(msSinceEpoch: 2000, counter: 0),
       maxHops: 10,
       negotiatedMtu: 247,
+      fieldId: Uint8List(16),
     );
 
     final projectedId = h.projector.projectedEventIds.first;
@@ -105,8 +106,8 @@ void main() {
     final eventId = await projectedId.timeout(const Duration(seconds: 2));
     final db = await DatabaseHelper().database;
 
-    final logs = await db.query('Event_Logs',
-        where: 'event_id = ?', whereArgs: [eventId]);
+    final logs = await db
+        .query('Event_Logs', where: 'event_id = ?', whereArgs: [eventId]);
     expect(logs.length, 1);
     expect(logs.first['event_type'], EventType.hazardMarker);
 
@@ -143,6 +144,7 @@ void main() {
       expiresAtHlc: HlcTimestampV2(msSinceEpoch: 2000, counter: 0),
       maxHops: 6,
       negotiatedMtu: 247,
+      fieldId: Uint8List(16),
     );
 
     final projectedId = h.projector.projectedEventIds.first;
@@ -152,22 +154,22 @@ void main() {
 
     final eventId = await projectedId.timeout(const Duration(seconds: 2));
     final db = await DatabaseHelper().database;
-    final logs = await db.query('Event_Logs',
-        where: 'event_id = ?', whereArgs: [eventId]);
+    final logs = await db
+        .query('Event_Logs', where: 'event_id = ?', whereArgs: [eventId]);
     expect(logs.length, 1);
     expect(logs.first['event_type'], EventType.requestBroadcast);
     expect(logs.first['urgency'], 3);
 
     final sos = await sosFuture.timeout(const Duration(seconds: 2));
     expect(sos.urgency, 3);
-    expect(sos.description, '受困');
+    expect(sos.description, '?');
 
     await eventStream.dispose();
     await h.projector.dispose();
     await h.dispatcher.dispose();
   });
 
-  test('v2 projection rows are read-model only — excluded from v1 outbound',
+  test('v2 projection rows are read-model only ??excluded from v1 outbound',
       () async {
     final handler = MeshEventHandler();
     // A normal v1 event (no v2- prefix) and a v2 projection row.
@@ -214,6 +216,7 @@ void main() {
       expiresAtHlc: HlcTimestampV2(msSinceEpoch: 2000, counter: 0),
       maxHops: 6,
       negotiatedMtu: 247,
+      fieldId: Uint8List(16),
     );
     final outcome = await h.dispatcher
         .onReceiveEnvelopeBytes(published.wireBytes, peerId: 'AA:BB:CC');

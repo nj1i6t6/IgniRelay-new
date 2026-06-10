@@ -120,7 +120,7 @@ package resqmesh.v2;
 // EventEnvelope).
 message EventEnvelope {
   // ── Identity & versioning ───────────────────────────────────────────
-  uint32 protocol_version = 1;     // v0.3 == 2 (v2 wire). v0.2 was implicit 1.
+  uint32 protocol_version = 1;     // Phase 0b field-auth == 3. v0.3 was 2.
   bytes  envelope_id      = 2;     // 16 bytes. MUST be UUIDv7 (locked).
                                    //   Author generates; relays never mutate.
                                    //   Dedupe key. Globally unique;
@@ -426,20 +426,22 @@ The Ed25519 signature MUST cover the canonical encoding (§8) of these inputs, a
 
 1. `protocol_version`
 2. `envelope_id`
-3. `event_type`
-4. `priority`
-5. `created_at_hlc` (both `ms_since_epoch` and `counter`)
-6. `expires_at_hlc` (both `ms_since_epoch` and `counter`)
-7. `max_hops` (the INITIAL value chosen by the author; NOT a remaining-hop counter)
-8. `author_key`
-9. `sig_algo`
-10. `SHA-256(payload)` — computed locally on send and on receive; NOT a wire field.
+3. `field_id` (v3; public field scope label)
+4. `event_type`
+5. `priority`
+6. `created_at_hlc` (both `ms_since_epoch` and `counter`)
+7. `expires_at_hlc` (both `ms_since_epoch` and `counter`)
+8. `max_hops` (the INITIAL value chosen by the author; NOT a remaining-hop counter)
+9. `author_key`
+10. `sig_algo`
+11. `SHA-256(payload)` — computed locally on send and on receive; NOT a wire field.
 
 ### 7.2 NOT signed (relay-mutable or receiver-local)
 
 - `last_relay_id` — overwritten by each relay before re-transmit.
 - `is_experimental` — included on wire but not signed (intentional — see §7.4).
 - `signature` itself.
+- `field_mac` (computed from the canonical signature input; including it would be circular).
 - `payload` (signed by reference via locally computed `SHA-256(payload)`).
 - `hop_count_seen` — receiver-local, never on wire.
 - `signature_status` — receiver-local, never on wire.
@@ -448,9 +450,9 @@ The Ed25519 signature MUST cover the canonical encoding (§8) of these inputs, a
 
 ### 7.3 Rationale
 
-- A relay must not be able to forge higher priority, longer expiry, different event_type, or different author identity.
+- A relay must not be able to forge higher priority, longer expiry, different event_type, field scope, or author identity.
 - A relay MAY annotate its identity in `last_relay_id` for trace/debug without invalidating the signature.
-- The signature input includes `SHA-256(payload)` (32 bytes) rather than full payload bytes, keeping the signature canonical input fixed-size (124 bytes). Both sender and receiver compute `SHA-256(payload)` locally; any wire-level corruption of `payload` produces a different hash, the signature verification fails, and the envelope is dropped with `drop_reason = signature-invalid`. (We dropped the explicit `payload_hash` wire field — it would have added 34 bytes per envelope without strengthening the bind.)
+- The signature input includes `SHA-256(payload)` (32 bytes) rather than full payload bytes, keeping the signature canonical input fixed-size (141 bytes in current v3; 124 bytes in the historical v2 layout). Both sender and receiver compute `SHA-256(payload)` locally; any wire-level corruption of `payload` produces a different hash, the signature verification fails, and the envelope is dropped with `drop_reason = signature-invalid`. (We dropped the explicit `payload_hash` wire field — it would have added 34 bytes per envelope without strengthening the bind.)
 
 ### 7.4 Why `is_experimental` is unsigned
 
@@ -499,6 +501,7 @@ payload_hash = SHA256(payload)                  # computed locally; not on wire
 sig_input = b""
 sig_input += u32_le(protocol_version)
 sig_input += u8(16) || envelope_id              # length-prefixed (always 16 bytes)
+sig_input += u8(16) || field_id                 # v3 field scope; always 16 bytes
 sig_input += u32_le(event_type)
 sig_input += u32_le(priority)
 sig_input += u64_le(created_at_hlc.ms_since_epoch)
@@ -515,7 +518,7 @@ Where:
 
 - `u8` / `u32_le` / `u64_le` are unsigned 1/4/8-byte little-endian integer encodings.
 - Length prefixes are a defense against length-extension surprises across future field additions.
-- Total `sig_input` length is fixed at exactly `4 + 17 + 4 + 4 + 12 + 12 + 4 + 33 + 1 + 33 = 124 bytes` for v2.
+- Total `sig_input` length is fixed at exactly `4 + 17 + 17 + 4 + 4 + 12 + 12 + 4 + 33 + 1 + 33 = 141 bytes` for v3. The historical v2 layout was 124 bytes without `field_id`.
 - Field order is the order listed in §7.1.
 - The `payload_hash` line uses the LOCALLY computed SHA-256 of the payload bytes — there is no wire field for it.
 
@@ -526,7 +529,7 @@ The conformance corpus (§17) MUST include at least 5 fully worked test envelope
 - Plaintext envelope field values (JSON).
 - `payload` bytes (hex).
 - Computed `SHA-256(payload)` (hex; for verification — confirms each implementation hashes payload bytes identically).
-- Computed `sig_input` bytes (hex; 124 bytes for v2).
+- Computed `sig_input` bytes (hex; 141 bytes for v3; 124 bytes for historical v2).
 - A signing private key (test-only).
 - The Ed25519 `signature` over `sig_input` (hex).
 - The fully serialized `EventEnvelope` proto bytes (hex) that includes the signature (and does NOT include payload_hash, since it is not a wire field).
@@ -551,7 +554,7 @@ Envelope fixed overhead (rough, single-byte tags only):
 
 | Field | Wire bytes |
 |---|---|
-| `protocol_version` (varint, value=2) | 2 |
+| `protocol_version` (varint, value=3) | 2 |
 | `envelope_id` (16B + len + tag) | 18 |
 | `event_type` (varint) | 2-3 |
 | `priority` (varint) | 2 |
@@ -739,7 +742,7 @@ The Stage 0c migration helper on first launch:
 CREATE TABLE envelopes (
   -- Identity
   envelope_id        BLOB PRIMARY KEY,         -- 16 bytes
-  protocol_version   INTEGER NOT NULL,         -- always 2 in v0.3
+  protocol_version   INTEGER NOT NULL,         -- always 3 after Phase 0b field-auth
   event_type         INTEGER NOT NULL,         -- EventType enum value
   priority           INTEGER NOT NULL,         -- Priority enum value
 
@@ -986,7 +989,7 @@ The 0c implementation MUST emit only these (defined as a Dart `enum DropReason` 
 Envelope-layer drop reasons (EnvelopeDispatcherV2):
 
 - `decode-required-field-missing`
-- `unknown-protocol-version` (Stage 0c wave 3E — `protocol_version != 2`)
+- `unknown-protocol-version` (Stage 0c wave 3E / Phase 0b 4-3 — `protocol_version != 3`)
 - `unknown-sig-algo`
 - `signature-invalid` (covers both forged signature AND payload tampering, since `SHA-256(payload)` mismatch surfaces as a signature failure)
 - `max-hops-overcommit` (§11.3 — `max_hops > default` per event type)
@@ -1112,11 +1115,11 @@ The 0a spec deliberately does NOT add a `parent_envelope_id` field to envelope o
 
 `docs/specs/wire_conformance_v1.json` — a single JSON file co-owned by 0a and 0b. The envelope slice of this corpus is 0a's responsibility.
 
-The corpus is **deterministic** (no live timestamp); it carries a `corpus_revision` string + `spec_date`, currently `v0.3-stage0c-wave3d-1` / `2026-05-13`. A `notes` object documents corpus-wide conventions. Re-generating MUST produce a byte-identical file; see 0b §11.7 for the `--check` mode that enforces this on CI.
+The corpus is **deterministic** (no live timestamp); it carries a `corpus_revision` string + `spec_date`, currently `v0.3-phase0b-4-3-1` / `2026-05-13`. A `notes` object documents corpus-wide conventions. Re-generating MUST produce a byte-identical file; see 0b §11.7 for the `--check` mode that enforces this on CI.
 
 ### 17.2 Sample shape (envelope slice)
 
-Each envelope sample is one of two flavors. Both carry the structural envelope plus the canonical Ed25519 signature input bytes (the 124-byte block fed into `Ed25519.sign`), per §8.
+Each envelope sample is one of two flavors. Both carry the structural envelope plus the canonical Ed25519 signature input bytes (the 141-byte v3 block fed into `Ed25519.sign`), per §8 / §21.4.
 
 **Unsigned sample** — used for procedural coverage (per-EventType × per-Priority, size boundaries, chunking shape):
 
@@ -1126,7 +1129,7 @@ Each envelope sample is one of two flavors. Both carry the structural envelope p
   "name": "<stable identifier>",
   "description": "<one line>",
   "envelope_struct": {
-    "protocol_version": 2,
+    "protocol_version": 3,
     "envelope_id_hex": "<32 hex chars>",
     "event_type": 30,
     "priority": 6,
@@ -1141,8 +1144,8 @@ Each envelope sample is one of two flavors. Both carry the structural envelope p
     "is_experimental": false
   },
   "payload_sha256_hex": "<64 hex chars>",
-  "expected_canonical_sig_input_bytes": 124,
-  "expected_canonical_sig_input_hex": "<248 hex chars>"
+  "expected_canonical_sig_input_bytes": 141,
+  "expected_canonical_sig_input_hex": "<282 hex chars>"
 }
 ```
 
@@ -1156,7 +1159,7 @@ Each `envelope_struct` carries exactly ONE of `payload_hex` (raw inline) or `pay
   "name": "...",
   "envelope_struct": { ... },
   "payload_sha256_hex": "...",
-  "expected_canonical_sig_input_bytes": 124,
+  "expected_canonical_sig_input_bytes": 141,
   "expected_canonical_sig_input_hex": "...",
   "derived_author_key_hex": "<64 hex chars = 32-byte Ed25519 public key>",
   "test_only_private_key_hex": "<64 hex chars = 32-byte Ed25519 seed; TEST ONLY>",
@@ -1164,7 +1167,7 @@ Each `envelope_struct` carries exactly ONE of `payload_hex` (raw inline) or `pay
 }
 ```
 
-The canonical signature input is the source-of-truth byte stream; the conformance test asserts `len == 124` on every sample. `payload_sha256_hex` is the locally-computed payload hash that feeds the canonical input (per §3.2, §7.1 #10, §8.2) and is NOT a wire field — it's surfaced in the corpus only so consumers can verify the canonical input was built correctly.
+The canonical signature input is the source-of-truth byte stream; the conformance test asserts `len == 141` on every v3 sample. `payload_sha256_hex` is the locally-computed payload hash that feeds the canonical input (per §3.2, §7.1 #11, §8.2 / §21.4) and is NOT a wire field — it's surfaced in the corpus only so consumers can verify the canonical input was built correctly.
 
 ### 17.2.1 Coverage (envelope slice)
 
@@ -1193,7 +1196,7 @@ Additional envelope-layer negatives planned for follow-up waves (RESOURCE / NORM
 
 ### 17.4 CI gate
 
-Each of Dart / Kotlin / Swift MUST encode every positive sample's canonical signature input bit-identically (124 bytes), verify every signed sample with the embedded Ed25519 public key, and reject every negative sample with the documented `expected_drop_reason`. CI is part of the Stage 0c acceptance check (brief §3.4). See 0b §11.6 for the cross-platform consumer-wiring status.
+Each of Dart / Kotlin / Swift MUST encode every positive sample's canonical signature input bit-identically (141 bytes for v3), verify every signed sample with the embedded Ed25519 public key, and reject every negative sample with the documented `expected_drop_reason`. CI is part of the Stage 0c acceptance check (brief §3.4). See 0b §11.6 for the cross-platform consumer-wiring status.
 
 ### 17.5 Test vector generation tooling
 
@@ -1320,8 +1323,8 @@ This decision table has been mirrored into 0b §15 (Decisions Locked). Both spec
 ## 21. v3 Field Scoping & Membership Auth (Phase 0b #4-3 — frozen contract, pending implementation)
 
 > **Status**: FROZEN contract for the Phase 0b #4-3 breaking wire cut (signed off by GPT review 2026-06-10,
-> after 4-2). At time of writing the code is still on `protocol_version = 2` (§3.1); once 4-3 lands, §21
-> SUPERSEDES the v2 wording it references. Implementation MUST match this section byte-for-byte.
+> after 4-2). Phase 0b 4-3 has landed in Dart: `protocol_version = 3` (§3.1) and §21
+> SUPERSEDES the earlier v2 wording it references. Implementation MUST match this section byte-for-byte.
 > Companion: `docs/PHASE0B4_WIRE_DESIGN.md` §1 / §8.
 
 ### 21.1 Motivation

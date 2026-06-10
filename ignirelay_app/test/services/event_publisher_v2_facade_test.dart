@@ -1,4 +1,4 @@
-import 'dart:collection';
+﻿import 'dart:collection';
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';

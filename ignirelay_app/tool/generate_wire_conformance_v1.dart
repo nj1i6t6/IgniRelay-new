@@ -35,6 +35,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart' as crypto_pkg;
 import 'package:cryptography/cryptography.dart';
 import 'package:ignirelay_app/app/crypto/canonical_encoder_v2.dart';
+import 'package:ignirelay_app/app/crypto/field_auth_v2.dart';
 import 'package:ignirelay_app/app/mesh/chunker.dart';
 import 'package:ignirelay_app/app/mesh/iblt.dart';
 import 'package:ignirelay_app/app/mesh/mesh_constants.dart';
@@ -45,8 +46,20 @@ import 'package:ignirelay_app/app/mesh/mesh_constants.dart';
 
 const String _scenariosDir = 'test/wire_conformance/scenarios';
 const String _outputPath = '../docs/specs/wire_conformance_v1.json';
-const String _corpusRevision = 'v0.3-stage0c-wave3d-1';
+// Phase 0b #4-3 bumped the wire to v3 (canonical 124→141, field_id + field_mac).
+const String _corpusRevision = 'v0.3-phase0b-4-3-1';
 const String _specDate = '2026-05-13';
+
+// Phase 0b #4-3: one corpus-wide test field. All envelope samples ride this
+// field_id and carry a field_mac over their canonical input (spec §21). The
+// secret is fixed so the corpus stays deterministic and Kotlin/Swift (4-3b) can
+// reproduce field_id + field_mac.
+final Uint8List _testFieldJoinSecret =
+    Uint8List.fromList(List.generate(32, (i) => (i * 37 + 11) & 0xFF));
+
+// Derived once at the top of buildCorpus() and read by the per-sample emitters.
+late Uint8List _corpusFieldId;
+late Uint8List _corpusFieldMacKey;
 
 // Anchor for HLC timestamps in procedural samples (matches existing YAML
 // scenarios so adjacent envelopes look coherent). 2026-05-15 13:00:00 UTC.
@@ -97,11 +110,14 @@ Future<int> main(List<String> args) async {
   outFile.writeAsStringSync(encoded);
 
   stdout.writeln('generate_wire_conformance_v1: wrote ${outFile.path}');
-  stdout.writeln('  envelope_samples=${(corpus['envelope_samples'] as List).length}');
-  stdout.writeln('  chunking_samples=${(corpus['chunking_samples'] as List).length}');
+  stdout.writeln(
+      '  envelope_samples=${(corpus['envelope_samples'] as List).length}');
+  stdout.writeln(
+      '  chunking_samples=${(corpus['chunking_samples'] as List).length}');
   stdout.writeln('  iblt_samples=${(corpus['iblt_samples'] as List).length}');
   stdout.writeln('  bloom_samples=${(corpus['bloom_samples'] as List).length}');
-  stdout.writeln('  negative_cases=${(corpus['negative_cases'] as List).length}');
+  stdout
+      .writeln('  negative_cases=${(corpus['negative_cases'] as List).length}');
   return 0;
 }
 
@@ -119,11 +135,26 @@ Future<Map<String, dynamic>> buildCorpus() async {
     throw FormatException('scenarios dir missing: ${scenariosDir.path}');
   }
 
+  // Phase 0b #4-3 (spec §21): the corpus-wide test field. Stored in module
+  // vars so the per-sample emitters can read them without threading params
+  // through every call site.
+  final testFieldId = await FieldAuthV2.deriveFieldId(_testFieldJoinSecret);
+  final testFieldMacKey =
+      await FieldAuthV2.deriveFieldMacKey(_testFieldJoinSecret);
+  _corpusFieldId = testFieldId;
+  _corpusFieldMacKey = testFieldMacKey;
+
   final corpus = <String, dynamic>{
     'corpus_revision': _corpusRevision,
     'spec_date': _specDate,
     'spec_envelope': 'docs/specs/envelope_v2_spec_2026-05-13.md',
     'spec_transport': 'docs/specs/native_transport_v1_2026-05-13.md',
+    'test_field': <String, dynamic>{
+      'field_join_secret_hex': _hex(_testFieldJoinSecret),
+      'field_id_hex': _hex(testFieldId),
+      'field_mac_key_hex': _hex(testFieldMacKey),
+      'hkdf_info': FieldAuthV2.hkdfInfo,
+    },
     'notes': <String, dynamic>{
       'bloom_hash_ascii_only':
           'Bloom vectors intentionally use ASCII event IDs only. Kotlin and '
@@ -320,8 +351,9 @@ Future<Map<String, dynamic>> _emitProceduralEnvelope({
   }
 
   final sigInput = CanonicalEncoderV2.buildSignatureInput(
-    protocolVersion: kProtocolVersionV2,
+    protocolVersion: kProtocolVersionV3,
     envelopeId: envelopeId,
+    fieldId: _corpusFieldId,
     eventType: eventType,
     priority: priority,
     createdAtHlcMs: createdMs,
@@ -334,9 +366,14 @@ Future<Map<String, dynamic>> _emitProceduralEnvelope({
     payloadHash: payloadHash,
   );
 
+  // Field membership MAC over the SAME canonical bytes (§21.5).
+  final fieldMac =
+      await FieldAuthV2.computeFieldMac(_corpusFieldMacKey, sigInput);
+
   if (withSignature) {
     final ed = Ed25519();
-    final keyPair = await ed.newKeyPairFromSeed(_proceduralPrivKeySeed(caseSeed));
+    final keyPair =
+        await ed.newKeyPairFromSeed(_proceduralPrivKeySeed(caseSeed));
     final sig = await ed.sign(sigInput, keyPair: keyPair);
     signature = Uint8List.fromList(sig.bytes);
   }
@@ -345,8 +382,10 @@ Future<Map<String, dynamic>> _emitProceduralEnvelope({
   // Threshold: 64 bytes. Smaller payloads are eyeball-friendly; larger
   // ones blow up the JSON unnecessarily.
   final envelopeStruct = <String, dynamic>{
-    'protocol_version': kProtocolVersionV2,
+    'protocol_version': kProtocolVersionV3,
     'envelope_id_hex': _hex(envelopeId),
+    'field_id_hex': _hex(_corpusFieldId),
+    'field_mac_hex': _hex(fieldMac),
     'event_type': eventType,
     'priority': priority,
     'created_at_hlc': {'ms_since_epoch': createdMs, 'counter': 0},
@@ -544,9 +583,12 @@ List<Map<String, dynamic>> _buildIbltSamples() {
   for (var k = 1; k <= 10; k++) {
     // A: shared (10 ids) + a_only (k ids)
     // B: shared (10 ids) + b_only (k ids)
-    final shared = _asciiSeqIds(prefix: 'iblt-sub-sh-', start: 0, count: 10, width: 8);
-    final aOnly = _asciiSeqIds(prefix: 'iblt-sub-a-', start: 0, count: k, width: 8);
-    final bOnly = _asciiSeqIds(prefix: 'iblt-sub-b-', start: 0, count: k, width: 8);
+    final shared =
+        _asciiSeqIds(prefix: 'iblt-sub-sh-', start: 0, count: 10, width: 8);
+    final aOnly =
+        _asciiSeqIds(prefix: 'iblt-sub-a-', start: 0, count: k, width: 8);
+    final bOnly =
+        _asciiSeqIds(prefix: 'iblt-sub-b-', start: 0, count: k, width: 8);
     final a = IBLT();
     final b = IBLT();
     for (final id in shared) {
@@ -564,20 +606,48 @@ List<Map<String, dynamic>> _buildIbltSamples() {
       'kind': 'iblt_subtract',
       'name': 'subtract_k$k',
       'a_operations': [
-        {'op': 'insert', 'event_ids_generator': {
-          'algorithm': 'ascii_seq_v1', 'prefix': 'iblt-sub-sh-', 'start': 0, 'count': 10, 'width': 8,
-        }},
-        {'op': 'insert', 'event_ids_generator': {
-          'algorithm': 'ascii_seq_v1', 'prefix': 'iblt-sub-a-', 'start': 0, 'count': k, 'width': 8,
-        }},
+        {
+          'op': 'insert',
+          'event_ids_generator': {
+            'algorithm': 'ascii_seq_v1',
+            'prefix': 'iblt-sub-sh-',
+            'start': 0,
+            'count': 10,
+            'width': 8,
+          }
+        },
+        {
+          'op': 'insert',
+          'event_ids_generator': {
+            'algorithm': 'ascii_seq_v1',
+            'prefix': 'iblt-sub-a-',
+            'start': 0,
+            'count': k,
+            'width': 8,
+          }
+        },
       ],
       'b_operations': [
-        {'op': 'insert', 'event_ids_generator': {
-          'algorithm': 'ascii_seq_v1', 'prefix': 'iblt-sub-sh-', 'start': 0, 'count': 10, 'width': 8,
-        }},
-        {'op': 'insert', 'event_ids_generator': {
-          'algorithm': 'ascii_seq_v1', 'prefix': 'iblt-sub-b-', 'start': 0, 'count': k, 'width': 8,
-        }},
+        {
+          'op': 'insert',
+          'event_ids_generator': {
+            'algorithm': 'ascii_seq_v1',
+            'prefix': 'iblt-sub-sh-',
+            'start': 0,
+            'count': 10,
+            'width': 8,
+          }
+        },
+        {
+          'op': 'insert',
+          'event_ids_generator': {
+            'algorithm': 'ascii_seq_v1',
+            'prefix': 'iblt-sub-b-',
+            'start': 0,
+            'count': k,
+            'width': 8,
+          }
+        },
       ],
       'expected_a_bytes_hex': _hex(a.toBytes()),
       'expected_b_bytes_hex': _hex(b.toBytes()),
@@ -596,7 +666,8 @@ List<Map<String, dynamic>> _buildIbltSamples() {
     });
   }
   {
-    final ids = _asciiSeqIds(prefix: 'iblt-fill-', start: 0, count: 100, width: 8);
+    final ids =
+        _asciiSeqIds(prefix: 'iblt-fill-', start: 0, count: 100, width: 8);
     final iblt = IBLT();
     for (final id in ids) {
       iblt.insert(id);
@@ -608,7 +679,11 @@ List<Map<String, dynamic>> _buildIbltSamples() {
         {
           'op': 'insert',
           'event_ids_generator': {
-            'algorithm': 'ascii_seq_v1', 'prefix': 'iblt-fill-', 'start': 0, 'count': 100, 'width': 8,
+            'algorithm': 'ascii_seq_v1',
+            'prefix': 'iblt-fill-',
+            'start': 0,
+            'count': 100,
+            'width': 8,
           },
         },
       ],
@@ -743,7 +818,8 @@ List<Map<String, dynamic>> _buildNegativeCases() {
     },
     {
       'kind': 'unknown_sig_algo',
-      'description': 'sig_algo = 0x02 (post-quantum slot, not implemented in v0.3).',
+      'description':
+          'sig_algo = 0x02 (post-quantum slot, not implemented in v0.3).',
       'sig_algo': 2,
       'expected_drop_reason': 'unknown-sig-algo',
     },
@@ -754,7 +830,8 @@ List<Map<String, dynamic>> _buildNegativeCases() {
     },
     {
       'kind': 'chunk_index_oob',
-      'description': 'Chunk header with chunk_index >= total_chunks is illegal.',
+      'description':
+          'Chunk header with chunk_index >= total_chunks is illegal.',
       'expected_drop_reason': 'chunk-bad-header',
     },
     {
@@ -765,7 +842,8 @@ List<Map<String, dynamic>> _buildNegativeCases() {
     },
     {
       'kind': 'mtu_below_minimum',
-      'description': 'MTU so low that chunk_payload < 1 byte — Chunker REJECTS.',
+      'description':
+          'MTU so low that chunk_payload < 1 byte — Chunker REJECTS.',
       'mtu': kAttHeaderSize + kChunkHeaderSize, // exactly leaves 0 payload
       'expected_drop_reason': 'mtu-below-minimum-for-chunked',
     },
@@ -787,7 +865,7 @@ List<Map<String, dynamic>> _buildNegativeCases() {
     },
     {
       'kind': 'unknown_protocol_version',
-      'description': 'protocol_version != 2 — decoder REJECTS the envelope.',
+      'description': 'protocol_version != 3 — decoder REJECTS the envelope.',
       'protocol_version': 99,
       'expected_drop_reason': 'unknown-protocol-version',
     },
@@ -803,7 +881,7 @@ List<Map<String, dynamic>> _buildNegativeCases() {
       'kind': 'invalid_envelope_id_in_chunk',
       'description':
           'Reassembler receives chunks with mismatched envelope_id prefixes — '
-          'dropped as drift.',
+              'dropped as drift.',
       'expected_drop_reason': 'reassembly-envelope-id-mismatch',
     },
   ];
@@ -957,6 +1035,7 @@ Future<Map<String, dynamic>> _buildEnvelopeSampleFromYaml(_Scenario s) async {
     final sigInput = CanonicalEncoderV2.buildSignatureInput(
       protocolVersion: env['protocol_version'] as int,
       envelopeId: envelopeId,
+      fieldId: _corpusFieldId,
       eventType: env['event_type'] as int,
       priority: env['priority'] as int,
       createdAtHlcMs: created['ms_since_epoch'] as int,
@@ -970,9 +1049,13 @@ Future<Map<String, dynamic>> _buildEnvelopeSampleFromYaml(_Scenario s) async {
     );
     final sig = await ed.sign(sigInput, keyPair: keyPair);
     signature = Uint8List.fromList(sig.bytes);
+    final fieldMac =
+        await FieldAuthV2.computeFieldMac(_corpusFieldMacKey, sigInput);
 
     final envelopeStruct = Map<String, dynamic>.from(env);
     envelopeStruct['author_key_hex'] = _hex(authorKey);
+    envelopeStruct['field_id_hex'] = _hex(_corpusFieldId);
+    envelopeStruct['field_mac_hex'] = _hex(fieldMac);
     final payloadSha = _hex(crypto_pkg.sha256.convert(payload).bytes);
 
     return <String, dynamic>{
@@ -994,6 +1077,7 @@ Future<Map<String, dynamic>> _buildEnvelopeSampleFromYaml(_Scenario s) async {
   final sigInput = CanonicalEncoderV2.buildSignatureInput(
     protocolVersion: env['protocol_version'] as int,
     envelopeId: envelopeId,
+    fieldId: _corpusFieldId,
     eventType: env['event_type'] as int,
     priority: env['priority'] as int,
     createdAtHlcMs: created['ms_since_epoch'] as int,
@@ -1005,12 +1089,17 @@ Future<Map<String, dynamic>> _buildEnvelopeSampleFromYaml(_Scenario s) async {
     sigAlgo: env['sig_algo'] as int,
     payloadHash: payloadHash,
   );
+  final fieldMac =
+      await FieldAuthV2.computeFieldMac(_corpusFieldMacKey, sigInput);
   final payloadSha = _hex(crypto_pkg.sha256.convert(payload).bytes);
+  final envelopeStruct = Map<String, dynamic>.from(env);
+  envelopeStruct['field_id_hex'] = _hex(_corpusFieldId);
+  envelopeStruct['field_mac_hex'] = _hex(fieldMac);
   return <String, dynamic>{
     'kind': 'envelope',
     'name': s.name,
     'description': s.description,
-    'envelope_struct': env,
+    'envelope_struct': envelopeStruct,
     'payload_sha256_hex': payloadSha,
     'expected_canonical_sig_input_hex': _hex(sigInput),
     'expected_canonical_sig_input_bytes': sigInput.length,
@@ -1022,9 +1111,12 @@ extension _ScenarioMap on _Scenario {
   void fromMap(Map<String, dynamic> map) {
     name = (map['name'] as String?) ?? '';
     description = (map['description'] as String?) ?? '';
-    envelope = (map['envelope'] as Map<String, dynamic>?) ?? const <String, dynamic>{};
-    testSigning = (map['test_signing'] as Map<String, dynamic>?) ?? const <String, dynamic>{};
-    expected = (map['expected'] as Map<String, dynamic>?) ?? const <String, dynamic>{};
+    envelope =
+        (map['envelope'] as Map<String, dynamic>?) ?? const <String, dynamic>{};
+    testSigning = (map['test_signing'] as Map<String, dynamic>?) ??
+        const <String, dynamic>{};
+    expected =
+        (map['expected'] as Map<String, dynamic>?) ?? const <String, dynamic>{};
   }
 }
 

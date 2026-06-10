@@ -74,8 +74,10 @@ const int kTierHysteresis = 10;
 // divergence. Do not change a value here without updating the other two files.
 // ═════════════════════════════════════════════════════════════════════════════
 
-/// Wire protocol version. v0.3 uses EventEnvelope v2.
-const int kProtocolVersionV2 = 2;
+/// Wire protocol version. Phase 0b #4-3 bumped this 2→3 (EventEnvelope v3 adds
+/// signed field_id + field_mac membership; canonical 124→141, spec §21).
+/// Kotlin/Swift siblings bump to 3 in 4-3b (cross-platform parity wave).
+const int kProtocolVersionV3 = 3;
 
 /// Hard cap on serialized envelope size (NORMAL priority cap; bounds reassembly).
 const int kMaxEnvelopeBytes = 2048;

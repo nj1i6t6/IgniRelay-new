@@ -1,7 +1,7 @@
-// v0.3 Stage 0c — end-to-end pipeline test.
+// v0.3 Stage 0c ??end-to-end pipeline test.
 //
-// Publisher signs an envelope → Dispatcher decodes + verifies → Store records
-// it → Trace logs the action. Exercises the full Stage 0c spec pipeline in
+// Publisher signs an envelope ??Dispatcher decodes + verifies ??Store records
+// it ??Trace logs the action. Exercises the full Stage 0c spec pipeline in
 // one test process (in-memory sqflite).
 // ignore_for_file: prefer_const_constructors
 
@@ -54,10 +54,11 @@ void main() {
       authorPublicKey: pubBytes,
       trace: trace,
     );
-    return _PipelineHarness(db, store, trace, rate, dispatcher, publisher, pubBytes);
+    return _PipelineHarness(
+        db, store, trace, rate, dispatcher, publisher, pubBytes);
   }
 
-  group('Publisher → Dispatcher round-trip', () {
+  group('Publisher ??Dispatcher round-trip', () {
     test('SOS_RED status update accepts cleanly', () async {
       final h = await makeHarness();
       final published = await h.publisher.send(
@@ -68,6 +69,7 @@ void main() {
         expiresAtHlc: HlcTimestampV2(msSinceEpoch: 2000, counter: 0),
         maxHops: 6,
         negotiatedMtu: 247,
+        fieldId: Uint8List(16),
       );
       final outcome = await h.dispatcher.onReceiveEnvelopeBytes(
         published.wireBytes,
@@ -104,6 +106,7 @@ void main() {
           expiresAtHlc: HlcTimestampV2(msSinceEpoch: 2, counter: 0),
           maxHops: 6,
           negotiatedMtu: 247,
+          fieldId: Uint8List(16),
         ),
         throwsA(isA<PublishRejected>()
             .having((e) => e.dropReason, 'dropReason', 'priority-mismatch')),
@@ -112,7 +115,7 @@ void main() {
 
     test('over-budget SOS is rejected at sender', () async {
       final h = await makeHarness();
-      // 240B SOS budget — push 250B payload to exceed (envelope adds overhead).
+      // 240B SOS budget ??push 250B payload to exceed (envelope adds overhead).
       expect(
         () => h.publisher.send(
           eventType: EventTypeV2.statusUpdate,
@@ -122,6 +125,7 @@ void main() {
           expiresAtHlc: HlcTimestampV2(msSinceEpoch: 2, counter: 0),
           maxHops: 6,
           negotiatedMtu: 247,
+          fieldId: Uint8List(16),
         ),
         throwsA(isA<PublishRejected>().having(
             (e) => e.dropReason, 'dropReason', 'over-budget-sos-rejected')),
@@ -138,8 +142,9 @@ void main() {
         expiresAtHlc: HlcTimestampV2(msSinceEpoch: 2, counter: 0),
         maxHops: 6,
         negotiatedMtu: 247,
+        fieldId: Uint8List(16),
       );
-      // Decode → tamper payload → re-encode (signature unchanged → mismatch).
+      // Decode ??tamper payload ??re-encode (signature unchanged ??mismatch).
       final tamperedEnv = EventEnvelopeV2.decode(published.wireBytes);
       final tampered = EventEnvelopeV2(
         envelopeId: tamperedEnv.envelopeId,
@@ -155,7 +160,8 @@ void main() {
         lastRelayId: tamperedEnv.lastRelayId,
         isExperimental: tamperedEnv.isExperimental,
       );
-      final outcome = await h.dispatcher.onReceiveEnvelopeBytes(tampered.encode());
+      final outcome =
+          await h.dispatcher.onReceiveEnvelopeBytes(tampered.encode());
       expect(outcome, isA<DispatchDropped>());
       expect((outcome as DispatchDropped).dropReason, 'signature-invalid');
     });
@@ -171,6 +177,7 @@ void main() {
         expiresAtHlc: HlcTimestampV2(msSinceEpoch: 100000, counter: 0),
         maxHops: 6,
         negotiatedMtu: 247,
+        fieldId: Uint8List(16),
       );
       await h.dispatcher.onReceiveEnvelopeBytes(earlier.wireBytes);
 
@@ -182,15 +189,17 @@ void main() {
         expiresAtHlc: HlcTimestampV2(msSinceEpoch: 100000, counter: 0),
         maxHops: 6,
         negotiatedMtu: 247,
+        fieldId: Uint8List(16),
       );
-      final outcome = await h.dispatcher.onReceiveEnvelopeBytes(later.wireBytes);
+      final outcome =
+          await h.dispatcher.onReceiveEnvelopeBytes(later.wireBytes);
       expect(outcome, isA<DispatchAccepted>());
       final accepted = outcome as DispatchAccepted;
       expect(accepted.isLwwWinner, true,
           reason: 'newer HLC must take the LWW slot');
 
-      final winner =
-          await h.store.currentLwwWinner(eventType: EventTypeV2.statusUpdate, lwwKeyComponent: h.authorKey);
+      final winner = await h.store.currentLwwWinner(
+          eventType: EventTypeV2.statusUpdate, lwwKeyComponent: h.authorKey);
       expect(winner, later.envelope.envelopeId);
     });
 
@@ -206,7 +215,8 @@ void main() {
         rateLimiter: rate,
       );
       final keyPair = await Ed25519().newKeyPair();
-      final pubBytes = Uint8List.fromList((await keyPair.extractPublicKey()).bytes);
+      final pubBytes =
+          Uint8List.fromList((await keyPair.extractPublicKey()).bytes);
       final publisher = MessagePublisherV2(
         keyPair: keyPair,
         authorPublicKey: pubBytes,
@@ -221,6 +231,7 @@ void main() {
         expiresAtHlc: HlcTimestampV2(msSinceEpoch: 100000, counter: 0),
         maxHops: 6,
         negotiatedMtu: 247,
+        fieldId: Uint8List(16),
       );
       final second = await publisher.send(
         eventType: EventTypeV2.statusUpdate,
@@ -230,8 +241,10 @@ void main() {
         expiresAtHlc: HlcTimestampV2(msSinceEpoch: 100000, counter: 0),
         maxHops: 6,
         negotiatedMtu: 247,
+        fieldId: Uint8List(16),
       );
-      expect(await dispatcher.onReceiveEnvelopeBytes(first.wireBytes), isA<DispatchAccepted>());
+      expect(await dispatcher.onReceiveEnvelopeBytes(first.wireBytes),
+          isA<DispatchAccepted>());
       final dropped = await dispatcher.onReceiveEnvelopeBytes(second.wireBytes);
       expect(dropped, isA<DispatchDropped>());
       expect((dropped as DispatchDropped).dropReason, 'author-rate-limited');
@@ -249,7 +262,8 @@ void main() {
         where: 'action = ? AND drop_reason = ?',
         whereArgs: [TraceAction.dropped, reason],
       );
-      expect(rows, isNotEmpty, reason: 'trace should include drop_reason=$reason');
+      expect(rows, isNotEmpty,
+          reason: 'trace should include drop_reason=$reason');
     }
 
     test('unknown-protocol-version emits DispatchDropped + trace', () async {
@@ -262,6 +276,7 @@ void main() {
         expiresAtHlc: HlcTimestampV2(msSinceEpoch: 100000, counter: 0),
         maxHops: 6,
         negotiatedMtu: 247,
+        fieldId: Uint8List(16),
       );
       final env = EventEnvelopeV2.decode(published.wireBytes);
       final tampered = EventEnvelopeV2(
@@ -279,9 +294,11 @@ void main() {
         lastRelayId: env.lastRelayId,
         isExperimental: env.isExperimental,
       );
-      final outcome = await h.dispatcher.onReceiveEnvelopeBytes(tampered.encode());
+      final outcome =
+          await h.dispatcher.onReceiveEnvelopeBytes(tampered.encode());
       expect(outcome, isA<DispatchDropped>());
-      expect((outcome as DispatchDropped).dropReason, 'unknown-protocol-version');
+      expect(
+          (outcome as DispatchDropped).dropReason, 'unknown-protocol-version');
       await expectDroppedTrace(h, 'unknown-protocol-version');
     });
 
@@ -296,6 +313,7 @@ void main() {
         expiresAtHlc: HlcTimestampV2(msSinceEpoch: 1000, counter: 0),
         maxHops: 6,
         negotiatedMtu: 247,
+        fieldId: Uint8List(16),
       );
       final outcome =
           await h.dispatcher.onReceiveEnvelopeBytes(published.wireBytes);
@@ -318,6 +336,7 @@ void main() {
         expiresAtHlc: HlcTimestampV2(msSinceEpoch: 2000, counter: 0),
         maxHops: 6,
         negotiatedMtu: 247,
+        fieldId: Uint8List(16),
       );
       final outcome =
           await h.dispatcher.onReceiveEnvelopeBytes(published.wireBytes);
@@ -336,12 +355,14 @@ void main() {
         expiresAtHlc: HlcTimestampV2(msSinceEpoch: 100000, counter: 0),
         maxHops: 6,
         negotiatedMtu: 247,
+        fieldId: Uint8List(16),
       );
       expect(
         await h.dispatcher.onReceiveEnvelopeBytes(published.wireBytes),
         isA<DispatchAccepted>(),
       );
-      final dup = await h.dispatcher.onReceiveEnvelopeBytes(published.wireBytes);
+      final dup =
+          await h.dispatcher.onReceiveEnvelopeBytes(published.wireBytes);
       expect(dup, isA<DispatchDropped>());
       expect((dup as DispatchDropped).dropReason, 'dedupe-hit');
       await expectDroppedTrace(h, 'dedupe-hit');
@@ -357,6 +378,7 @@ void main() {
         expiresAtHlc: HlcTimestampV2(msSinceEpoch: 100000, counter: 0),
         maxHops: 7,
         negotiatedMtu: 247,
+        fieldId: Uint8List(16),
       );
       final outcome =
           await h.dispatcher.onReceiveEnvelopeBytes(published.wireBytes);

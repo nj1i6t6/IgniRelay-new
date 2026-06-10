@@ -41,7 +41,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 11,
+      version: 12,
       onConfigure: (db) async {
         await db.rawQuery('PRAGMA journal_mode=WAL');
       },
@@ -244,6 +244,35 @@ class DatabaseHelper {
       await db.execute('DROP TABLE IF EXISTS Outbox_V2');
       await _createOutboxV2Table(db);
     }
+    if (oldVersion < 12) {
+      // v12 (Phase 0b #4-3, spec §21.8, strategy C): the wire bumped to
+      // protocol_version 3 (EventEnvelope v3 adds signed field_id + field_mac;
+      // canonical 124→141). Old pv=2 envelopes were signed over the 124-byte
+      // layout and CANNOT be re-signed (no private key for others' events) — a
+      // v3 dispatcher drops them as unknown-protocol-version / signature-invalid.
+      // Purge all pre-v3 wire state so a stale dev DB never re-broadcasts an
+      // incompatible envelope. Lww_Index_V2 cascades on the Envelopes_V2 delete
+      // (FK ON DELETE CASCADE); pre-v3 Tombstones_V2 are cleared too. Outbox_V2
+      // (ephemeral by contract) is dropped + rebuilt so no pending pv=2 row goes
+      // out post-upgrade.
+      if (await _tableExists(db, 'Envelopes_V2')) {
+        await db.execute('DELETE FROM Envelopes_V2 WHERE protocol_version = 2');
+      }
+      if (await _tableExists(db, 'Tombstones_V2')) {
+        await db.execute('DELETE FROM Tombstones_V2');
+      }
+      await db.execute('DROP TABLE IF EXISTS Outbox_V2');
+      await _createOutboxV2Table(db);
+    }
+  }
+
+  /// True when a table named [name] exists in the database.
+  Future<bool> _tableExists(Database db, String name) async {
+    final rows = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+      [name],
+    );
+    return rows.isNotEmpty;
   }
 
   /// v0.3 Stage 0c1 — schema for the Envelope v2 storage layer.

@@ -3,7 +3,7 @@
 #
 # A reference envelope used by the canonical-encoder + signature path. The
 # generator script will load this YAML, build an EventEnvelopeV2 with the
-# fields below, compute the canonical signature input (124 bytes), sign with
+# fields below, compute the canonical signature input (141 bytes), sign with
 # the test-only private key (also from this file), and emit the resulting
 # (envelope_struct, expected_canonical_bytes_hex, expected_proto_bytes_hex,
 # expected_signature_hex) tuple into wire_conformance_v1.json.
@@ -16,7 +16,7 @@ name: sos_red_minimal
 description: SOS_RED snapshot at minimal payload — single-notify at MTU=512, 2 chunks at MTU=247.
 
 envelope:
-  protocol_version: 2
+  protocol_version: 3
   envelope_id_hex: "01890b1a8e7c7c0a8b9c4f8d63b21f00"   # UUIDv7 sample
   event_type: 1                                          # EVENT_TYPE_STATUS_UPDATE
   priority: 1                                            # PRIORITY_SOS_RED
@@ -38,7 +38,7 @@ test_signing:
   public_key_hex_must_match_author: true   # the generator will substitute author_key with the public key derived from private_key_hex
 
 expected:
-  canonical_sig_input_bytes: 124   # locked length per spec §8.2
+  canonical_sig_input_bytes: 141   # locked v3 length per spec §8.2 / §21.4
   chunk_count_at_mtu_247: 1        # fits in single notify (envelope ≤ 226 B)
   chunk_count_at_mtu_185: 1        # fits in single notify (envelope ≤ 164 B)
   chunk_count_at_mtu_512: 1

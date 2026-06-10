@@ -1,6 +1,6 @@
-// v0.3 Stage 0c wave 3A — PROTOCOL_HELLO state machine + validator + service.
+// v0.3 Stage 0c wave 3A ??PROTOCOL_HELLO state machine + validator + service.
 //
-// Covers spec native_transport_v1 §5.2, §5.7, §6.2, §15.9:
+// Covers spec native_transport_v1 禮5.2, 禮5.7, 禮6.2, 禮15.9:
 //   - Valid HELLO transitions to active(profile)
 //   - 5 s timeout transitions to legacyFallback(PhoneV1-legacy)
 //   - Malformed payload transitions to failed
@@ -38,7 +38,7 @@ void main() {
     await DatabaseHelper().resetForTest();
   });
 
-  // ── 1. Validator (pure) ───────────────────────────────────────────────
+  // ?? 1. Validator (pure) ???????????????????????????????????????????????
 
   group('ProtocolHelloValidator', () {
     test('valid PhoneV1 HELLO is accepted with PhoneV1 profile', () {
@@ -94,7 +94,7 @@ void main() {
       expect(result.dropReason, ProtocolHelloValidator.dropPayloadInvalid);
     });
 
-    test('protocol_version != 2 drops with hello-protocol-version-incompatible',
+    test('protocol_version != 3 drops with hello-protocol-version-incompatible',
         () {
       final hello = ProtocolHelloData(
         protocolVersion: 1,
@@ -132,7 +132,7 @@ void main() {
     });
   });
 
-  // ── 2. PeerCapabilityRegistry state machine ──────────────────────────
+  // ?? 2. PeerCapabilityRegistry state machine ??????????????????????????
 
   group('PeerCapabilityRegistry', () {
     test('initial pending state on onPeerReadyForHello', () {
@@ -196,12 +196,10 @@ void main() {
       );
       final result = reg.onHelloAccepted('CC:DD', hello.encode());
       expect(result.isAccepted, false);
-      expect(
-          result.dropReason, ProtocolHelloValidator.dropSelfDeclaredLegacy);
+      expect(result.dropReason, ProtocolHelloValidator.dropSelfDeclaredLegacy);
       final s = reg.stateFor('CC:DD')!;
       expect(s.status, PeerCapabilityStatus.failed);
-      expect(s.failureReason,
-          ProtocolHelloValidator.dropSelfDeclaredLegacy);
+      expect(s.failureReason, ProtocolHelloValidator.dropSelfDeclaredLegacy);
       expect(s.profile, CapabilityProfile.phoneV1Legacy);
     });
 
@@ -220,15 +218,15 @@ void main() {
         helloTimeout: const Duration(milliseconds: 30),
       );
       reg.onPeerReadyForHello('GG:HH');
-      // Re-arm with same key — second call should reset state and timer.
+      // Re-arm with same key ??second call should reset state and timer.
       await Future<void>.delayed(const Duration(milliseconds: 10));
       reg.onPeerReadyForHello('GG:HH');
       // First timer (which started ~10ms ago) would have fired at 30ms;
       // the second timer (just started) fires at 40ms total. Check at 60ms
       // that we're in legacyFallback (proves the timer fired, not skipped).
       await Future<void>.delayed(const Duration(milliseconds: 60));
-      expect(reg.stateFor('GG:HH')?.status,
-          PeerCapabilityStatus.legacyFallback);
+      expect(
+          reg.stateFor('GG:HH')?.status, PeerCapabilityStatus.legacyFallback);
     });
 
     test('changes stream emits on every transition', () async {
@@ -247,7 +245,7 @@ void main() {
     });
   });
 
-  // ── 3. buildSelfHello guards ─────────────────────────────────────────
+  // ?? 3. buildSelfHello guards ?????????????????????????????????????????
 
   group('buildSelfHello', () {
     test('rejects PHONE_V1_LEGACY self-advertisement', () {
@@ -298,7 +296,7 @@ void main() {
     });
   });
 
-  // ── 4. ProtocolHelloService end-to-end ────────────────────────────────
+  // ?? 4. ProtocolHelloService end-to-end ????????????????????????????????
 
   group('ProtocolHelloService', () {
     Future<_HelloHarness> makeHarness({
@@ -332,8 +330,7 @@ void main() {
         trace: trace,
       );
 
-      final registry =
-          PeerCapabilityRegistry(helloTimeout: helloTimeout);
+      final registry = PeerCapabilityRegistry(helloTimeout: helloTimeout);
       final sent = <_SentChunkBatch>[];
       final service = ProtocolHelloService(
         publisher: publisher,
@@ -354,7 +351,14 @@ void main() {
       );
       service.attachDispatcher(dispatcher);
       return _HelloHarness(
-        db, store, trace, rate, dispatcher, peerPublisher, registry, service,
+        db,
+        store,
+        trace,
+        rate,
+        dispatcher,
+        peerPublisher,
+        registry,
+        service,
         sent,
       );
     }
@@ -389,7 +393,7 @@ void main() {
       await h.dispose();
     });
 
-    test('valid peer HELLO via dispatcher → registry active(PhoneV1)',
+    test('valid peer HELLO via dispatcher ??registry active(PhoneV1)',
         () async {
       final h = await makeHarness();
       await h.service.onPeerReadyForHello('AA:BB', 247);
@@ -411,9 +415,10 @@ void main() {
         expiresAtHlc: HlcTimestampV2(msSinceEpoch: 60000, counter: 0),
         maxHops: 0,
         negotiatedMtu: 247,
+        fieldId: Uint8List(16),
       );
 
-      // Receive via dispatcher (it emits onto outcomes → service routes to
+      // Receive via dispatcher (it emits onto outcomes ??service routes to
       // registry).
       final outcome = await h.dispatcher.onReceiveEnvelopeBytes(
         published.wireBytes,
@@ -430,7 +435,7 @@ void main() {
       await h.dispose();
     });
 
-    test('peer never sends HELLO → 5 s fallback (legacy)', () async {
+    test('peer never sends HELLO ??5 s fallback (legacy)', () async {
       final h = await makeHarness(
         helloTimeout: const Duration(milliseconds: 40),
       );
@@ -442,7 +447,7 @@ void main() {
       await h.dispose();
     });
 
-    test('peer self-declares LEGACY → failed (drop connection signal)',
+    test('peer self-declares LEGACY ??failed (drop connection signal)',
         () async {
       final h = await makeHarness();
       await h.service.onPeerReadyForHello('CC:DD', 247);
@@ -459,6 +464,7 @@ void main() {
         expiresAtHlc: HlcTimestampV2(msSinceEpoch: 60000, counter: 0),
         maxHops: 0,
         negotiatedMtu: 247,
+        fieldId: Uint8List(16),
       );
       await h.dispatcher.onReceiveEnvelopeBytes(
         published.wireBytes,
@@ -468,17 +474,18 @@ void main() {
 
       final state = h.registry.stateFor('CC:DD')!;
       expect(state.status, PeerCapabilityStatus.failed);
-      expect(state.failureReason,
-          ProtocolHelloValidator.dropSelfDeclaredLegacy);
+      expect(
+          state.failureReason, ProtocolHelloValidator.dropSelfDeclaredLegacy);
       await h.dispose();
     });
 
-    test('HELLO at non-NORMAL priority is dropped by matrix BEFORE state machine',
+    test(
+        'HELLO at non-NORMAL priority is dropped by matrix BEFORE state machine',
         () async {
       final h = await makeHarness();
       await h.service.onPeerReadyForHello('EE:FF', 247);
-      // Spec §6 says PROTOCOL_HELLO must be NORMAL; sending at SOS_RED is a
-      // priority abuse — the publisher itself rejects at send time.
+      // Spec 禮6 says PROTOCOL_HELLO must be NORMAL; sending at SOS_RED is a
+      // priority abuse ??the publisher itself rejects at send time.
       expect(
         () => h.peerPublisher.send(
           eventType: EventTypeV2.protocolHello,
@@ -492,6 +499,7 @@ void main() {
           expiresAtHlc: HlcTimestampV2(msSinceEpoch: 60000, counter: 0),
           maxHops: 0,
           negotiatedMtu: 247,
+          fieldId: Uint8List(16),
         ),
         throwsA(isA<PublishRejected>()),
       );
@@ -518,6 +526,7 @@ void main() {
         expiresAtHlc: HlcTimestampV2(msSinceEpoch: 60000, counter: 0),
         maxHops: 0,
         negotiatedMtu: 247,
+        fieldId: Uint8List(16),
       );
 
       final outcome = await h.dispatcher.onReceiveEnvelopeBytes(

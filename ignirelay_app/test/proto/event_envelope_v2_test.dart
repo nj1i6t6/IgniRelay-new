@@ -55,7 +55,7 @@ void main() {
       final orig = _sample();
       final bytes = orig.encode();
       final out = EventEnvelopeV2.decode(bytes);
-      expect(out.protocolVersion, 2);
+      expect(out.protocolVersion, 3);
       expect(out.envelopeId, orig.envelopeId);
       expect(out.eventType, orig.eventType);
       expect(out.priority, orig.priority);
@@ -73,7 +73,7 @@ void main() {
     test('rejects when envelope_id is missing or wrong size', () {
       // Build a manual proto wire stream that omits envelope_id.
       final w = ProtoWriter();
-      w.writeUint32(1, 2);
+      w.writeUint32(1, 3);
       w.writeEnum(3, EventTypeV2.statusUpdate);
       w.writeEnum(4, PriorityV2.sosRed);
       // missing envelope_id at tag 2 entirely
@@ -100,7 +100,7 @@ void main() {
 
     test('skips unknown fields (forward compat)', () {
       final w = ProtoWriter();
-      w.writeUint32(1, 2);
+      w.writeUint32(1, 3);
       w.writeBytes(2, List.generate(16, (i) => i));
       w.writeEnum(3, EventTypeV2.statusUpdate);
       w.writeEnum(4, PriorityV2.sosRed);
@@ -111,6 +111,7 @@ void main() {
       w.writeUint32(9, 1);
       w.writeBytes(10, List.generate(64, (i) => i));
       w.writeBytes(11, [1, 2, 3]);
+      w.writeBytes(14, List.filled(16, 0));
       // unknown tag 99 (varint)
       w.writeUint32(99, 12345);
       // unknown tag 100 (length-delimited)
@@ -305,7 +306,8 @@ void main() {
     test('bearing 0 (due north) survives and is NOT absent', () {
       final north = const LocationEvidence(latE7: 250339805, bearingDeg: 0);
       final out = LocationEvidence.decode(north.encode());
-      expect(out.bearingDeg, 0, reason: '0° north must round-trip, not become null');
+      expect(out.bearingDeg, 0,
+          reason: '0° north must round-trip, not become null');
     });
 
     test('bearing 215 round-trips', () {

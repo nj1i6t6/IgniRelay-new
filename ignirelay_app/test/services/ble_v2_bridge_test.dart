@@ -1,4 +1,4 @@
-// v0.3 Stage 0c wave 3B — BleV2Bridge end-to-end.
+// v0.3 Stage 0c wave 3B ??BleV2Bridge end-to-end.
 //
 // Covers the wiring contract spelled out in the wave 3B scope:
 //   - native `peer_ready_for_hello` event triggers ProtocolHelloService
@@ -96,6 +96,7 @@ void main() {
         expiresAtHlc: HlcTimestampV2(msSinceEpoch: 60000, counter: 0),
         maxHops: 1,
         negotiatedMtu: 247,
+        fieldId: Uint8List(16),
       );
       // Tell bridge the peer is ready so the registry has a pending entry.
       h.events.add({
@@ -156,7 +157,7 @@ void main() {
         'role': 'central',
       });
       await _drainMicrotasks();
-      // Peer self-declares LEGACY → bridge routes via dispatcher to registry → failed.
+      // Peer self-declares LEGACY ??bridge routes via dispatcher to registry ??failed.
       final badHello = ProtocolHelloData(
         peerKind: PeerKind.phoneV1Legacy,
         maxRxEnvelopeBytes: 164,
@@ -170,6 +171,7 @@ void main() {
         expiresAtHlc: HlcTimestampV2(msSinceEpoch: 60000, counter: 0),
         maxHops: 1,
         negotiatedMtu: 247,
+        fieldId: Uint8List(16),
       );
       for (final c in published.chunks) {
         h.events.add({
@@ -180,8 +182,7 @@ void main() {
       }
       await _drainMicrotasks();
       await Future<void>.delayed(const Duration(milliseconds: 10));
-      expect(h.registry.stateFor('GG:HH')?.status,
-          PeerCapabilityStatus.failed);
+      expect(h.registry.stateFor('GG:HH')?.status, PeerCapabilityStatus.failed);
       expect(h.registry.stateFor('GG:HH')?.failureReason,
           ProtocolHelloValidator.dropSelfDeclaredLegacy);
       // Now sendEnvelope must refuse.
@@ -228,6 +229,7 @@ void main() {
         expiresAtHlc: HlcTimestampV2(msSinceEpoch: 60000, counter: 0),
         maxHops: 1,
         negotiatedMtu: 247,
+        fieldId: Uint8List(16),
       );
       for (final c in pubHello.chunks) {
         h.events.add({
@@ -238,12 +240,12 @@ void main() {
       }
       await _drainMicrotasks();
       await Future<void>.delayed(const Duration(milliseconds: 10));
-      expect(h.registry.stateFor('II:JJ')?.profile,
-          CapabilityProfile.bleNodeV1);
+      expect(
+          h.registry.stateFor('II:JJ')?.profile, CapabilityProfile.bleNodeV1);
 
       // Envelope size sweet spot at MTU=185: fits SOS_RED 240B budget but
       // > 164B single-notify cap (185 - 3 ATT - 18 chunk header). A ~50B
-      // payload puts the encoded envelope around ~210B → 2 chunks.
+      // payload puts the encoded envelope around ~210B ??2 chunks.
       h.writes.clear();
       final outcome = await h.bridge.sendEnvelope(
         peerId: 'II:JJ',
@@ -285,6 +287,7 @@ void main() {
         expiresAtHlc: HlcTimestampV2(msSinceEpoch: 60000, counter: 0),
         maxHops: 1,
         negotiatedMtu: 247,
+        fieldId: Uint8List(16),
       );
       for (final c in pubHello.chunks) {
         h.events.add({
@@ -388,6 +391,7 @@ void main() {
         expiresAtHlc: HlcTimestampV2(msSinceEpoch: 60000, counter: 0),
         maxHops: 1,
         negotiatedMtu: 247,
+        fieldId: Uint8List(16),
       );
       for (final c in pubHello.chunks) {
         h.events.add({
@@ -461,16 +465,14 @@ Future<_Harness> _makeHarness({
     rateLimiter: rate,
   );
   final selfKey = await Ed25519().newKeyPair();
-  final selfPub =
-      Uint8List.fromList((await selfKey.extractPublicKey()).bytes);
+  final selfPub = Uint8List.fromList((await selfKey.extractPublicKey()).bytes);
   final selfPublisher = MessagePublisherV2(
     keyPair: selfKey,
     authorPublicKey: selfPub,
     trace: trace,
   );
   final peerKey = await Ed25519().newKeyPair();
-  final peerPub =
-      Uint8List.fromList((await peerKey.extractPublicKey()).bytes);
+  final peerPub = Uint8List.fromList((await peerKey.extractPublicKey()).bytes);
   final peerPublisher = MessagePublisherV2(
     keyPair: peerKey,
     authorPublicKey: peerPub,

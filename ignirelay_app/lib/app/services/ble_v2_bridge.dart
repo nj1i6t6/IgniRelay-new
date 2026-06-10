@@ -24,6 +24,7 @@ import 'dart:typed_data';
 
 import 'package:ignirelay_app/app/controllers/envelope_dispatcher_v2.dart';
 import 'package:ignirelay_app/app/controllers/message_publisher_v2.dart';
+import 'package:ignirelay_app/app/crypto/field_auth_v2.dart';
 import 'package:ignirelay_app/app/mesh/capability_profile.dart';
 import 'package:ignirelay_app/app/mesh/reassembler.dart';
 import 'package:ignirelay_app/app/proto/event_envelope_v2.dart';
@@ -277,6 +278,11 @@ class BleV2Bridge {
         expiresAtHlc: expiresAtHlc,
         maxHops: maxHops,
         negotiatedMtu: mtu,
+        // 4-3 placeholder: no field joined yet, so emit a zero field_id and no
+        // field_mac. The real (field_id, field_mac_key) context is threaded
+        // through here when the field-join flow + PRESENCE publish land in 4-4
+        // (the dispatcher field-scope check stays OFF in production until then).
+        fieldId: FieldAuthV2.zeroFieldId(),
         envelopeId: envelopeId,
         isExperimental: isExperimental,
       );

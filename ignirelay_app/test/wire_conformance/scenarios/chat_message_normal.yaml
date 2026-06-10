@@ -8,7 +8,7 @@ name: chat_message_normal
 description: CHAT_MESSAGE = 30 at NORMAL priority — single-notify at MTU >= 247.
 
 envelope:
-  protocol_version: 2
+  protocol_version: 3
   envelope_id_hex: "01890b1aa1cf7d3a8b9c4f8d63b21f30"
   event_type: 30
   priority: 6
@@ -29,7 +29,7 @@ test_signing:
   public_key_hex_must_match_author: true
 
 expected:
-  canonical_sig_input_bytes: 124
+  canonical_sig_input_bytes: 141
   chunk_count_at_mtu_247: 1
   chunk_count_at_mtu_185: 1
   chunk_count_at_mtu_512: 1

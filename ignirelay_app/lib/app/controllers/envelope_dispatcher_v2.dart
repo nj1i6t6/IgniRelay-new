@@ -6,7 +6,7 @@
 // `mesh_trace_logs` row with the spec-named drop_reason):
 //
 //   1. proto3 decode (required-field check inside EventEnvelopeV2.decode)
-//   2. unknown-protocol-version (only protocol_version == 2 accepted) [3E]
+//   2. unknown-protocol-version (only protocol_version == 3 accepted)
 //   3. sig_algo recognition (only 0x01 = Ed25519 in v0.3)
 //   4. SHA-256(payload) recomputation + Ed25519 signature verification
 //   5. max-hops-overcommit (envelope_v2_spec §11.3) [3E]
@@ -38,10 +38,12 @@ import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:ignirelay_app/app/crypto/canonical_encoder_v2.dart';
+import 'package:ignirelay_app/app/crypto/field_auth_v2.dart';
 import 'package:ignirelay_app/app/proto/event_envelope_v2.dart';
 import 'package:ignirelay_app/app/proto/proto_wire.dart';
 import 'package:ignirelay_app/app/services/author_rate_limiter.dart';
 import 'package:ignirelay_app/app/services/envelope_store_v2.dart';
+import 'package:ignirelay_app/app/services/field_key_store.dart';
 import 'package:ignirelay_app/app/services/mesh_trace_writer.dart';
 import 'package:ignirelay_app/app/services/payload_budget_v2.dart';
 import 'package:ignirelay_app/app/services/priority_matrix_v2.dart';
@@ -112,10 +114,21 @@ class EnvelopeDispatcherV2 {
   /// dev-mode trace screen) listen here.
   Stream<DispatchOutcome> get outcomes => _outcomes.stream;
 
-  /// Protocol version the dispatcher accepts. Spec §3 / §7.5 #1: v0.3 ==
-  /// `protocol_version = 2`. A future v0.4 device sending `protocol_version
-  /// = 3` will surface here as `unknown-protocol-version`.
-  static const int _acceptedProtocolVersion = 2;
+  /// Protocol version the dispatcher accepts. Phase 0b #4-3 bumped v0.3 to
+  /// `protocol_version = 3` (canonical now 141 bytes incl. field_id, §21).
+  /// A peer sending `protocol_version = 2` surfaces as `unknown-protocol-version`.
+  static const int _acceptedProtocolVersion = 3;
+
+  /// Local field-membership keys (spec §21.6). Null when no fields are joined.
+  final FieldKeyStore? _fieldKeys;
+
+  /// Stage 4-3 shim — gates the field-scope + field-mac membership check
+  /// (spec §21.6). Defaults OFF so existing tests (which build envelopes with a
+  /// zero/unknown field_id and no FieldKeyStore) keep passing, and because an
+  /// empty store with the check ON would drop every non-control envelope.
+  /// Production flips this ON together with the field-join flow in 4-4. The
+  /// verification LOGIC is fully implemented + tested here regardless.
+  final bool _enableFieldScopeCheck;
 
   /// Stage 0c wave 3E shim — gates the clock-based `expires_at_hlc < now`
   /// branch of the envelope-expired check (spec §7.5 #10).
@@ -147,11 +160,15 @@ class EnvelopeDispatcherV2 {
     Future<DateTime> Function()? now,
     bool enableClockBasedExpiry = false,
     bool enableMaxHopsOvercommit = false,
+    FieldKeyStore? fieldKeys,
+    bool enableFieldScopeCheck = false,
   })  : _store = store,
         _trace = trace,
         _rateLimiter = rateLimiter,
         _enableClockBasedExpiry = enableClockBasedExpiry,
         _enableMaxHopsOvercommit = enableMaxHopsOvercommit,
+        _fieldKeys = fieldKeys,
+        _enableFieldScopeCheck = enableFieldScopeCheck,
         _now = now ?? (() async => DateTime.now());
 
   Future<void> dispose() async {
@@ -178,7 +195,7 @@ class EnvelopeDispatcherV2 {
     }
 
     // Stage 0c wave 3E — unknown-protocol-version. Reject anything not
-    // protocol_version == 2 BEFORE signature verify (sig canonical input
+    // protocol_version == 3 BEFORE signature verify (sig canonical input
     // includes the version, so a wrong version would fail signature anyway,
     // but the explicit early drop produces the right trace reason instead
     // of `signature-invalid`).
@@ -212,6 +229,7 @@ class EnvelopeDispatcherV2 {
     final sigInput = CanonicalEncoderV2.buildSignatureInput(
       protocolVersion: envelope.protocolVersion,
       envelopeId: envelope.envelopeId,
+      fieldId: envelope.fieldId,
       eventType: envelope.eventType,
       priority: envelope.priority,
       createdAtHlcMs: envelope.createdAtHlc.msSinceEpoch,
@@ -223,7 +241,8 @@ class EnvelopeDispatcherV2 {
       sigAlgo: envelope.sigAlgo,
       payloadHash: payloadHash,
     );
-    final pubKey = SimplePublicKey(envelope.authorKey, type: KeyPairType.ed25519);
+    final pubKey =
+        SimplePublicKey(envelope.authorKey, type: KeyPairType.ed25519);
     final signature = Signature(envelope.signature, publicKey: pubKey);
     final ok = await Ed25519().verify(sigInput, signature: signature);
     if (!ok) {
@@ -235,6 +254,43 @@ class EnvelopeDispatcherV2 {
         ),
         traceMeta: _TraceMeta.fromEnvelope(envelope, peerId, sigStatus: 1),
       );
+    }
+
+    // v3 §21.6 — field scope + membership. Two INDEPENDENT proofs from the
+    // Ed25519 check above: (1) field_id must be a locally joined field, then
+    // (2) field_mac must verify (HMAC over the SAME `sigInput` bytes, §21.4).
+    // Control frames (§21.7) are exempt. Gated behind [_enableFieldScopeCheck];
+    // production flips it on with the field-join flow (4-4). See field comment.
+    if (_enableFieldScopeCheck &&
+        !FieldAuthV2.isControlEventType(envelope.eventType)) {
+      final store = _fieldKeys;
+      if (store == null || !store.isJoined(envelope.fieldId)) {
+        return _drop(
+          DispatchDropped(
+            dropReason: 'field-scope-mismatch',
+            envelopeId: envelope.envelopeId,
+            detail: 'field_id not in joined set',
+            peerId: peerId,
+          ),
+          traceMeta: _TraceMeta.fromEnvelope(envelope, peerId, sigStatus: 0),
+        );
+      }
+      final macKey = store.macKeyFor(envelope.fieldId)!;
+      final macOk = await FieldAuthV2.verifyFieldMac(
+        macKey,
+        sigInput,
+        envelope.fieldMac,
+      );
+      if (!macOk) {
+        return _drop(
+          DispatchDropped(
+            dropReason: 'field-mac-invalid',
+            envelopeId: envelope.envelopeId,
+            peerId: peerId,
+          ),
+          traceMeta: _TraceMeta.fromEnvelope(envelope, peerId, sigStatus: 0),
+        );
+      }
     }
 
     // Stage 0c wave 3E — max-hops-overcommit (spec §11.3). Receivers MUST
@@ -438,7 +494,8 @@ class EnvelopeDispatcherV2 {
       envelopeId: drop.envelopeId ?? Uint8List(16),
       eventType: traceMeta.eventType,
       priority: traceMeta.priority,
-      authorKey: traceMeta.authorKey.isEmpty ? Uint8List(32) : traceMeta.authorKey,
+      authorKey:
+          traceMeta.authorKey.isEmpty ? Uint8List(32) : traceMeta.authorKey,
       lastRelayId: traceMeta.lastRelayId,
       createdAtHlcMs: traceMeta.createdAtHlcMs,
       expiresAtHlcMs: traceMeta.expiresAtHlcMs,

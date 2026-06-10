@@ -100,9 +100,4 @@ class EventStore {
       excludeEventType: EventType.hazardMarker,
     );
   }
-
-  /// 查詢「resourceRegister」型事件（給據點物資畫面列出我發布的據點）。
-  Future<List<Map<String, dynamic>>> queryResourceRegisters({int limit = 100}) {
-    return queryByType(EventType.resourceRegister, limit: limit);
-  }
 }

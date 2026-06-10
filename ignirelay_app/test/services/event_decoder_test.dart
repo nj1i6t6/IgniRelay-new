@@ -1,16 +1,17 @@
 // event_decoder_test.dart
 //
-// Stage 1 corrective gate test:
-//   - 每個 decoder 都能把合法 payload 解成 plain Dart 物件
+// Gate test:
+//   - 每個保留的 decoder 都能把合法 payload 解成 plain Dart 物件
 //   - 拿到不合法 / 空 payload 時必須 return null，不能 throw
-//   - decodeByType() 對未支援的 eventType return null
 //
-// 為什麼是這四件事：EventDecoder 是 UI 與 protobuf 之間唯一的橋；它必須
-// fail-soft，否則 main_shell / map_screen_controller 在收到野生 wire payload
-// 時會整個 widget tree 炸掉。
+// EventDecoder 是 UI 與 protobuf 之間的橋；它必須 fail-soft，否則在收到野生
+// wire payload 時會整個 widget tree 炸掉。
+//
+// Phase 0b #3B-4：舊產品的 decodeResourceData 與 decodeByType（含 match/chat
+// dispatch）已隨 decoder 移除，對應測試一併刪除。只剩 SOS/求援
+// (decodeRequestData) 與危險標記 (decodeHazardData)。
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ignirelay_app/app/mesh/event_types.dart';
 import 'package:ignirelay_app/app/proto/mesh_protocol.pb.dart' as pb;
 import 'package:ignirelay_app/app/services/event_decoder.dart';
 
@@ -52,30 +53,6 @@ void main() {
     });
   });
 
-  group('EventDecoder — decodeResourceData', () {
-    test('parses well-formed ResourceData', () {
-      final raw = pb.ResourceData(
-        resourceType: 'FOOD/RICE',
-        quantity: 12.0,
-        unit: 'kg',
-        deliveryMode: 'PICKUP',
-      ).writeToBuffer();
-
-      final out = decoder.decodeResourceData(raw);
-      expect(out, isNotNull);
-      expect(out!.resourceType, 'FOOD/RICE');
-      expect(out.quantity, 12);
-      expect(out.unit, 'kg');
-      expect(out.deliveryMode, 'PICKUP');
-    });
-
-    test('returns null on malformed payload', () {
-      final out =
-          decoder.decodeResourceData(const <int>[0xff, 0xfe, 0xfd, 0xfc]);
-      expect(out, isNull);
-    });
-  });
-
   group('EventDecoder — decodeHazardData', () {
     test('parses well-formed HazardData', () {
       final raw = pb.HazardData(
@@ -98,41 +75,6 @@ void main() {
 
     test('returns null on malformed payload', () {
       final out = decoder.decodeHazardData(const <int>[0xff, 0xff]);
-      expect(out, isNull);
-    });
-  });
-
-  group('EventDecoder — decodeByType', () {
-    test('dispatches resourceRegister → ResourceData', () {
-      final raw = pb.ResourceData(
-        resourceType: 'WATER',
-        quantity: 3.0,
-        unit: 'L',
-        deliveryMode: 'PICKUP',
-      ).writeToBuffer();
-      final out = decoder.decodeByType(EventType.resourceRegister, raw);
-      expect(out, isA<ResourceData>());
-    });
-
-    test('dispatches requestBroadcast → RequestData', () {
-      final raw = pb.RequestData(resourceType: 'FOOD', quantityNeeded: 1)
-          .writeToBuffer();
-      final out = decoder.decodeByType(EventType.requestBroadcast, raw);
-      expect(out, isA<RequestData>());
-    });
-
-    test('dispatches hazardMarker → HazardDataDecoded', () {
-      final raw = pb.HazardData(
-        hazardType: 'FLOOD',
-        severity: 2,
-      ).writeToBuffer();
-      final out = decoder.decodeByType(EventType.hazardMarker, raw);
-      expect(out, isA<HazardDataDecoded>());
-    });
-
-    test('returns null for unsupported eventType', () {
-      final out =
-          decoder.decodeByType(EventType.chatMessage, const <int>[1, 2, 3]);
       expect(out, isNull);
     });
   });

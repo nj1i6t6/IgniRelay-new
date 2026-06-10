@@ -3,8 +3,8 @@
 // Stage 1 corrective gate test:
 //   - EventStore 只動 Event_Logs，不會偷偷 join 別張表
 //   - 不會用 `payload LIKE` 做 negotiation 模糊查（避免 BLOB-as-text 反模式）
-//   - queryNonHazardMarkersWithLocation / queryResourceRegisters 等語意方法
-//     確實按 event_type 過濾，讓 UI 不需要 import event_types.dart
+//   - queryNonHazardMarkersWithLocation 等語意方法確實按 event_type 過濾，
+//     讓 UI 不需要 import event_types.dart
 //
 // 用 in-memory sqflite_ffi 做純資料層測試。
 
@@ -120,7 +120,7 @@ void main() {
     });
   });
 
-  group('EventStore — queryByType / queryResourceRegisters', () {
+  group('EventStore — queryByType', () {
     test('queryByType filters strictly by event_type', () async {
       final db = await dbHelper.database;
       final now = DateTime.now().millisecondsSinceEpoch;
@@ -135,25 +135,6 @@ void main() {
           urgency: 0,
           hlcTimestamp: now);
       final regs = await store.queryByType(EventType.resourceRegister);
-      expect(regs.length, 1);
-      expect(regs.first['event_type'], EventType.resourceRegister);
-    });
-
-    test('queryResourceRegisters is a semantic alias for resourceRegister type',
-        () async {
-      final db = await dbHelper.database;
-      final now = DateTime.now().millisecondsSinceEpoch;
-      await _insertEventLog(db,
-          eventId: _uid('reg'),
-          eventType: EventType.resourceRegister,
-          urgency: 0,
-          hlcTimestamp: now);
-      await _insertEventLog(db,
-          eventId: _uid('hz'),
-          eventType: EventType.hazardMarker,
-          urgency: 3,
-          hlcTimestamp: now);
-      final regs = await store.queryResourceRegisters();
       expect(regs.length, 1);
       expect(regs.first['event_type'], EventType.resourceRegister);
     });

@@ -904,3 +904,518 @@ class ProtocolNoticeData {
     return ProtocolNoticeData(noticeId: id);
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 0b #4-1 — whitepaper field-event payload structs (STRUCTURAL ONLY).
+//
+// Hand-written proto3 payload bodies for the whitepaper events
+// (PRESENCE / CHECKPOINT / HAZARD_MARKER / ADMIN_BROADCAST) plus the shared
+// `LocationEvidence` observation. This wave adds ONLY the structs + codecs +
+// unit tests. It deliberately does NOT:
+//   • add the matching EventTypeV2 constants / matrix entries  (→ commit 4-2),
+//   • touch the canonical signature input or add `field_id`    (→ commit 4-3),
+//   • bump protocol_version or wire these into publisher / dispatcher /
+//     projector / conformance corpus.
+// So this change has ZERO impact on the signed envelope and the cross-platform
+// conformance corpus. Field numbers are FROZEN once shipped — reserved-tag
+// comments mark future tags so later waves cannot reuse them (same discipline
+// as ShelterStatusData et al above).
+//
+// Design: docs/PHASE0B4_WIRE_DESIGN.md §3, grounded in REBUILD_PLAN §3.6 —
+// only LocationEvidence rides the wire; the fused PositionEstimate (confidence /
+// uncertainty) is UI-local and never serialized.
+//
+// Decode is intentionally lenient (skip unknowns, default missing fields) like
+// the other payload structs: a malformed payload is a read-model concern, not a
+// security boundary (the envelope signature is verified before the payload is
+// ever decoded).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// How a [LocationEvidence] observation was produced (PHASE0B4 §3.1).
+class LocationSource {
+  static const int unknown = 0;
+  static const int gps = 1;
+  static const int fieldNode = 2;
+  static const int bleRssi = 3;
+  static const int pdr = 4;
+  static const int manual = 5;
+}
+
+/// Whose position the observation describes:
+///   SUBJECT  — self-reported (e.g. own GPS fix).
+///   OBSERVER — something/someone else saw the subject (e.g. a node's RSSI fix).
+class LocationFrame {
+  static const int unspecified = 0;
+  static const int subject = 1;
+  static const int observer = 2;
+}
+
+/// LocationEvidence — a single on-wire position OBSERVATION (not a fused
+/// estimate). lat/lng are degrees × 1e7 fixed-point encoded as `sint64`, so the
+/// wire bytes are bit-identical across Dart/Kotlin/Swift/MCU. The UI fuses
+/// multiple evidences into a `PositionEstimate` locally; that fusion never
+/// rides the wire (REBUILD_PLAN §3.6).
+///
+/// Coordinate convention: degrees × 1e7, rounded to the nearest unit (≤0.55 cm
+/// quantization error). e.g. 25.0339805° → 250339805. Use [latDegrees] /
+/// [lngDegrees] to convert back, or [LocationEvidence.fromDegrees] to build from
+/// doubles. All platforms (Dart/Kotlin/Swift/MCU) MUST round-to-nearest so the
+/// integer wire value matches.
+class LocationEvidence {
+  /// Fixed-point scale: 1 degree == 1e7 units (~1.1 cm at the equator).
+  static const int kE7 = 10000000;
+
+  final int source; // LocationSource.*
+  final int frame; // LocationFrame.*
+  final int latE7; // degrees × 1e7 (sint64)
+  final int lngE7; // degrees × 1e7 (sint64)
+  final int accuracyM; // horizontal accuracy estimate, metres (0 == unknown)
+  final HlcTimestampV2 observedAt;
+  final String anchorNodeId; // optional — set for FIELD_NODE / BLE_RSSI fixes
+  final int distanceFromAnchorM; // optional — 0 == absent
+  final int bearingDeg; // optional — 0..359 (0 == absent / due north)
+
+  // Reserved tags (do not reuse on later additions):
+  //   10  floor_or_level  (sint32) — multi-storey disambiguation
+  //   11  speed_mps       (uint32)
+  //   12..15 reserved
+
+  const LocationEvidence({
+    this.source = LocationSource.unknown,
+    this.frame = LocationFrame.unspecified,
+    this.latE7 = 0,
+    this.lngE7 = 0,
+    this.accuracyM = 0,
+    this.observedAt = HlcTimestampV2.zero,
+    this.anchorNodeId = '',
+    this.distanceFromAnchorM = 0,
+    this.bearingDeg = 0,
+  });
+
+  double get latDegrees => latE7 / kE7;
+  double get lngDegrees => lngE7 / kE7;
+
+  /// Build from degrees (UI-friendly). Rounds to the nearest fixed-point unit.
+  factory LocationEvidence.fromDegrees({
+    int source = LocationSource.unknown,
+    int frame = LocationFrame.unspecified,
+    required double latDegrees,
+    required double lngDegrees,
+    int accuracyM = 0,
+    HlcTimestampV2 observedAt = HlcTimestampV2.zero,
+    String anchorNodeId = '',
+    int distanceFromAnchorM = 0,
+    int bearingDeg = 0,
+  }) {
+    return LocationEvidence(
+      source: source,
+      frame: frame,
+      latE7: (latDegrees * kE7).round(),
+      lngE7: (lngDegrees * kE7).round(),
+      accuracyM: accuracyM,
+      observedAt: observedAt,
+      anchorNodeId: anchorNodeId,
+      distanceFromAnchorM: distanceFromAnchorM,
+      bearingDeg: bearingDeg,
+    );
+  }
+
+  Uint8List encode() {
+    final w = ProtoWriter();
+    w.writeEnum(1, source);
+    w.writeEnum(2, frame);
+    w.writeSint64(3, latE7);
+    w.writeSint64(4, lngE7);
+    w.writeUint32(5, accuracyM);
+    // Embedded message: emit only when non-default so all-default → empty wire.
+    if (observedAt.msSinceEpoch != 0 || observedAt.counter != 0) {
+      w.writeMessage(6, observedAt.encode());
+    }
+    w.writeString(7, anchorNodeId);
+    w.writeUint32(8, distanceFromAnchorM);
+    w.writeUint32(9, bearingDeg);
+    return w.toBytes();
+  }
+
+  static LocationEvidence decode(Uint8List bytes) {
+    final r = ProtoReader(bytes);
+    var source = 0;
+    var frame = 0;
+    var lat = 0;
+    var lng = 0;
+    var accuracy = 0;
+    HlcTimestampV2 observedAt = HlcTimestampV2.zero;
+    var anchor = '';
+    var distance = 0;
+    var bearing = 0;
+    while (!r.isAtEnd) {
+      final tag = r.readTag();
+      final field = tagFieldNumber(tag);
+      final wire = tagWireType(tag);
+      switch (field) {
+        case 1:
+          source = r.readUint32();
+          break;
+        case 2:
+          frame = r.readUint32();
+          break;
+        case 3:
+          if (wire != wireVarint) throw ProtoDecodeException('location.lat wire-type');
+          lat = r.readSint64();
+          break;
+        case 4:
+          if (wire != wireVarint) throw ProtoDecodeException('location.lng wire-type');
+          lng = r.readSint64();
+          break;
+        case 5:
+          accuracy = r.readUint32();
+          break;
+        case 6:
+          if (wire != wireLengthDelimited) {
+            throw ProtoDecodeException('location.observed_at wire-type');
+          }
+          observedAt = HlcTimestampV2.decode(r.readLengthDelimited());
+          break;
+        case 7:
+          anchor = r.readString();
+          break;
+        case 8:
+          distance = r.readUint32();
+          break;
+        case 9:
+          bearing = r.readUint32();
+          break;
+        default:
+          r.skipValue(wire);
+      }
+    }
+    return LocationEvidence(
+      source: source,
+      frame: frame,
+      latE7: lat,
+      lngE7: lng,
+      accuracyM: accuracy,
+      observedAt: observedAt,
+      anchorNodeId: anchor,
+      distanceFromAnchorM: distance,
+      bearingDeg: bearing,
+    );
+  }
+}
+
+/// PresenceData — payload for the (commit 4-2) EVENT_TYPE_PRESENCE. A node's
+/// "last footprint": anonymous identity, where it was last observed, and a
+/// coarse battery hint. Contract: `anon_user_id` is 16 bytes (rotatable, NOT
+/// the envelope author_key); not enforced on decode (lenient — see section
+/// header) but validated at publish time in a later wave.
+class PresenceData {
+  final Uint8List anonUserId;
+  final LocationEvidence location;
+  final int batteryHint; // 0..100, 0 == absent
+
+  // Reserved tags:
+  //   4  movement_state (enum) — STILL / WALKING / VEHICLE ; later wave
+  //   5..15 reserved
+
+  PresenceData({
+    Uint8List? anonUserId,
+    this.location = const LocationEvidence(),
+    this.batteryHint = 0,
+  }) : anonUserId = anonUserId ?? Uint8List(0);
+
+  Uint8List encode() {
+    final w = ProtoWriter();
+    w.writeBytes(1, anonUserId);
+    final loc = location.encode();
+    if (loc.isNotEmpty) w.writeMessage(2, loc);
+    w.writeUint32(3, batteryHint);
+    return w.toBytes();
+  }
+
+  static PresenceData decode(Uint8List bytes) {
+    final r = ProtoReader(bytes);
+    Uint8List anon = Uint8List(0);
+    var location = const LocationEvidence();
+    var battery = 0;
+    while (!r.isAtEnd) {
+      final tag = r.readTag();
+      final field = tagFieldNumber(tag);
+      final wire = tagWireType(tag);
+      switch (field) {
+        case 1:
+          if (wire != wireLengthDelimited) {
+            throw ProtoDecodeException('presence.anon_user_id wire-type');
+          }
+          anon = Uint8List.fromList(r.readLengthDelimited());
+          break;
+        case 2:
+          if (wire != wireLengthDelimited) {
+            throw ProtoDecodeException('presence.location wire-type');
+          }
+          location = LocationEvidence.decode(r.readLengthDelimited());
+          break;
+        case 3:
+          battery = r.readUint32();
+          break;
+        default:
+          r.skipValue(wire);
+      }
+    }
+    return PresenceData(
+      anonUserId: anon,
+      location: location,
+      batteryHint: battery,
+    );
+  }
+}
+
+/// CheckpointData — payload for the (commit 4-2) EVENT_TYPE_CHECKPOINT: an
+/// explicit roll-call "X passed checkpoint Y". `location` is optional (the
+/// checkpoint anchor usually implies position). `anon_user_id` contract: 16
+/// bytes (see [PresenceData]).
+class CheckpointData {
+  final Uint8List anonUserId;
+  final String checkpointId; // roll-call point / Field Node anchor id
+  final LocationEvidence location; // optional
+
+  // Reserved tags:
+  //   4  direction (enum) — IN / OUT ; later wave
+  //   5..15 reserved
+
+  CheckpointData({
+    Uint8List? anonUserId,
+    this.checkpointId = '',
+    this.location = const LocationEvidence(),
+  }) : anonUserId = anonUserId ?? Uint8List(0);
+
+  Uint8List encode() {
+    final w = ProtoWriter();
+    w.writeBytes(1, anonUserId);
+    w.writeString(2, checkpointId);
+    final loc = location.encode();
+    if (loc.isNotEmpty) w.writeMessage(3, loc);
+    return w.toBytes();
+  }
+
+  static CheckpointData decode(Uint8List bytes) {
+    final r = ProtoReader(bytes);
+    Uint8List anon = Uint8List(0);
+    var checkpointId = '';
+    var location = const LocationEvidence();
+    while (!r.isAtEnd) {
+      final tag = r.readTag();
+      final field = tagFieldNumber(tag);
+      final wire = tagWireType(tag);
+      switch (field) {
+        case 1:
+          if (wire != wireLengthDelimited) {
+            throw ProtoDecodeException('checkpoint.anon_user_id wire-type');
+          }
+          anon = Uint8List.fromList(r.readLengthDelimited());
+          break;
+        case 2:
+          if (wire != wireLengthDelimited) {
+            throw ProtoDecodeException('checkpoint.checkpoint_id wire-type');
+          }
+          checkpointId = r.readString();
+          break;
+        case 3:
+          if (wire != wireLengthDelimited) {
+            throw ProtoDecodeException('checkpoint.location wire-type');
+          }
+          location = LocationEvidence.decode(r.readLengthDelimited());
+          break;
+        default:
+          r.skipValue(wire);
+      }
+    }
+    return CheckpointData(
+      anonUserId: anon,
+      checkpointId: checkpointId,
+      location: location,
+    );
+  }
+}
+
+/// Hazard classification carried by [HazardMarkerData]. Enum (varint) rather
+/// than a free string: compact, MCU-friendly, no parse step.
+class HazardType {
+  static const int unspecified = 0;
+  static const int fire = 1;
+  static const int flood = 2;
+  static const int landslide = 3;
+  static const int collapse = 4;
+  static const int chemical = 5;
+  static const int blockedRoute = 6;
+  static const int other = 7;
+}
+
+/// HazardMarkerData — typed payload for EVENT_TYPE_HAZARD_MARKER (50),
+/// replacing the legacy raw-JSON shim (the swap happens in commit 4-5; this
+/// wave only defines the struct). `description` SHOULD stay within
+/// [kDescriptionMaxLen] — enforced at publish time, not in this lenient codec.
+class HazardMarkerData {
+  /// Recommended upper bound for [description] (chars). Publish-time budget,
+  /// not enforced on decode.
+  static const int kDescriptionMaxLen = 280;
+
+  final String hazardId;
+  final int hazardType; // HazardType.*
+  final int severity; // 0..N, sender-defined scale
+  final LocationEvidence location;
+  final String description;
+  final bool isConfirmation; // true == confirms an existing marker
+
+  // Reserved tags:
+  //   7  expires_at (HlcTimestampV2) — auto-clear; later wave
+  //   8..15 reserved
+
+  const HazardMarkerData({
+    this.hazardId = '',
+    this.hazardType = HazardType.unspecified,
+    this.severity = 0,
+    this.location = const LocationEvidence(),
+    this.description = '',
+    this.isConfirmation = false,
+  });
+
+  Uint8List encode() {
+    final w = ProtoWriter();
+    w.writeString(1, hazardId);
+    w.writeEnum(2, hazardType);
+    w.writeUint32(3, severity);
+    final loc = location.encode();
+    if (loc.isNotEmpty) w.writeMessage(4, loc);
+    w.writeString(5, description);
+    w.writeBool(6, isConfirmation);
+    return w.toBytes();
+  }
+
+  static HazardMarkerData decode(Uint8List bytes) {
+    final r = ProtoReader(bytes);
+    var hazardId = '';
+    var hazardType = 0;
+    var severity = 0;
+    var location = const LocationEvidence();
+    var description = '';
+    var isConfirmation = false;
+    while (!r.isAtEnd) {
+      final tag = r.readTag();
+      final field = tagFieldNumber(tag);
+      final wire = tagWireType(tag);
+      switch (field) {
+        case 1:
+          if (wire != wireLengthDelimited) {
+            throw ProtoDecodeException('hazard.hazard_id wire-type');
+          }
+          hazardId = r.readString();
+          break;
+        case 2:
+          hazardType = r.readUint32();
+          break;
+        case 3:
+          severity = r.readUint32();
+          break;
+        case 4:
+          if (wire != wireLengthDelimited) {
+            throw ProtoDecodeException('hazard.location wire-type');
+          }
+          location = LocationEvidence.decode(r.readLengthDelimited());
+          break;
+        case 5:
+          if (wire != wireLengthDelimited) {
+            throw ProtoDecodeException('hazard.description wire-type');
+          }
+          description = r.readString();
+          break;
+        case 6:
+          isConfirmation = r.readBool();
+          break;
+        default:
+          r.skipValue(wire);
+      }
+    }
+    return HazardMarkerData(
+      hazardId: hazardId,
+      hazardType: hazardType,
+      severity: severity,
+      location: location,
+      description: description,
+      isConfirmation: isConfirmation,
+    );
+  }
+}
+
+/// Scope of an [AdminBroadcastData] message.
+class AdminScope {
+  static const int unspecified = 0;
+  static const int field = 1; // this field/site only
+  static const int all = 2; // all reachable nodes
+}
+
+/// AdminBroadcastData — payload for the (commit 4-2) EVENT_TYPE_ADMIN_BROADCAST:
+/// an authority message to a field or to everyone. `message` SHOULD stay within
+/// [kMessageMaxLen] (publish-time budget, not enforced on decode).
+class AdminBroadcastData {
+  static const int kMessageMaxLen = 480;
+
+  final int scope; // AdminScope.*
+  final String message;
+  final HlcTimestampV2 expiresAt;
+
+  // Reserved tags:
+  //   4  severity (enum) — INFO / WARN / CRITICAL ; later wave
+  //   5..15 reserved
+
+  const AdminBroadcastData({
+    this.scope = AdminScope.unspecified,
+    this.message = '',
+    this.expiresAt = HlcTimestampV2.zero,
+  });
+
+  Uint8List encode() {
+    final w = ProtoWriter();
+    w.writeEnum(1, scope);
+    w.writeString(2, message);
+    if (expiresAt.msSinceEpoch != 0 || expiresAt.counter != 0) {
+      w.writeMessage(3, expiresAt.encode());
+    }
+    return w.toBytes();
+  }
+
+  static AdminBroadcastData decode(Uint8List bytes) {
+    final r = ProtoReader(bytes);
+    var scope = 0;
+    var message = '';
+    HlcTimestampV2 expiresAt = HlcTimestampV2.zero;
+    while (!r.isAtEnd) {
+      final tag = r.readTag();
+      final field = tagFieldNumber(tag);
+      final wire = tagWireType(tag);
+      switch (field) {
+        case 1:
+          scope = r.readUint32();
+          break;
+        case 2:
+          if (wire != wireLengthDelimited) {
+            throw ProtoDecodeException('admin.message wire-type');
+          }
+          message = r.readString();
+          break;
+        case 3:
+          if (wire != wireLengthDelimited) {
+            throw ProtoDecodeException('admin.expires_at wire-type');
+          }
+          expiresAt = HlcTimestampV2.decode(r.readLengthDelimited());
+          break;
+        default:
+          r.skipValue(wire);
+      }
+    }
+    return AdminBroadcastData(
+      scope: scope,
+      message: message,
+      expiresAt: expiresAt,
+    );
+  }
+}

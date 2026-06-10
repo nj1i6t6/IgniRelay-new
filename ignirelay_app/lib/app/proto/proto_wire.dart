@@ -69,6 +69,17 @@ class ProtoWriter {
     writeVarint(value);
   }
 
+  /// Signed 64-bit varint via zigzag (proto `sint64`). Maps small-magnitude
+  /// signed values to small varints; plain int64 would encode any negative as
+  /// a full 10-byte varint. Used by LocationEvidence for 1e7 fixed-point
+  /// lat/lng — signed, and wanting a compact, bit-identical encoding across
+  /// Dart/Kotlin/Swift/MCU (nanopb `sint64`). zigzag: (n << 1) ^ (n >> 63).
+  void writeSint64(int fieldNumber, int value) {
+    if (value == 0) return; // proto3 default omitted
+    writeTag(fieldNumber, wireVarint);
+    writeVarint((value << 1) ^ (value >> 63));
+  }
+
   void writeBool(int fieldNumber, bool value) {
     if (!value) return; // proto3 default omitted
     writeTag(fieldNumber, wireVarint);
@@ -177,6 +188,13 @@ class ProtoReader {
   int readUint32() => readVarint();
 
   int readUint64() => readVarint();
+
+  /// Decode a zigzag-encoded signed varint (proto `sint64`). Inverse of
+  /// [ProtoWriter.writeSint64]: (u >>> 1) ^ -(u & 1).
+  int readSint64() {
+    final u = readVarint();
+    return (u >>> 1) ^ -(u & 1);
+  }
 
   /// Length-delimited bytes; returns a view into the underlying buffer.
   Uint8List readLengthDelimited() {

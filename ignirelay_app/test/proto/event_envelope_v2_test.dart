@@ -222,5 +222,204 @@ void main() {
       expect(out.bgState, BgState.foreground);
     });
   });
+
+  group('LocationEvidence', () {
+    test('round-trips all fields', () {
+      final loc = LocationEvidence(
+        source: LocationSource.fieldNode,
+        frame: LocationFrame.observer,
+        latE7: 250339805,
+        lngE7: 1215645000,
+        accuracyM: 12,
+        observedAt: HlcTimestampV2(msSinceEpoch: 1747350000000, counter: 3),
+        anchorNodeId: 'cp-03',
+        distanceFromAnchorM: 47,
+        bearingDeg: 215,
+      );
+      final out = LocationEvidence.decode(loc.encode());
+      expect(out.source, LocationSource.fieldNode);
+      expect(out.frame, LocationFrame.observer);
+      expect(out.latE7, 250339805);
+      expect(out.lngE7, 1215645000);
+      expect(out.accuracyM, 12);
+      expect(out.observedAt.msSinceEpoch, 1747350000000);
+      expect(out.observedAt.counter, 3);
+      expect(out.anchorNodeId, 'cp-03');
+      expect(out.distanceFromAnchorM, 47);
+      expect(out.bearingDeg, 215);
+    });
+
+    test('all defaults → empty wire bytes (proto3 omission)', () {
+      final bytes = const LocationEvidence().encode();
+      expect(bytes.length, 0);
+      final out = LocationEvidence.decode(bytes);
+      expect(out.source, LocationSource.unknown);
+      expect(out.latE7, 0);
+      expect(out.lngE7, 0);
+      expect(out.observedAt.msSinceEpoch, 0);
+    });
+
+    test('negative coordinates round-trip (zigzag sint64)', () {
+      // Santiago, CL — both hemispheres negative.
+      final loc = LocationEvidence.fromDegrees(
+        source: LocationSource.gps,
+        frame: LocationFrame.subject,
+        latDegrees: -33.4489,
+        lngDegrees: -70.6693,
+      );
+      expect(loc.latE7, -334489000);
+      expect(loc.lngE7, -706693000);
+      final out = LocationEvidence.decode(loc.encode());
+      expect(out.latE7, -334489000);
+      expect(out.lngE7, -706693000);
+      expect(out.latDegrees, closeTo(-33.4489, 1e-7));
+      expect(out.lngDegrees, closeTo(-70.6693, 1e-7));
+    });
+
+    test('zigzag keeps a negative coordinate compact (not a 10-byte varint)',
+        () {
+      // Plain int64 would encode any negative as 10 bytes; zigzag of a
+      // ~-7e8 magnitude fits in 5 varint bytes. tag(1B)+value ≤ 6B for the field.
+      final loc = LocationEvidence(lngE7: -706693000);
+      // Only field 4 (lng) is non-default → whole message stays small.
+      expect(loc.encode().length, lessThan(7));
+    });
+
+    test('fromDegrees rounds to nearest fixed-point unit', () {
+      // 25.0339805 * 1e7 == 250339804.9999… in IEEE-754; round-to-nearest
+      // recovers the intended 250339805 (truncation would give …804).
+      final loc = LocationEvidence.fromDegrees(
+        latDegrees: 25.0339805,
+        lngDegrees: 121.5645,
+      );
+      expect(loc.latE7, 250339805);
+      expect(loc.lngE7, 1215645000);
+    });
+
+    test('skips unknown fields (forward compat)', () {
+      final w = ProtoWriter();
+      w.writeEnum(1, LocationSource.gps);
+      w.writeSint64(3, 250339805);
+      w.writeUint32(99, 42); // unknown varint
+      w.writeBytes(100, [1, 2, 3]); // unknown length-delimited
+      final out = LocationEvidence.decode(w.toBytes());
+      expect(out.source, LocationSource.gps);
+      expect(out.latE7, 250339805);
+    });
+  });
+
+  group('PresenceData', () {
+    test('round-trips id + nested location + battery', () {
+      final p = PresenceData(
+        anonUserId: Uint8List.fromList(List.generate(16, (i) => i + 1)),
+        location: LocationEvidence.fromDegrees(
+          source: LocationSource.gps,
+          frame: LocationFrame.subject,
+          latDegrees: 25.0339805,
+          lngDegrees: 121.5645,
+          accuracyM: 8,
+        ),
+        batteryHint: 73,
+      );
+      final out = PresenceData.decode(p.encode());
+      expect(out.anonUserId, p.anonUserId);
+      expect(out.batteryHint, 73);
+      expect(out.location.source, LocationSource.gps);
+      expect(out.location.latE7, 250339805);
+      expect(out.location.accuracyM, 8);
+    });
+
+    test('empty presence round-trips with defaults', () {
+      final out = PresenceData.decode(PresenceData().encode());
+      expect(out.anonUserId, isEmpty);
+      expect(out.batteryHint, 0);
+      expect(out.location.latE7, 0);
+    });
+  });
+
+  group('CheckpointData', () {
+    test('round-trips with optional location present', () {
+      final c = CheckpointData(
+        anonUserId: Uint8List.fromList(List.generate(16, (i) => 0xA0 | i)),
+        checkpointId: 'cp-04',
+        location: const LocationEvidence(
+          source: LocationSource.fieldNode,
+          anchorNodeId: 'node-04',
+        ),
+      );
+      final out = CheckpointData.decode(c.encode());
+      expect(out.anonUserId, c.anonUserId);
+      expect(out.checkpointId, 'cp-04');
+      expect(out.location.anchorNodeId, 'node-04');
+    });
+
+    test('round-trips with location omitted', () {
+      final c = CheckpointData(
+        anonUserId: Uint8List.fromList(List.generate(16, (i) => i)),
+        checkpointId: 'cp-09',
+      );
+      final out = CheckpointData.decode(c.encode());
+      expect(out.checkpointId, 'cp-09');
+      expect(out.location.latE7, 0);
+      expect(out.location.anchorNodeId, '');
+    });
+  });
+
+  group('HazardMarkerData', () {
+    test('typed payload round-trips', () {
+      final h = HazardMarkerData(
+        hazardId: 'hz-0001',
+        hazardType: HazardType.landslide,
+        severity: 4,
+        location: LocationEvidence.fromDegrees(
+          source: LocationSource.manual,
+          latDegrees: 24.1,
+          lngDegrees: 121.2,
+        ),
+        description: 'road blocked at km 12',
+        isConfirmation: true,
+      );
+      final out = HazardMarkerData.decode(h.encode());
+      expect(out.hazardId, 'hz-0001');
+      expect(out.hazardType, HazardType.landslide);
+      expect(out.severity, 4);
+      expect(out.location.latE7, 241000000);
+      expect(out.description, 'road blocked at km 12');
+      expect(out.isConfirmation, true);
+    });
+
+    test('defaults round-trip (unspecified type, no confirmation)', () {
+      final out = HazardMarkerData.decode(const HazardMarkerData().encode());
+      expect(out.hazardType, HazardType.unspecified);
+      expect(out.severity, 0);
+      expect(out.isConfirmation, false);
+      expect(out.description, '');
+    });
+  });
+
+  group('AdminBroadcastData', () {
+    test('round-trips scope + message + expiry', () {
+      final a = AdminBroadcastData(
+        scope: AdminScope.field,
+        message: 'evacuate sector B',
+        expiresAt: HlcTimestampV2(msSinceEpoch: 1747350720000, counter: 0),
+      );
+      final out = AdminBroadcastData.decode(a.encode());
+      expect(out.scope, AdminScope.field);
+      expect(out.message, 'evacuate sector B');
+      expect(out.expiresAt.msSinceEpoch, 1747350720000);
+    });
+
+    test('ALL scope without expiry round-trips', () {
+      final a = AdminBroadcastData(
+        scope: AdminScope.all,
+        message: 'all clear',
+      );
+      final out = AdminBroadcastData.decode(a.encode());
+      expect(out.scope, AdminScope.all);
+      expect(out.message, 'all clear');
+      expect(out.expiresAt.msSinceEpoch, 0);
+    });
+  });
 }
 // ignore_for_file: prefer_const_constructors, prefer_const_declarations, no_leading_underscores_for_local_identifiers

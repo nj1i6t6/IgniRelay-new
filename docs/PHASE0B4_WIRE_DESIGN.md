@@ -108,9 +108,31 @@ sig_input(124) = u32le(pv) ‖ u8(16)‖envelope_id ‖ u32le(event_type) ‖ u3
 **豁免 field-scope drop**（它們是 link 協商，不是場域事件）。否則 HELLO 自己就會被 field-scope 擋掉、
 永遠握不上手。
 
-> ⚠️ **要 GPT 拍板的第 2 件事**：① `field_id` 用 16-byte 定長 opaque（vs 變長字串）？
-> ② canonical 插在 envelope_id 之後（vs append 末端）？③ control range 用 zero-field_id 豁免？
-> ④ HMAC vs 純 Ed25519 簽章綁定（白皮書 §13.3 場域金鑰；MCU 功耗 — REBUILD_PLAN Q2 仍 open）。
+> ✅ **GPT 已全部拍板（4-3-preflight，2026-06-10）**：① `field_id` = 16-byte 定長 opaque
+> （= `SHA-256(field_join_secret)[0..15]`）；② canonical 插在 envelope_id 之後（141 bytes）；
+> ③ control range（100–129）用 zero-field_id 豁免 field-scope；④ **採 HMAC 場域成員認證（見 §1.4）**，
+> 不是只靠 Ed25519。完整凍結契約見 `envelope_v2_spec` §21。
+
+### 1.4 場域成員認證：`field_mac`（HMAC，GPT 4-3-preflight 拍板）
+
+`field_id` 是明文 scope 標籤、任何人聽到就能抄；只有 Ed25519 只能證明「某 author key 簽的」，不能證明
+「此 author 是這個場域的人」。故 v3 在 author 簽章之外，**再加一道場域成員 HMAC**：
+
+- **Ed25519 signature** → AUTHOR IDENTITY（誰簽的）。
+- **`field_mac`（HMAC）** → FIELD MEMBERSHIP（簽的人握有場域密鑰）。兩者**獨立驗證**。
+
+凍結契約（完整見 spec §21）：
+1. **信封新欄位 `15 field_mac (bytes,16)`**（非控制框必填 16 bytes；控制框 absent/empty）。`field_id` 仍是
+   `14 (bytes,16)`。
+2. **金鑰**：`field_id = SHA-256(field_join_secret)[0..15]`；
+   `field_mac_key = HKDF-SHA256(ikm=field_join_secret, salt=empty, info="ignirelay/field-mac/v3", L=32)`。
+3. **`field_mac = HMAC-SHA256(field_mac_key, canonical_sig_input_v3)[0..15]`**（截斷 16 bytes=128-bit，足夠；
+   與 field_id/envelope_id 對稱）。
+4. **不循環**：`field_mac` **不**進 `canonical_sig_input_v3`（它是 canonical 的函數）；Ed25519 與 field_mac
+   蓋**同一份** canonical bytes，彼此不互含。
+5. **收端**：驗 Ed25519（author）→ control range 豁免 → field-scope（field_id ∈ 本機已加入場域？）→ 驗
+   field_mac（membership）。新 `drop_reason = field-mac-invalid`。兩道（簽章 + MAC）都過才收。
+6. **仍 open（非 wire 契約）**：`field_join_secret` 的派發/輪換（QR/代碼/re-key）留 join-flow 後續階段。
 
 ---
 
@@ -269,7 +291,7 @@ Conformance 工具鏈（已定位）：
 |---|---|---|---|
 | **4-1** | payload structs（**不動信封/canonical**） | 加 `LocationEvidence` + `PresenceData` + `CheckpointData` + `HazardMarkerData` + `AdminBroadcastData` 手寫 encode/decode + 單元測試。**零 wire 信封變更 → 零 conformance 衝擊**。 | analyze/test 綠 |
 | **4-2** | EventType additive | 加 `PRESENCE`/`CHECKPOINT`/`ADMIN_BROADCAST` 常數 + `maxHopsDefault`/`isKnown` + priority matrix 條目。純加值。 | test 綠 |
-| **4-3** | **field_id + canonical + pv→3（核心 breaking 刀）** | `EventEnvelopeV2` 欄位 14 + 必填；`CanonicalEncoderV2` 124→141；`MessagePublisherV2` 簽章帶 field_id + pv=3；dispatcher `==3` + `field-scope-mismatch` + control-range 豁免；**重生 conformance corpus** + Dart corpus test + 負面案例；更新 `envelope_v2_spec`。**＋ HELLO negotiation 同步升 v3（完整 version-literal 落點見 §8.1）＋ purge 舊 pv=2 local wire state（見 §8.3）。前置決策：場域金鑰綁定須先拍板（§8.2）。** | **全 conformance（Dart）綠＋ HELLO 握手測試綠** |
+| **4-3** | **field_id + field_mac + canonical + pv→3（核心 breaking 刀）** | `EventEnvelopeV2` 欄位 14 `field_id` + 15 `field_mac` + 必填規則；`CanonicalEncoderV2` 124→141（只插 field_id，**field_mac 不進 canonical**）；`MessagePublisherV2` 簽 Ed25519 + 算 `field_mac=HMAC(field_mac_key, canonical_v3)[0..15]` + pv=3；dispatcher `==3` + `field-scope-mismatch` + **`field-mac-invalid`** + control-range 豁免；**重生 conformance corpus** + Dart corpus test + 負面案例；更新 `envelope_v2_spec`（§21）。**＋ HELLO negotiation 同步升 v3（version-literal 落點見 §8.1）＋ purge 舊 pv=2 local wire state（strategy C，見 §8.3）。** 前置決策場域金鑰 ✅ 已拍板=HMAC（§1.4 / spec §21）。 | **全 conformance（Dart）綠＋ HELLO 握手＋ field_mac 驗證測試綠** |
 | **4-3b** | Kotlin/Swift parity | `WireConformanceInstrumentationTest.kt` + `WireConformanceTests.swift` 對齊新 corpus。 | Kotlin on-device 綠 / Swift 編譯 |
 | **4-4** | publish/receive PRESENCE | `EventPublisherV2Facade.publishPresence` + `V2InboundProjector` PRESENCE 投影 + read-model + debug shell「發 PRESENCE」接線。 | test +（雙機）|
 | **4-5** | HAZARD typed payload | facade `_dualWriteHazardMarker` 與 `_projectHazard` 從 JSON shim 換 typed `HazardMarkerData`。 | test 綠 |
@@ -289,9 +311,10 @@ conformance 衝擊），讓 4-3 聚焦在 canonical/簽章/版本。
 ## 7. 待 GPT 拍板清單（彙整）
 
 1. **EventType 策略**：~~接受「沿用並擴充 `EventTypeV2`」、把 REBUILD_PLAN §3.2 標 superseded？~~ ✅ **已拍板（GPT review #2）並於 4-2 落地：沿用並擴充，§3.2 已標 superseded。**
-2. **field_id 形態**：16-byte 定長 opaque？canonical 插在 envelope_id 之後？control range zero-field_id
-   豁免 field-scope？
-3. **場域金鑰綁定**：HMAC vs 純 Ed25519（白皮書 §13.3 / Q2，MCU 功耗實測待補）。
+2. **field_id 形態**：~~16-byte 定長 opaque？canonical 插在 envelope_id 之後？control range zero-field_id
+   豁免？~~ ✅ **4-3-preflight 拍板：全是（16B opaque、插 envelope_id 之後、control zero-field_id 豁免）。**
+3. **場域金鑰綁定**：~~HMAC vs 純 Ed25519~~ ✅ **4-3-preflight 拍板：HMAC 場域成員認證（field_mac，
+   spec §21 / §1.4）。Ed25519 仍管 author identity；兩道獨立驗。**
 4. **CHECKPOINT**：~~獨立 type（選項 A）vs PRESENCE+checkpoint_id（選項 B）？~~ ✅ **4-2 拍板：選項 A（獨立 type=4，非 LWW）。**
 5. **SOS 位置**：`StatusUpdateData` 加 `location`（A）vs PRESENCE 配對（B）？
 6. **LocationEvidence 精度**：lat/lng 用 sint64 1e7 fixed-point（跨平台 parity）OK？
@@ -299,8 +322,9 @@ conformance 衝擊），讓 4-3 聚焦在 canonical/簽章/版本。
 8. **ADMIN_BROADCAST**：~~新增 type 82（A）vs 複用 `OFFICIAL_ALERT_SUMMARY`（B）？~~ ✅ **4-2 拍板：新增 type 82（A，非 LWW，SOS→DROP 防偽裝）。**
 9. **HELLO 協商版本**（Amendment §8.1）：envelope 升 v3 時，HELLO `protocolVersion` 是否一併升 v3
    （讓不相容 peer 在握手就被擋，而非下游默默 drop）？
-10. **場域金鑰綁定時程**（Amendment §8.2）：HMAC / field-scoped key / membership proof 的選型是否
-    **必須在 4-3 前**定案（`field_id` 只是 signed scope label，不是完整成員驗證）？
+10. **場域金鑰綁定時程**（Amendment §8.2）：~~HMAC / field-scoped key / membership proof 是否必須在
+    4-3 前定案？~~ ✅ **已於 4-3-preflight 定案（HMAC，spec §21）—— 正是趕在 4-3 動 canonical 前釘死，
+    避免 corpus 重生白做。**
 11. **舊 wire state 處理**（Amendment §8.3）：Envelopes_V2 / Outbox_V2 既有 `protocol_version=2` records
     用 purge migration（A）/ dev DB reset（B）/ 兩者都做（C）？
 
@@ -370,8 +394,10 @@ canonical 簽章輸入的形態 —— 例如 HMAC 會引入 field key 參與 MA
 2. **field-scoped author key**：加入場域時派發/簽發一把該場域專用 author key（憑證鏈）；驗證端認簽發者。
 3. **join token / membership proof**：加入時取得短憑證，事件帶可驗證的成員證明。
 
-> ⚠️ 這題不能拖到 4-3 之後。若選 HMAC（方案 1），canonical / 簽章輸入要在 **4-3 當刀**就把 field-key
-> MAC 一起設計進去，否則 4-3 的 corpus 重生白做一次。Q3（§7）升級為 **4-3 前置硬決策**。
+> ✅ **已拍板（4-3-preflight）：採方案 1 = field_key + HMAC-SHA256（`field_mac`）。** 完整凍結契約見
+> §1.4 / `envelope_v2_spec` §21：`field_mac` 是信封欄位 15、HMAC 蓋 `canonical_sig_input_v3`（不進
+> canonical、不循環）、收端新 `field-mac-invalid` drop。正因這會動到 4-3 的 canonical/簽章/corpus，才
+> 趕在動刀前釘死，避免 corpus 重生白做。
 
 ### 8.3 直接 v2→v3、不做 coexist：要寫明舊 wire state 的清理策略
 

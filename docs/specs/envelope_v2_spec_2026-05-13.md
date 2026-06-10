@@ -1317,4 +1317,123 @@ This decision table has been mirrored into 0b §15 (Decisions Locked). Both spec
 
 ---
 
+## 21. v3 Field Scoping & Membership Auth (Phase 0b #4-3 — frozen contract, pending implementation)
+
+> **Status**: FROZEN contract for the Phase 0b #4-3 breaking wire cut (signed off by GPT review 2026-06-10,
+> after 4-2). At time of writing the code is still on `protocol_version = 2` (§3.1); once 4-3 lands, §21
+> SUPERSEDES the v2 wording it references. Implementation MUST match this section byte-for-byte.
+> Companion: `docs/PHASE0B4_WIRE_DESIGN.md` §1 / §8.
+
+### 21.1 Motivation
+
+`field_id` alone — a plaintext 16-byte scope label on the wire — is copyable by any listener. Ed25519 proves
+"author X signed this" but NOT "author X belongs to this field". IgniRelay is a field/site system, so v3 adds a
+field-membership proof (an HMAC over the canonical signature input, keyed by a per-field secret) ALONGSIDE the
+author signature:
+
+- **Ed25519 signature** → AUTHOR IDENTITY (who signed).
+- **`field_mac` (HMAC)** → FIELD MEMBERSHIP (the signer holds the field secret).
+
+The two are verified INDEPENDENTLY; both MUST pass for a non-control envelope.
+
+### 21.2 Envelope additions (proto3, additive fields)
+
+v3 keeps fields 1–13 unchanged on the wire EXCEPT `protocol_version`, and adds two `bytes` fields:
+
+| Tag | Field | Type | v3 rule |
+|---|---|---|---|
+| 1 | `protocol_version` | uint32 | **== 3** (was 2). decode rejects 0; dispatcher drops `!= 3` as `unknown-protocol-version`. |
+| 14 | `field_id` | bytes(16) | Scope label. Non-control: REQUIRED, exactly 16 bytes. Control range: 16 zero bytes. |
+| 15 | `field_mac` | bytes(16) | Membership MAC. Non-control: REQUIRED, exactly 16 bytes. Control range: absent/empty. |
+
+`field_id = SHA-256(field_join_secret)[0..15]` — one-way and public; knowing `field_id` does not reveal the secret.
+
+### 21.3 Key derivation
+
+- `field_join_secret` — shared secret handed out when a node joins a field (QR / code; the join flow itself is a later phase).
+- `field_id      = SHA-256(field_join_secret)[0..15]`  (16-byte public scope label).
+- `field_mac_key = HKDF-SHA256(ikm = field_join_secret, salt = empty (32 zero bytes per RFC 5869), info = "ignirelay/field-mac/v3", L = 32)`.
+
+The `info` string provides domain separation so the MAC key can never collide with any other use of the secret.
+
+### 21.4 `canonical_sig_input_v3` (the signed bytes)
+
+Take the v2 124-byte layout (§8.2) and insert `u8(16)‖field_id` IMMEDIATELY AFTER `u8(16)‖envelope_id`:
+
+```
+canonical_sig_input_v3 (141 bytes) =
+    u32le(protocol_version = 3)
+  ‖ u8(16)‖envelope_id
+  ‖ u8(16)‖field_id              ← NEW (two adjacent 16-byte identity blocks)
+  ‖ u32le(event_type) ‖ u32le(priority)
+  ‖ u64le(created.ms)‖u32le(created.ctr)
+  ‖ u64le(expires.ms)‖u32le(expires.ctr)
+  ‖ u32le(max_hops)
+  ‖ u8(32)‖author_key ‖ u8(sig_algo) ‖ u8(32)‖SHA256(payload)
+```
+
+`field_mac` is **NOT** in `canonical_sig_input_v3` — it is a function OF those bytes, so including it would be
+circular. `last_relay_id` / `is_experimental` remain unsigned (§7.2), as before.
+
+### 21.5 Author compute order (send)
+
+1. Build `canonical_sig_input_v3` with `field_id` set (or 16 zero bytes for control frames).
+2. `signature = Ed25519-Sign(author_priv, canonical_sig_input_v3)`              → field 10.
+3. `field_mac = HMAC-SHA256(field_mac_key, canonical_sig_input_v3)[0..15]`      → field 15 (control frames: omit).
+
+Both MACs cover the SAME bytes; neither is fed into the other (no circularity).
+
+**`field_mac` truncation**: HMAC-SHA256 truncated to the leftmost 16 bytes (128 bits). A 128-bit MAC is well above
+forgery feasibility for this threat model and keeps the wire symmetric with `field_id` / `envelope_id`. Use the full
+32 bytes only with a documented reason; the default is 16.
+
+### 21.6 Receiver verify order (additions to §7.5)
+
+After decode + `protocol_version == 3`:
+
+1. Recompute `canonical_sig_input_v3`.
+2. Verify Ed25519 `signature` over it. Fail → DROP `signature-invalid` (§20.9).  *(author identity)*
+3. Control range (100–129): SKIP steps 4–5 (no field scope, no MAC).
+4. field-scope: if `field_id` ∉ the local joined-field set → DROP `field-scope-mismatch`. *(A node not in the field also lacks the secret, so it cannot reach step 5 anyway.)*
+5. field_mac: compute `field_mac_key` from the stored `field_join_secret` for that `field_id`; if
+   `HMAC-SHA256(field_mac_key, canonical_sig_input_v3)[0..15] != field_mac` → DROP `field-mac-invalid` (NEW). *(field membership)*
+
+Steps 2 and 5 are INDEPENDENT proofs; both MUST pass for a non-control envelope to be accepted.
+New `drop_reason = field-mac-invalid` (membership proof failed; written to `mesh_trace_logs` like `signature-invalid`).
+
+### 21.7 Control frames
+
+`PROTOCOL_HELLO` / `PROTOCOL_NOTICE` / `HEARTBEAT` / `TRACE_PING` / `TRACE_ACK` (100–129):
+
+- `field_id` = 16 zero bytes; `field_mac` absent/empty.
+- Dispatcher EXEMPTS the control range from `field-scope-mismatch` and `field-mac-invalid` (they are link
+  negotiation, not field events). Without this, HELLO could never complete before a field is established.
+
+### 21.8 Protocol version & old-state (strategy C)
+
+- 4-3 bumps the ENVELOPE `protocol_version` 2→3 AND the HELLO negotiation version 2→3 in the SAME code commit
+  (the 11 version-literal sites listed in PHASE0B4_WIRE_DESIGN §8.1). A v3-only node rejects v2 peers at the handshake.
+- Old local pv=2 wire state (`Envelopes_V2` durable rows signed over the 124-byte layout; `Outbox_V2` pending) is
+  NOT upgradable in place (canonical changed; no private key to re-sign others' events). **Strategy C**:
+  - purge migration: `DELETE` pv=2 rows from `Envelopes_V2`; `DROP`+rebuild `Outbox_V2`.
+  - dev DB reset note in the changelog + a unit test that builds the OLD schema, inserts a pv=2 row, runs the
+    upgrade, and asserts the row is purged (the only path that exercises `onUpgrade`, since normal tests run
+    fresh `onCreate`-only DBs).
+
+### 21.9 Conformance impact (4-3)
+
+Regenerate the envelope corpus (§17): every sample's canonical sig input 124→141 (field_id inserted) and re-signed;
+each sample gains `field_id_hex` + `field_mac_hex`; the corpus gains a test `field_join_secret`. New negative cases:
+`field_id` missing/len, `field_mac` missing/len (non-control), `field-mac-invalid`, `field-scope-mismatch`,
+`unknown-protocol-version` (pv≠3). Dart corpus green first, then Kotlin (CI gate) / Swift parity.
+
+### 21.10 What stays open (NOT part of the frozen wire contract)
+
+- `field_join_secret` distribution / rotation (QR, code, re-key) is a join-flow concern for a later phase; §21 only
+  fixes the ON-WIRE crypto contract.
+- MCU/nanopb HMAC cost: HMAC-SHA256 is cheap on the target MCUs and `field_mac_key` is precomputed once per field;
+  no spec change expected.
+
+---
+
 End of envelope_v2_spec_2026-05-13.md.

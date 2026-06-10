@@ -102,6 +102,14 @@ MeshEvent {
 
 ### 3.2 新 EventType（非連續編號 — GPT Q1 定案）
 
+> ⚠️ **SUPERSEDED（2026-06-10，Phase 0b #4 design pass）**：下方 10/20/30 編號表是**讀實際 wire 前**
+> 的草案,與**已實作的 `EventTypeV2`**（status 1–19 / coordination 20–49 / hazard 50–79 / official
+> 80–99 / control 100–129,spec 凍結 + conformance corpus + Kotlin/Swift parity）**牴觸**。
+> SOS 早已 = `STATUS_UPDATE` + safetyState。新立場：**沿用並擴充 `EventTypeV2`,不重新編號**（只新增
+> `PRESENCE`=3 / `CHECKPOINT`=4 / `ADMIN_BROADCAST`=82）。完整設計、`field_id` canonical 綁定、
+> `LocationEvidence` schema、commit 切法、conformance 衝擊見 **`docs/PHASE0B4_WIRE_DESIGN.md`**。
+> 下表僅留作白皮書事件↔語意對照的歷史參考。
+
 `0` 留 `UNSPECIFIED`;主事件用 10 的倍數、之間留 gap,之後加 `SOS_CANCELLED`、`PRESENCE_LOST`、`CHECKPOINT_MISSED` 不破壞編號。
 
 | # | EventType | payload 重點欄位 | urgency | 白皮書 |

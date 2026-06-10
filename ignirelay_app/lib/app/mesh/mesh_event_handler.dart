@@ -8,7 +8,6 @@ import 'package:ignirelay_app/app/crypto/signer.dart';
 import 'package:ignirelay_app/app/db/database_helper.dart';
 import 'package:ignirelay_app/app/proto/mesh_protocol.pb.dart' as pb;
 import 'package:ignirelay_app/app/services/location_service.dart';
-import 'package:ignirelay_app/app/services/negotiation_manager.dart';
 
 import 'package:ignirelay_app/app/mesh/mesh_router.dart';
 import 'package:ignirelay_app/platform/mesh_transport.dart';
@@ -62,8 +61,6 @@ class MeshEventHandler {
   static final MeshEventHandler _instance = MeshEventHandler._internal();
   factory MeshEventHandler() => _instance;
   MeshEventHandler._internal();
-
-  final NegotiationManager _negotiationManager = NegotiationManager();
 
   /// v0.3 Stage 0c — `V2InboundProjector` 寫進 `Event_Logs` 的投影列一律以此
   /// 為 event_id 前綴。這些列**只是 read-model**（給 EventStream/UI 看），它們
@@ -324,25 +321,18 @@ class MeshEventHandler {
     }
 
     // ── Event dispatch ─────────────────────────────────────────
-    final senderPubKeyList = senderPubKey ?? <int>[];
     final payloadBytes = Uint8List.fromList(payload);
 
     switch (eventType) {
-      // ── Infrastructure events → handle locally ──
-      case EventType.resourceRegister:
-        if (payload.isNotEmpty) {
-          await _handleResourceRegisterEvent(decoded, payload, eventId, db);
-        }
-        break;
+      // ── Kept receive projections ──
       case EventType.requestBroadcast:
+        // requestBroadcast 同時是「物資需求」與「SOS-class status」的載體：
+        // V2InboundProjector 把 v2 SOS（safetyState TRAPPED/INJURED）投影成
+        // v1 requestBroadcast，而 SOS read-model 仍借 Requests_State。故 Phase
+        // 0b #3B 保留此投影（已與 NegotiationManager 解耦），等新的 PRESENCE/
+        // SOS/LocationEvidence read-model 出來再決定替換（見 REBUILD_PLAN §3.6）。
         if (payload.isNotEmpty) {
           await _handleRequestBroadcastEvent(decoded, payload, eventId, db);
-        }
-        break;
-      case EventType.physicalHandshake:
-        // Slot 3 kept for backward compat
-        if (payload.isNotEmpty) {
-          await _handlePhysicalHandshakeEvent({'raw': payload});
         }
         break;
       case EventType.hazardMarker:
@@ -350,38 +340,36 @@ class MeshEventHandler {
           await _handleHazardEvent(decoded, payload, sourceNodeId, db);
         }
         break;
-      case EventType.quarantineVote:
-        // existing quarantine vote handling (no-op in current codebase)
+
+      // ── Phase 0b #3B：舊產品 receive projection 已停用 ──
+      // 事件本身仍已落 Event_Logs + 會 emit 到 EventStream（核心 ingest，上方
+      // 已完成）；這裡僅停掉「投影到舊產品業務表 / 委派 NegotiationManager」。
+      // 服務檔案、DB schema 與 EventManager send path 留待後續 #3B 刀處理
+      // （見 docs/REBUILD_PLAN.md §4）。本刀不碰 wire / EventType / field_id。
+      case EventType.resourceRegister:   // 舊：物資供給 → Materials_State
+      case EventType.chatMessage:        // 舊：聊天 → Chat_Messages
+      case EventType.matchInquiry:       // 10
+      case EventType.matchAvailable:     // 11
+      case EventType.matchGone:          // 12
+      case EventType.matchIntent:        // 2 (matchOffer)
+      case EventType.matchRequest:       // 15
+      case EventType.matchConfirm:       // 8 (matchAccept)
+      case EventType.matchReject:        // 9 (matchDecline)
+      case EventType.matchCancel:        // 6
+      case EventType.handshakeComplete:  // 16
+      case EventType.locationUpdate:     // 14
         break;
-      case EventType.fireAlarmRf:
-        // existing fire alarm RF handling (no-op in current codebase)
-        break;
-      case EventType.chatMessage:
+
+      // ── Legacy / reserved slots（無投影，保留 no-op）──
+      case EventType.physicalHandshake:
+        // Slot 3 kept for backward compat（new handshake 走 slot 16）。
         if (payload.isNotEmpty) {
-          await _handleChatEvent(decoded, payload, sourceNodeId, db);
+          await _handlePhysicalHandshakeEvent({'raw': payload});
         }
         break;
-
-      // ── Deprecated slots → silently ignore ──
-      case EventType.matchInquiry:  // 10
-      case EventType.matchAvailable: // 11
-      case EventType.matchGone:      // 12
-        break;
-
-      // ── Negotiation events → delegate to Application Layer ──
-      case EventType.matchIntent:       // 2 (matchOffer)
-      case EventType.matchRequest:      // 15
-      case EventType.matchConfirm:      // 8 (matchAccept)
-      case EventType.matchReject:       // 9 (matchDecline)
-      case EventType.matchCancel:       // 6
-      case EventType.handshakeComplete: // 16
-        await _negotiationManager.handleRemoteEvent(
-          eventType, payloadBytes, senderPubKeyList);
-        break;
-
-      case EventType.locationUpdate: // 14 — negotiation-related
-        await _negotiationManager.handleRemoteEvent(
-          eventType, payloadBytes, senderPubKeyList);
+      case EventType.quarantineVote:
+      case EventType.fireAlarmRf:
+        // 現行 codebase 無對應處理（保留 slot）。
         break;
 
       default:
@@ -395,48 +383,6 @@ class MeshEventHandler {
     );
     debugPrint(
         '[MeshEvt] Stored event $eventId (${payload.length} bytes) from $sourceNodeId');
-  }
-
-  /// 處理遠端物資登記：投影到 Materials_State
-  Future<void> _handleResourceRegisterEvent(
-    WirePayload decoded,
-    List<int> payload,
-    String eventId,
-    dynamic db,
-  ) async {
-    try {
-      final rd = pb.ResourceData.fromBuffer(payload);
-      if (rd.resourceId.isEmpty) return;
-
-      String deliveryMode = rd.deliveryMode;
-      if (deliveryMode.isEmpty) {
-        // Fallback: description field might hold delivery mode
-        deliveryMode = (rd.description == 'DELIVER' || rd.description == 'PICKUP' || rd.description == 'DROP_OFF')
-            ? rd.description : 'PICKUP';
-      }
-
-      await db.insert('Materials_State', {
-        'resource_id': rd.resourceId,
-        'status': 'AVAILABLE',
-        'hlc_timestamp': decoded.hlcTimestamp > 0
-            ? decoded.hlcTimestamp
-            : DateTime.now().millisecondsSinceEpoch,
-        'hlc_counter': decoded.hlcCounter,
-        'matched_request_id': null,
-        'match_expires_at': null,
-        'total_qty': rd.quantity,
-        'delivery_mode': deliveryMode,
-        'payload': Uint8List.fromList(payload),
-      });
-      _dlog('SUPPLY_SYNC ${rd.resourceId.substring(0, 8)}.. to Materials_State');
-      // 亂序保險:若先前有 bystander 寫過 COMPLETED Match_Negotiations
-      // (handshakeComplete 比 supply 先到),這裡 reconcile 讓 Materials_State
-      // 立刻轉 CONSUMED,避免社區頁仍顯示已交接物資。
-      await _negotiationManager.reconcileMaterialStatus(rd.resourceId);
-    } catch (e) {
-      // UNIQUE constraint = 已有此物資，忽略
-      debugPrint('[MeshEvt] Materials_State insert skipped: $e');
-    }
   }
 
   /// 處理遠端需求廣播：投影到 Requests_State
@@ -479,8 +425,9 @@ class MeshEventHandler {
         'payload': Uint8List.fromList(payload),
       });
       _dlog('REQUEST_SYNC ${rd.requestId.substring(0, 8)}.. to Requests_State');
-      // 亂序保險:同 Materials_State 對稱處理。
-      await _negotiationManager.reconcileRequestStatus(rd.requestId);
+      // Phase 0b #3B：原本在此呼叫 _negotiationManager.reconcileRequestStatus
+      // 做亂序對帳（舊 match 產品）— 已移除。Requests_State 仍寫入，作為
+      // SOS-class status 的 read-model 載體（見上方 switch 的保留說明）。
     } catch (e) {
       debugPrint('[MeshEvt] Requests_State insert skipped: $e');
     }
@@ -534,54 +481,6 @@ class MeshEventHandler {
       }
     } catch (e) {
       debugPrint('[MeshEvt] Hazard sync skipped: $e');
-    }
-  }
-
-  /// 處理聊天訊息事件：解碼 JSON payload 並寫入 Chat_Messages
-  Future<void> _handleChatEvent(
-    WirePayload decoded,
-    List<int> payload,
-    String sourceNodeId,
-    dynamic db,
-  ) async {
-    try {
-      final jsonStr = utf8.decode(payload);
-      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
-      final roomId = map['room_id'] as String?;
-      final content = map['content'] as String?;
-      if (roomId == null || roomId.isEmpty || content == null || content.isEmpty) {
-        debugPrint('[MeshEvt] Chat event missing room_id or content');
-        return;
-      }
-
-      // 檢查用戶是否已加入此聊天室（避免跨聊天室顯示）
-      final room = await db.query('Chat_Rooms',
-          columns: ['room_id'],
-          where: 'room_id = ?',
-          whereArgs: [roomId],
-          limit: 1) as List<Map<String, dynamic>>;
-      if (room.isEmpty) {
-        _dlog('CHAT_SKIP(not-joined) room=$roomId');
-        return;
-      }
-
-      final senderPubKey = decoded.senderPubKey != null
-          ? Uint8List.fromList(decoded.senderPubKey!)
-          : Uint8List.fromList(utf8.encode(sourceNodeId));
-
-      await db.insert('Chat_Messages', {
-        'event_id': decoded.eventId,
-        'room_id': roomId,
-        'sender_pub_key': senderPubKey,
-        'content': content,
-        'reply_to': map['reply_to'] as String?,
-        'hlc_timestamp': decoded.hlcTimestamp > 0
-            ? decoded.hlcTimestamp
-            : DateTime.now().millisecondsSinceEpoch,
-      });
-      _dlog('CHAT_INSERT ${decoded.eventId.substring(0, 8)}.. room=$roomId');
-    } catch (e) {
-      debugPrint('[MeshEvt] Chat event insert skipped: $e');
     }
   }
 

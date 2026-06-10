@@ -296,6 +296,23 @@ void main() {
       expect(loc.lngE7, 1215645000);
     });
 
+    test('bearing absent decodes to null (distinct from due north)', () {
+      final noBearing = const LocationEvidence(latE7: 250339805);
+      expect(noBearing.bearingDeg, isNull);
+      expect(LocationEvidence.decode(noBearing.encode()).bearingDeg, isNull);
+    });
+
+    test('bearing 0 (due north) survives and is NOT absent', () {
+      final north = const LocationEvidence(latE7: 250339805, bearingDeg: 0);
+      final out = LocationEvidence.decode(north.encode());
+      expect(out.bearingDeg, 0, reason: '0° north must round-trip, not become null');
+    });
+
+    test('bearing 215 round-trips', () {
+      final b = const LocationEvidence(latE7: 250339805, bearingDeg: 215);
+      expect(LocationEvidence.decode(b.encode()).bearingDeg, 215);
+    });
+
     test('skips unknown fields (forward compat)', () {
       final w = ProtoWriter();
       w.writeEnum(1, LocationSource.gps);

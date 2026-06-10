@@ -973,7 +973,13 @@ class LocationEvidence {
   final HlcTimestampV2 observedAt;
   final String anchorNodeId; // optional — set for FIELD_NODE / BLE_RSSI fixes
   final int distanceFromAnchorM; // optional — 0 == absent
-  final int bearingDeg; // optional — 0..359 (0 == absent / due north)
+
+  /// Compass bearing to the subject, degrees 0..359, or `null` when absent.
+  /// `0` is a real value (due north) and is NOT conflated with absent. On the
+  /// wire this rides as `bearing_deg_plus_one` (field 9): 0/omitted == absent,
+  /// 1..360 == 0..359°. A single scalar (vs a separate presence bool) keeps it
+  /// proto3-default-omit-clean and MCU/nanopb-friendly.
+  final int? bearingDeg;
 
   // Reserved tags (do not reuse on later additions):
   //   10  floor_or_level  (sint32) — multi-storey disambiguation
@@ -989,7 +995,7 @@ class LocationEvidence {
     this.observedAt = HlcTimestampV2.zero,
     this.anchorNodeId = '',
     this.distanceFromAnchorM = 0,
-    this.bearingDeg = 0,
+    this.bearingDeg,
   });
 
   double get latDegrees => latE7 / kE7;
@@ -1005,7 +1011,7 @@ class LocationEvidence {
     HlcTimestampV2 observedAt = HlcTimestampV2.zero,
     String anchorNodeId = '',
     int distanceFromAnchorM = 0,
-    int bearingDeg = 0,
+    int? bearingDeg,
   }) {
     return LocationEvidence(
       source: source,
@@ -1033,7 +1039,11 @@ class LocationEvidence {
     }
     w.writeString(7, anchorNodeId);
     w.writeUint32(8, distanceFromAnchorM);
-    w.writeUint32(9, bearingDeg);
+    // bearing_deg_plus_one (field 9): 0/omitted == absent, 1..360 == 0..359°,
+    // so due-north 0° stays distinct from "no bearing".
+    if (bearingDeg != null) {
+      w.writeUint32(9, bearingDeg! + 1);
+    }
     return w.toBytes();
   }
 
@@ -1047,7 +1057,7 @@ class LocationEvidence {
     HlcTimestampV2 observedAt = HlcTimestampV2.zero;
     var anchor = '';
     var distance = 0;
-    var bearing = 0;
+    int? bearing;
     while (!r.isAtEnd) {
       final tag = r.readTag();
       final field = tagFieldNumber(tag);
@@ -1083,7 +1093,9 @@ class LocationEvidence {
           distance = r.readUint32();
           break;
         case 9:
-          bearing = r.readUint32();
+          // bearing_deg_plus_one: 0 == absent, 1..360 == 0..359°.
+          final raw = r.readUint32();
+          bearing = raw == 0 ? null : raw - 1;
           break;
         default:
           r.skipValue(wire);

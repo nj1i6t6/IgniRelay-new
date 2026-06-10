@@ -155,13 +155,21 @@ message LocationEvidence {
   5  accuracy_m    uint32
   6  observed_at   HlcTimestampV2(msg)
   7  anchor_node_id string // optional（FIELD_NODE/BLE_RSSI 才有）
-  8  distance_from_anchor_m uint32 // optional
-  9  bearing_deg   uint32 // optional 0..359
+  8  distance_from_anchor_m uint32 // optional, 0 == absent
+  9  bearing_deg_plus_one uint32 // optional: 0/omitted == absent, 1..360 == 0..359°（見下注 4-1r）
   // 10..15 reserved
 }
 ```
-> ⚠️ lat/lng 用 **sint64 1e7 fixed-point**（非 double）以保 Dart↔Kotlin↔Swift↔MCU bit-parity；
-> 這是 conformance 能跨平台對齊的關鍵。待 GPT 確認精度（1e7 ≈ 1.1cm，足夠）。
+> ⚠️ **lat/lng（已落地 4-1）**：`sint64`、degrees × 1e7 fixed-point（非 double）以保
+> Dart↔Kotlin↔Swift↔MCU bit-parity。轉換規則 **round-to-nearest**（量化誤差 ≤0.55cm；
+> 各平台必須一致 round，否則整數 wire 值不對齊）。例：25.0339805° → 250339805
+> （注意 `25.0339805*1e7` 在 IEEE-754 是 …804.9999，**必須 round 不能 truncate**，4-1 已踩過此雷）。
+>
+> ⚠️ **bearing 存在性歧義（4-1r 修正）**：原 `bearing_deg uint32` 用「0 == absent」會與「0° 正北」
+> 混淆。改用 **`bearing_deg_plus_one`**：wire 上 0/omitted = 沒有方位、1..360 = 0..359°（單一純量、
+> 維持 proto3 default-omit、MCU/nanopb 友善）。Dart API 暴露為 `int? bearingDeg`（`null` = absent，
+> `0..359` = 真實角度含正北 0）。`distance_from_anchor_m` 維持「0 == absent」(0 距離=就在 anchor 上，
+> 退化情形,可接受)；只有 bearing 需要此修正。
 
 ### 3.2 事件 payload
 

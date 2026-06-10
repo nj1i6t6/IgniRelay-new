@@ -1,4 +1,4 @@
-// v0.3 Stage 0c wave 3B ??BleV2Bridge end-to-end.
+// v0.3 Stage 0c wave 3B — BleV2Bridge end-to-end.
 //
 // Covers the wiring contract spelled out in the wave 3B scope:
 //   - native `peer_ready_for_hello` event triggers ProtocolHelloService
@@ -157,7 +157,7 @@ void main() {
         'role': 'central',
       });
       await _drainMicrotasks();
-      // Peer self-declares LEGACY ??bridge routes via dispatcher to registry ??failed.
+      // Peer self-declares LEGACY → bridge routes via dispatcher to registry → failed.
       final badHello = ProtocolHelloData(
         peerKind: PeerKind.phoneV1Legacy,
         maxRxEnvelopeBytes: 164,
@@ -245,7 +245,7 @@ void main() {
 
       // Envelope size sweet spot at MTU=185: fits SOS_RED 240B budget but
       // > 164B single-notify cap (185 - 3 ATT - 18 chunk header). A ~50B
-      // payload puts the encoded envelope around ~210B ??2 chunks.
+      // payload puts the encoded envelope around ~210B → 2 chunks.
       h.writes.clear();
       final outcome = await h.bridge.sendEnvelope(
         peerId: 'II:JJ',

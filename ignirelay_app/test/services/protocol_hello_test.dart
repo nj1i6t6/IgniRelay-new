@@ -1,4 +1,4 @@
-// v0.3 Stage 0c wave 3A ??PROTOCOL_HELLO state machine + validator + service.
+// v0.3 Stage 0c wave 3A — PROTOCOL_HELLO state machine + validator + service.
 //
 // Covers spec native_transport_v1 禮5.2, 禮5.7, 禮6.2, 禮15.9:
 //   - Valid HELLO transitions to active(profile)
@@ -38,7 +38,7 @@ void main() {
     await DatabaseHelper().resetForTest();
   });
 
-  // ?? 1. Validator (pure) ???????????????????????????????????????????????
+  // ── 1. Validator (pure) ───────────────────────────────────────────────
 
   group('ProtocolHelloValidator', () {
     test('valid PhoneV1 HELLO is accepted with PhoneV1 profile', () {
@@ -132,7 +132,7 @@ void main() {
     });
   });
 
-  // ?? 2. PeerCapabilityRegistry state machine ??????????????????????????
+  // ── 2. PeerCapabilityRegistry state machine ──────────────────────────
 
   group('PeerCapabilityRegistry', () {
     test('initial pending state on onPeerReadyForHello', () {
@@ -218,7 +218,7 @@ void main() {
         helloTimeout: const Duration(milliseconds: 30),
       );
       reg.onPeerReadyForHello('GG:HH');
-      // Re-arm with same key ??second call should reset state and timer.
+      // Re-arm with same key — second call should reset state and timer.
       await Future<void>.delayed(const Duration(milliseconds: 10));
       reg.onPeerReadyForHello('GG:HH');
       // First timer (which started ~10ms ago) would have fired at 30ms;
@@ -245,7 +245,7 @@ void main() {
     });
   });
 
-  // ?? 3. buildSelfHello guards ?????????????????????????????????????????
+  // ── 3. buildSelfHello guards ─────────────────────────────────────────
 
   group('buildSelfHello', () {
     test('rejects PHONE_V1_LEGACY self-advertisement', () {
@@ -296,7 +296,7 @@ void main() {
     });
   });
 
-  // ?? 4. ProtocolHelloService end-to-end ????????????????????????????????
+  // ── 4. ProtocolHelloService end-to-end ────────────────────────────────
 
   group('ProtocolHelloService', () {
     Future<_HelloHarness> makeHarness({
@@ -393,7 +393,7 @@ void main() {
       await h.dispose();
     });
 
-    test('valid peer HELLO via dispatcher ??registry active(PhoneV1)',
+    test('valid peer HELLO via dispatcher → registry active(PhoneV1)',
         () async {
       final h = await makeHarness();
       await h.service.onPeerReadyForHello('AA:BB', 247);
@@ -418,7 +418,7 @@ void main() {
         fieldId: Uint8List(16),
       );
 
-      // Receive via dispatcher (it emits onto outcomes ??service routes to
+      // Receive via dispatcher (it emits onto outcomes → service routes to
       // registry).
       final outcome = await h.dispatcher.onReceiveEnvelopeBytes(
         published.wireBytes,
@@ -435,7 +435,7 @@ void main() {
       await h.dispose();
     });
 
-    test('peer never sends HELLO ??5 s fallback (legacy)', () async {
+    test('peer never sends HELLO → 5 s fallback (legacy)', () async {
       final h = await makeHarness(
         helloTimeout: const Duration(milliseconds: 40),
       );
@@ -447,7 +447,7 @@ void main() {
       await h.dispose();
     });
 
-    test('peer self-declares LEGACY ??failed (drop connection signal)',
+    test('peer self-declares LEGACY → failed (drop connection signal)',
         () async {
       final h = await makeHarness();
       await h.service.onPeerReadyForHello('CC:DD', 247);
@@ -485,7 +485,7 @@ void main() {
       final h = await makeHarness();
       await h.service.onPeerReadyForHello('EE:FF', 247);
       // Spec 禮6 says PROTOCOL_HELLO must be NORMAL; sending at SOS_RED is a
-      // priority abuse ??the publisher itself rejects at send time.
+      // priority abuse — the publisher itself rejects at send time.
       expect(
         () => h.peerPublisher.send(
           eventType: EventTypeV2.protocolHello,

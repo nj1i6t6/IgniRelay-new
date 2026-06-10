@@ -1,7 +1,7 @@
-// v0.3 Stage 0c ??end-to-end pipeline test.
+// v0.3 Stage 0c — end-to-end pipeline test.
 //
-// Publisher signs an envelope ??Dispatcher decodes + verifies ??Store records
-// it ??Trace logs the action. Exercises the full Stage 0c spec pipeline in
+// Publisher signs an envelope → Dispatcher decodes + verifies → Store records
+// it → Trace logs the action. Exercises the full Stage 0c spec pipeline in
 // one test process (in-memory sqflite).
 // ignore_for_file: prefer_const_constructors
 
@@ -58,7 +58,7 @@ void main() {
         db, store, trace, rate, dispatcher, publisher, pubBytes);
   }
 
-  group('Publisher ??Dispatcher round-trip', () {
+  group('Publisher → Dispatcher round-trip', () {
     test('SOS_RED status update accepts cleanly', () async {
       final h = await makeHarness();
       final published = await h.publisher.send(
@@ -115,7 +115,7 @@ void main() {
 
     test('over-budget SOS is rejected at sender', () async {
       final h = await makeHarness();
-      // 240B SOS budget ??push 250B payload to exceed (envelope adds overhead).
+      // 240B SOS budget — push 250B payload to exceed (envelope adds overhead).
       expect(
         () => h.publisher.send(
           eventType: EventTypeV2.statusUpdate,
@@ -144,7 +144,7 @@ void main() {
         negotiatedMtu: 247,
         fieldId: Uint8List(16),
       );
-      // Decode ??tamper payload ??re-encode (signature unchanged ??mismatch).
+      // Decode → tamper payload → re-encode (signature unchanged → mismatch).
       final tamperedEnv = EventEnvelopeV2.decode(published.wireBytes);
       final tampered = EventEnvelopeV2(
         envelopeId: tamperedEnv.envelopeId,
@@ -279,26 +279,36 @@ void main() {
         fieldId: Uint8List(16),
       );
       final env = EventEnvelopeV2.decode(published.wireBytes);
-      final tampered = EventEnvelopeV2(
-        protocolVersion: 3,
-        envelopeId: env.envelopeId,
-        eventType: env.eventType,
-        priority: env.priority,
-        createdAtHlc: env.createdAtHlc,
-        expiresAtHlc: env.expiresAtHlc,
-        maxHops: env.maxHops,
-        authorKey: env.authorKey,
-        sigAlgo: env.sigAlgo,
-        signature: env.signature,
-        payload: env.payload,
-        lastRelayId: env.lastRelayId,
-        isExperimental: env.isExperimental,
-      );
-      final outcome =
-          await h.dispatcher.onReceiveEnvelopeBytes(tampered.encode());
-      expect(outcome, isA<DispatchDropped>());
-      expect(
-          (outcome as DispatchDropped).dropReason, 'unknown-protocol-version');
+      // Tamper the version to values the v3 dispatcher must reject: 2 is the
+      // retired legacy version (spec §21.8 — a v3 node rejects v2 peers) and
+      // 4 is an unknown future version. The pre-4-3 revision of this test
+      // used `3` here (unknown back when 2 was accepted); 4-3 moved
+      // `_acceptedProtocolVersion` to 3 without bumping this literal, which
+      // inverted the test into asserting a drop for the ACCEPTED version.
+      for (final unknownVersion in [2, 4]) {
+        final tampered = EventEnvelopeV2(
+          protocolVersion: unknownVersion,
+          envelopeId: env.envelopeId,
+          fieldId: env.fieldId,
+          eventType: env.eventType,
+          priority: env.priority,
+          createdAtHlc: env.createdAtHlc,
+          expiresAtHlc: env.expiresAtHlc,
+          maxHops: env.maxHops,
+          authorKey: env.authorKey,
+          sigAlgo: env.sigAlgo,
+          signature: env.signature,
+          payload: env.payload,
+          lastRelayId: env.lastRelayId,
+          isExperimental: env.isExperimental,
+        );
+        final outcome =
+            await h.dispatcher.onReceiveEnvelopeBytes(tampered.encode());
+        expect(outcome, isA<DispatchDropped>(),
+            reason: 'protocol_version=$unknownVersion must be rejected');
+        expect((outcome as DispatchDropped).dropReason,
+            'unknown-protocol-version');
+      }
       await expectDroppedTrace(h, 'unknown-protocol-version');
     });
 

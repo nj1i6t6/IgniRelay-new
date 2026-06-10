@@ -1,9 +1,9 @@
-// V2InboundProjector ??verifies accepted EventEnvelope v2 (receive path) is
+// V2InboundProjector — verifies accepted EventEnvelope v2 (receive path) is
 // projected into the v1 Event_Logs read-model and reaches EventStream.
 //
-// Pipeline exercised: MessagePublisherV2 signs ??EnvelopeDispatcherV2 accepts
-// ??V2InboundProjector translates ??MeshEventHandler.ingestVerifiedEvent
-// persists + projects ??EventStream emits a typed event.
+// Pipeline exercised: MessagePublisherV2 signs → EnvelopeDispatcherV2 accepts
+// → V2InboundProjector translates → MeshEventHandler.ingestVerifiedEvent
+// persists + projects → EventStream emits a typed event.
 // ignore_for_file: prefer_const_constructors
 
 import 'dart:convert';
@@ -162,14 +162,14 @@ void main() {
 
     final sos = await sosFuture.timeout(const Duration(seconds: 2));
     expect(sos.urgency, 3);
-    expect(sos.description, '?');
+    expect(sos.description, '受困');
 
     await eventStream.dispose();
     await h.projector.dispose();
     await h.dispatcher.dispose();
   });
 
-  test('v2 projection rows are read-model only ??excluded from v1 outbound',
+  test('v2 projection rows are read-model only — excluded from v1 outbound',
       () async {
     final handler = MeshEventHandler();
     // A normal v1 event (no v2- prefix) and a v2 projection row.

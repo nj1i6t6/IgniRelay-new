@@ -31,10 +31,8 @@
 
     <!-- ── Notifications (Android 13+) ────────────────────────────── -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- ── Health Connect (醫療卡匯入) ──────────────────────────── -->
-    <uses-permission android:name="android.permission.health.READ_HEIGHT" />
-    <uses-permission android:name="android.permission.health.READ_WEIGHT" />
-    <uses-permission android:name="android.permission.health.READ_BLOOD_TYPE" />
+    <!-- Phase 0b #3A: Health Connect 權限已移除（health 依賴下線、medical card
+         產品降級;見 docs/REBUILD_PLAN.md §2）。 -->
 
     <!-- ── Hardware feature declarations ──────────────────────────────────── -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
@@ -70,25 +68,11 @@
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
 
-        <!-- Bug 13 Fix: Health Connect 權限設定頁 Activity Alias -->
-        <!-- 沒有這個 activity-alias，Health Connect 不會在「應用程式權限」中顯示烽傳 -->
-        <activity-alias
-            android:name="ViewPermissionUsageActivity"
-            android:exported="true"
-            android:targetActivity=".MainActivity"
-            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
-                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
-            </intent-filter>
-        </activity-alias>
-
-        <!-- Disable Impeller: vector_map_tiles / vector_tile_renderer
-             rely on Skia Canvas operations that Impeller does not fully support,
-             causing blank map tiles on real devices while markers still render. -->
-        <meta-data
-            android:name="io.flutter.embedding.android.EnableImpeller"
-            android:value="false" />
+        <!-- Phase 0b #3A: Health Connect 權限設定頁 activity-alias 已移除（health
+             依賴下線）。Impeller 的 EnableImpeller=false 也一併移除 — 當初關閉
+             是因為 vector_map_tiles / vector_tile_renderer 的 Skia Canvas 在
+             Impeller 下會出現空白圖磚;地圖模組已於 Phase 0b 下線（mapless），
+             故恢復 Flutter 預設（Impeller on）。見 docs/REBUILD_PLAN.md §3.6。 -->
 
         <!-- Flutter embedding -->
         <meta-data
@@ -102,10 +86,7 @@
             <action android:name="android.intent.action.PROCESS_TEXT" />
             <data android:mimeType="text/plain" />
         </intent>
-        <!-- Health Connect -->
-        <intent>
-            <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
-        </intent>
-        <package android:name="com.google.android.apps.healthdata" />
+        <!-- Phase 0b #3A: Health Connect <queries>（ACTION_SHOW_PERMISSIONS_RATIONALE
+             + com.google.android.apps.healthdata package）已移除（health 依賴下線）。 -->
     </queries>
 </manifest>

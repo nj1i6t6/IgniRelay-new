@@ -49,9 +49,6 @@ dependencies:
   protobuf: ^3.1.0
   fixnum: ^1.1.0
 
-  # ── Health Connect (醫療卡匯入) ──────────────────────────────
-  health: ^13.1.4
-
   # ── GPS Location ──────────────────────────────────────────
   geolocator: ^11.1.0
 

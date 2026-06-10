@@ -35,7 +35,9 @@ android {
 
     defaultConfig {
         applicationId = "network.ignirelay.field"
-        // minSdk 26: Health Connect (health package) 最低需求
+        // minSdk 26 (Android 8.0)。Phase 0b #3A：原註解的「Health Connect 最低
+        // 需求」理由已失效（health 依賴下線）。暫不下調 minSdk — 留待之後依
+        // 實際依賴與真機相容性一次評估（見 docs/REBUILD_PLAN.md）。
         minSdk = 26
         // 鎖定 35 (Android 15 stable)，避免 Flutter 預設 36 (Android 16 beta) 導致安裝相容性問題
         targetSdk = 35

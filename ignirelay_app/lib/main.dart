@@ -43,14 +43,7 @@ import 'package:ignirelay_app/app/controllers/handoff_controller.dart';
 import 'package:ignirelay_app/app/controllers/tier_manager.dart';
 import 'package:ignirelay_app/app/services/event_decoder.dart';
 import 'package:ignirelay_app/app/services/event_store.dart';
-import 'package:ignirelay_app/app/services/negotiation_repo.dart';
-import 'package:ignirelay_app/app/services/negotiation_manager.dart';
-import 'package:ignirelay_app/app/services/match_repository.dart';
-import 'package:ignirelay_app/app/services/station_supply_repo.dart';
-import 'package:ignirelay_app/app/services/profile_repo.dart';
-import 'package:ignirelay_app/app/services/medical_card_repo.dart';
 import 'package:ignirelay_app/app/services/location_service.dart';
-import 'package:ignirelay_app/app/services/chat_service.dart';
 import 'package:ignirelay_app/app/mesh/mesh_event_handler.dart';
 import 'package:ignirelay_app/app/controllers/mesh_runtime_controller.dart';
 import 'package:ignirelay_app/app/crdt/hlc.dart';
@@ -383,29 +376,12 @@ class _IgniRelayAppState extends State<IgniRelayApp> {
         Provider<EventStore>(
           create: (_) => EventStore(databaseHelper: DatabaseHelper()),
         ),
-        Provider<StationSupplyRepo>(
-          create: (_) => StationSupplyRepo(databaseHelper: DatabaseHelper()),
-        ),
-        Provider<ProfileRepo>(
-          create: (_) => ProfileRepo(databaseHelper: DatabaseHelper()),
-        ),
-        Provider<MedicalCardRepo>(
-          create: (_) => MedicalCardRepo(DatabaseHelper()),
-        ),
-        Provider<NegotiationRepo>(
-          create: (_) => NegotiationRepo(),
-        ),
-        Provider<NegotiationManager>(
-          create: (_) => NegotiationManager(),
-        ),
-        Provider<MatchRepository>(
-          create: (_) => MatchRepository(),
-        ),
+        // Phase 0b #3A: 舊產品 repo provider（match/supply/negotiation/medical/
+        // profile）已移除 — UI 消費端在 #2 刪除後不再被讀取。服務檔案暫留（仍被
+        // database_helper / event_manager / mesh_event_handler 等 kept core 直接
+        // import,屬 wire/event-model 耦合,留待後續重構）。見 REBUILD_PLAN §4。
         Provider<IdentityManager>(
           create: (_) => IdentityManager(),
-        ),
-        Provider<ChatService>(
-          create: (_) => ChatService()..attachV2Facade(_eventPublisherV2),
         ),
         Provider<LocationService>(
           create: (_) => LocationService(),
@@ -700,26 +676,12 @@ class _StartupRouterState extends State<_StartupRouter> {
   Future<void> _initLocationService() async {
     if (!mounted) return;
     try {
-      // 從 Provider 取得 LocationService / ChatService，避免在這裡再次呼叫
-      // singleton constructor。registration 仍走 main.dart 的 MultiProvider。
+      // Phase 0b: 舊「GPS 就緒 → 自動加入村里聊天室」已移除（chat 產品下線）。
+      // 位置服務仍啟動 — mapless 定位的 GPS evidence 來源（REBUILD_PLAN §3.6）。
       final locService = context.read<LocationService>();
-      final chatService = context.read<ChatService>();
-      locService.onFirstFix = () {
-        chatService.autoJoinVillageRoom().then((code) {
-          if (code != null) {
-            debugPrint('[Init] GPS 就緒，自動加入聊天室: $code');
-          }
-        }).catchError((e) {
-          debugPrint('[Init] 自動加入聊天室失敗: $e');
-        });
-      };
       await locService.init();
-      if (locService.hasLocation && locService.onFirstFix != null) {
-        locService.onFirstFix!();
-        locService.onFirstFix = null;
-      }
     } catch (e) {
-      debugPrint('[Init] Location/Chat init failed: $e');
+      debugPrint('[Init] Location init failed: $e');
     }
   }
 

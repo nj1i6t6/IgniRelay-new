@@ -137,3 +137,47 @@
 - deviations: none
 - next: 主理 AI 可先行 A12/B1；E1 排在 C1 凍結後。施工 AI 維持 A2 起跑（A2 開工前
   重檢 ActiveFieldController 是否已存在，見 A2 步驟 4 排程注意）
+
+---
+
+## [2026-06-12] CORRECTION — 歷史條目 commit hash 回填（append-only 補正）
+
+- 依 G9「DONE 必附 commit hash」字面要求，回填先前以「（見本 commit）」記載之條目
+  （施工 AI 於 A2 開工檢視時指出，判定有效）：
+  - A0 DONE = `f2026a3`
+  - A1 PARTIAL = `c39070f`
+  - DL DONE（App repo 部分）= `c73b248`（gateway repo `347ae52` 原已記載）
+  - PLAN-v1.1 DONE = `c136591`
+  - PLAN-v1.2 DONE = `0c9fe71`
+- 根因：條目與變更同 commit 寫入，寫入當下無法預知自身 hash。
+- 自本日起改採兩段式：先 commit 變更本體，再以後續 commit 記 STATUS 條目（含字面 hash）。
+
+---
+
+## [2026-06-12] PLAN-v1.3 DONE（計畫修訂，G11 Owner 授權路徑；E-CARE 跨專案串接）
+
+- repo/commit: IgniRelay @ `172e15e`（計畫本體；本條目為後續 commit）
+- 執行者: Claude（主理 AI，Owner 2026-06-12 口頭逐項拍板後執行）
+- Owner 決策（本次修訂依據）:
+  1. 與校內 E-CARE 專案（`github.com/rungyu0721/Ecare`，FastAPI 緊急事件輔助後端，
+     跑學校 GPU 資源）合作；合作模式＝零改動掛接（OD-13）。
+  2. UX：SOS 送出後彈窗詢問→同意進對話框；無網路＝關鍵字觸發本地圖卡、
+     有網路＝E-CARE AI 對話。SOS 本體零延遲、零依賴。
+  3. 管理端：本專案雲端後台（E6）為完整主控台；「E-CARE 通報」為其中一個
+     唯讀分頁（EC-4），資料層用 E-CARE 後端。
+  4. Demo 無時程壓力 → EC 全數排 Stage E 窗口，A→B→C 既有排程不動。
+- 變更（v1.2 → v1.3，詳文件 Changelog v1.3 條目）:
+  - 新增 EC 系列（Stage E 附掛）：背景＋EC 六不變量＋EC-1（App SOS 後援對話）
+    ＋EC-2（雲端→E-CARE 通報轉發 adapter，僅 cloud 形態）＋EC-3（VPS 代理／金鑰，
+    USER-GATE）＋EC-4（後台唯讀分頁）；§E.8 加第 5 項條件性實連驗收
+    （SUSPEND 判定=Owner-only）。
+  - E1 契約加 `ecare_base_url`/`ecare_api_key`（nullable，隨 app-bundle 下行）；
+    E6 加 E-CARE 連線設定。
+  - OD-13 入表；風險表 +3；附錄 B 加「EC 對接面」管制列
+    （基準＝E-CARE repo commit `4e4543d` 之 API_SPEC.md＋backend/models.py）；
+    §0.1/§0.3/§0.4/§1.2/§1.3/§4 同步。
+- DoD: 版號 bump ✅ / Changelog ✅ / A–D 任務內容零變更 ✅ / wire 契約檔 diff=0 ✅
+  （純文件修訂，未觸碼；工作區中施工 AI 的 A2 進行中檔案未被本次 commit 觸及）
+- deviations: none
+- next: 施工 AI 續 A2；EC-1～EC-4 待 Stage E 窗口（EC-1 前置 E4、EC-2 前置 E3、
+  EC-3 前置 E2、EC-4 前置 EC-2+E6）；E1 動工時記得納入 ecare 設定欄位

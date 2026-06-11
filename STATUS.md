@@ -107,3 +107,33 @@
 - DoD: 計畫版號 bump ✅ / Changelog 條目 ✅ / 凍結清單同步 ✅
 - deviations: none
 - next: 主理 AI 待 A2/A3（施工 AI）落地後接 A4/A5；A12/B1 可先行（無 A2/A3 依賴）
+
+---
+
+## [2026-06-11] PLAN-v1.2 DONE（計畫修訂，G11 Owner 授權路徑；Owner 拍板之產品範圍擴充）
+
+- repo/commit: IgniRelay @（見本 commit）
+- 執行者: Claude（主理 AI，Owner 本 session 口頭拍板逐項確認後執行）
+- Owner 決策（2026-06-11，本次修訂依據）:
+  1. 總順序改 A→B→C→**E**→D；Stage D 與 Stage E 可整段並行（D 入場條件 B10 不變）。
+  2. 新增「雲端場域服務」（Owner VPS + 網域）：多場域 SaaS——場域主/工作人員/
+     一般成員三角色、可見性政策（SOS 永不遮蔽）、手機與現場閘道雙路上雲；
+     v1 無自助註冊無金流（CLI 手動開通）。
+  3. 雷達相對位置視圖與場域自訂地圖由「選配」升格為**正式任務**（A10b、E7）。
+  4. 節點不加 NB-IoT（OD-10 封存為閘道 future）。
+- 變更（v1.1 → v1.2，詳文件 Changelog v1.2 條目）:
+  - §0.3/§0.4/§1（一句話/資料流/信任邊界/FINAL DoD）/§4 依賴圖 全面同步。
+  - 新增 Stage E 整章（§7 與 §8 之間）：E 不變量 6 條（wire 零變更、同一驗證管線、
+    角色不進 wire、SOS 底線、隱私紅線、密鑰紅線）+ E1–E7 任務（各含 DoD/禁止）
+    + §E.8 Exit（含 ≤5s 自動化 e2e 與 Owner 外網驗收 USER-GATE）。
+  - 新增 A10b（雷達；純顯示層、北朝上、零新依賴）+ A11 步驟 9 + §5.13 同步。
+  - A7 QR 凍結格式修訂為五段式（段3=https 雲端 URL、段4=staff token、
+    未知尾段忽略鐵則）；A5 施工筆記 7 預留 `cloud_base_url` 欄。
+  - C1 加雲端孿生前向相容註記（`/api/v1/fields/{fid}` 前綴擴充法）。
+  - OD-9～OD-12 入表；風險表 +3；附錄 B +3 凍結項（cloud_api_v1、
+    map_calibration_v1+vectors+generator、QR 五段式）；附錄 F +`http`/+`Pillow`。
+- DoD: 版號 bump ✅ / Changelog ✅ / 凍結清單同步 ✅ / wire 契約檔 diff=0 ✅
+  （本次修訂純文件，未觸碼）
+- deviations: none
+- next: 主理 AI 可先行 A12/B1；E1 排在 C1 凍結後。施工 AI 維持 A2 起跑（A2 開工前
+  重檢 ActiveFieldController 是否已存在，見 A2 步驟 4 排程注意）

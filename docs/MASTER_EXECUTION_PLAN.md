@@ -1,6 +1,6 @@
 # 烽傳 IgniRelay — 總施工計畫 MASTER EXECUTION PLAN
 
-> **版本 v1.2 · 2026-06-11 · Owner: simon（本文件中稱「Owner」）**
+> **版本 v1.3 · 2026-06-12 · Owner: simon（本文件中稱「Owner」）**
 > 範圍：從本日現況，一路到「手機 App + 實體 Field Node + Gateway + 管理者 Web 後台
 > + **雲端場域服務（Owner VPS，Stage E）**」整套產品跑通為止的完整施工路線。
 > **本文件是給施工 AI（以下稱 AGENT）逐字遵守的施工規格**，
@@ -13,7 +13,7 @@
 ### 0.1 這份文件是什麼
 
 - 本文件 = **唯一的跨 repo 施工總綱**。它把四個 repo 的工作拆成有編號的任務
-  （A0–A12 / B1–B10 / C1–C7 / D1–D5），每個任務有：前置條件、實作步驟、
+  （A0–A12 / B1–B10 / C1–C7 / E1–E7＋EC-1～EC-4 / D1–D5），每個任務有：前置條件、實作步驟、
   **DoD（Definition of Done）**、**驗證指令（逐字執行）**、**證據要求**、**禁止事項**。
 - 涉及的 repo（皆已存在於 Owner 機器上）：
 
@@ -41,7 +41,8 @@
 3. **Stage C：Web 管理端（現場 LAN 形態）**——跑在 PC 上、與 Gateway 同一個區域網路，使用者用瀏覽器觀看。
 4. **Stage E：雲端場域服務**——部署在 Owner 的 VPS（網域＋HTTPS）。多場域 SaaS：
    場域主開場域、成員掃 QR 加入、有網路的手機直接上雲、現場閘道有回程網路時同步上雲、
-   雲端後台（含場域自訂地圖）。詳本文件「Stage E」章（位於 §7 與 §8 之間）。
+   雲端後台（含場域自訂地圖）。詳本文件「Stage E」章（位於 §7 與 §8 之間）；
+   v1.3 起含 **EC 系列**（E-CARE 跨專案串接，Owner 2026-06-12 拍板）。
 5. **Stage D：實體硬體**——模擬器全綠、採購 gate（B10）通過之後，Owner 才買開發板
    （nRF54L15 DK + SX1262）與配件，進入實機 bring-up。**Stage D 可與 Stage E 整段並行**
    （軟體工作不依賴硬體、硬體工作不依賴雲端；D 的入場條件不變）。
@@ -54,7 +55,7 @@
 | 執行者 | 任務 | 理由 |
 |---|---|---|
 | **主理 AI（Claude，Owner 授權 session）** | A0、A1、**DL（設計語言）**、A4、A5、A12、B1、**E1（雲端契約＋地圖校準規格/vectors）**、各 Stage 稽核（§10.2） | 動凍結 wire / 密碼學 / 契約圖紙 / corpus·vectors 重生 / 視覺定調——錯誤會污染全下游 |
-| **施工 AI（其他 AGENT）** | A2、A3、A6、A7–A10、**A10b**、A11 腳本撰寫、B2–B9、C1–C7、**E2（文件＋腳本；執行=USER-GATE）、E3–E7**、其餘 | 有 corpus/vectors/grep gate 自動抓偷工，爆炸半徑受控 |
+| **施工 AI（其他 AGENT）** | A2、A3、A6、A7–A10、**A10b**、A11 腳本撰寫、B2–B9、C1–C7、**E2（文件＋腳本；執行=USER-GATE）、E3–E7、EC-1／EC-2／EC-4、EC-3（文件；執行=USER-GATE）**、其餘 | 有 corpus/vectors/grep gate 自動抓偷工，爆炸半徑受控 |
 
 - 施工 AI **不得**執行分工表中主理 AI 的任務；遇到依賴時走 G8 BLOCKED。
 - DL 任務（設計語言規範 + Web 範本）已由主理 AI 交付：規範 =
@@ -102,6 +103,11 @@
                                                   SQLite（多場域）+ 角色/可見性政策
                                                                          |
                                   [場域主/工作人員瀏覽器：雲端後台（網域 + HTTPS）]
+
+（v1.3 新增）EC 跨專案串接——黏合層全在本專案側，E-CARE 程式碼零改動：
+
+[手機 App] --SOS 後援 AI 對話（HTTPS＋金鑰）--> [VPS /ecare/ 代理] --tunnel--> [E-CARE 後端（學校資源：FastAPI+LLM）]
+[VPS 雲端場域服務] --SOS 通報轉發（EC-2 adapter）------^
 ```
 
 - **手機 App**（Flutter/Android 優先；iOS source-parity 保留、延後驗證）：
@@ -119,6 +125,9 @@
   SOS 永不受政策遮蔽）；場域自訂地圖（場域主上傳圖＋對位點配準）；
   角色與政策只存在服務層，**不進 wire**。v1 無自助註冊、無金流——Owner 以 CLI
   手動開通場域即商業流程。
+- **E-CARE 跨專案串接（v1.3，Stage E「EC 系列」）**：SOS 後援 AI 對話（App 直連、
+  經 VPS 代理）＋SOS 案件自動通報入 E-CARE 儀表板＋本後台「E-CARE 通報」分頁。
+  E-CARE 跑在學校資源、其程式碼零改動；SOS 本體對 E-CARE 零依賴（OD-13）。
 
 ### 1.3 三段信任邊界（安全模型，AGENT 不得弱化）
 
@@ -128,6 +137,7 @@
 | Node ↔ Node ↔ Gateway（LoRa） | **LORA-WIRE v1** 緊湊框架：`field_tag` 預過濾 + `mac8`（HMAC-SHA256 截 8B，金鑰 HKDF 自 `field_join_secret` 域分隔派生）+ CRC16 + event_id 去重 + HLC 窗口防重放。**作者 Ed25519 簽章不過 LoRa**（見 OD-2 信任模型） | 本文件附錄 C（B1 凍結） |
 | Gateway ↔ 瀏覽器（LAN HTTP） | Bearer token（本地設定檔）、僅綁 LAN、零外網資源 | 本文件附錄 D（C1 凍結） |
 | 手機 / Gateway ↔ 雲端（網際網路，v1.2） | TLS（網域憑證）＋**信封自證**：雲端以與現場閘道**同一驗證管線**重驗 Ed25519＋field_mac＋去重＋HLC 重放窗（每場域 secret 由 Owner 佈建，OD-9）＋rate limit。後台登入=owner/staff 帳密＋session。角色/可見性=服務層資料，不進 wire（OD-11） | 本文件 Stage E（E1 凍結） |
+| 手機 / 雲端 ↔ E-CARE（跨專案，v1.3） | 一律經 Owner VPS 反向代理＋per-field 金鑰（學校機器不開公網）；只送事件欄位、禁 PII（`/users` 與 `user_context` 禁用）；送出資料視同離開本系統信任邊界、場域條款須揭露（OD-13）；E-CARE 不可用＝正常態（App 無聲降級）；SOS 本體對 E-CARE 零依賴 | 本文件 Stage E「EC 系列」 |
 
 ### 1.4 最終完成定義（FINAL DoD — 整個專案算「完成」的條件）
 
@@ -328,13 +338,16 @@ Stage E（雲端場域服務；前置：Stage C Exit）
  E1 雲端契約+地圖校準凍結(需C1) ──► E3 雲端伺服器(多場域) ──► E4 App 雲端整合 ──► E6 雲端後台 ──► E7 場域自訂地圖(另需A10)
  E2 VPS/網域/TLS 佈建(USER-GATE；可在 E1 進行中先做) ──► E3 的部署驗收
  E3 ──► E5 閘道↔雲端同步
+ （v1.3）E4 ──► EC-1 App SOS 後援對話；E3 ──► EC-2 雲端→E-CARE 通報轉發 ──► EC-4 後台 E-CARE 分頁(另需E6)
+ （v1.3）E2 ──► EC-3 E-CARE 代理佈建(USER-GATE) ──► EC 實連驗收(§E.8 第 5 項)
 Stage D（實體硬體；需 B10 + Owner 採購；全程可與 Stage E 並行）
  D1 採購與開箱 ──► D2 bench bring-up ──► D3 真手機↔真Node ──► D4 Node→LoRa→GW→Web ──► D5 場試
 ```
 
 允許的並行：A1 與 A2 可並行（不同端）；B2 可在 A5 之後先行（v3 信封規格已凍結）；
 B5 環境安裝可隨時先做（經 Owner 同意）；C1–C3 可在 B4 後與 B6–B9 並行；
-**Stage D 與 Stage E 互不依賴，可整段並行**；E2 不依賴 E1 的契約內容，可先做。
+**Stage D 與 Stage E 互不依賴，可整段並行**；E2 不依賴 E1 的契約內容，可先做；
+EC-1／EC-2／EC-4 以 mock 開發、可與 E5–E7 並行（實連驗收需 EC-3 完成）。
 
 ---
 
@@ -1151,6 +1164,9 @@ C1–C5、C7 全 DONE（C6 可延）；`STAGE-C-EXIT: PASS` 記 gateway repo STA
    - **App 下行**：`GET /api/v1/fields/{fid}/app-bundle`（帶 member_token）＝
      政策＋地圖 meta＋ADMIN_BROADCAST 信封清單（**信封原樣 bytes 的 b64**——
      App 端必須走既有 decode＋驗證，見 E4）。
+   - **（v1.3）場域選用整合設定**：場域表加 `ecare_base_url`／`ecare_api_key`
+     （皆 nullable；owner 後台設定，供 EC 系列）；隨 app-bundle 下行。空值＝App
+     隱藏 AI 對話入口（EC-1）。金鑰由 VPS 代理層驗證（EC-3），雲端服務本身不驗此 key。
 2. `ignirelay_app/docs/specs/map_calibration_v1.md`（normative）：
    - **投影**：局部等距投影，原點＝第 1 對位點；
      `x_m = (lng − lng₀) × 111320.0 × cos(lat₀)`、`y_m = (lat − lat₀) × 110574.0`
@@ -1233,7 +1249,8 @@ ingest 批次上行本地新事件（游標持久化、斷線指數退避、even
 
 同一份 `webapp/` 依 capabilities 擴充：owner/staff 登入頁、場域切換器、場域管理
 （建立流程顯示 CLI 產出之邀請資料、member/staff QR 海報列印視圖、staff token 輪換、
-政策切換、**anon8 備註欄**＝場域主自填別名，僅該場域後台可見、不上 wire）、
+政策切換、**anon8 備註欄**＝場域主自填別名，僅該場域後台可見、不上 wire、
+（v1.3）E-CARE 連線設定＝URL／金鑰僅 owner 可編輯、顯示一律遮蔽尾碼）、
 C3 同款看板（per-field）、地圖頁籤（E7 掛入）。QR 在**伺服器端產 SVG**（零外部資源）。
 **DoD**：D1 角色行為自動測試（member 無後台、staff 看板有/管理無、owner 全有——
 API 層測試＋UI smoke）；D2 `grep -rn "data-sample" webapp/` 維持 0 行；
@@ -1261,6 +1278,133 @@ D4 App/後台疊加 smoke＋設計 gates 過；D5 通用 gate 全綠。
 **禁止**：兩端各自發明投影/擬合公式而不過同一份 vectors；引入 GIS/地圖函式庫；
 傳遞擬合係數（必須由點集重算）；把推導出的像素/距離寫進 DB 或 wire。
 
+### EC 系列 — E-CARE 跨專案串接（v1.3 新增；Owner 2026-06-12 拍板）
+
+> **背景**：Owner 與校內另一團隊的專案 **E-CARE**（`github.com/rungyu0721/Ecare`；
+> FastAPI 緊急事件輔助後端——事件分類／風險評估／LLM 安撫對話／案件通報 CRUD；
+> 跑在**學校 GPU 資源**上，不在 Owner VPS）合作。烽傳取用其三個能力：
+> ① SOS 後的 AI 安撫對話（`POST /chat`）；② SOS 案件通報進其儀表板
+> （`POST /reports`、`POST /reports/{id}/status`）；③ 急救圖卡內容（離線快照）。
+> 主理 AI 已於 2026-06-12 審閱 E-CARE repo（commit `4e4543d`）確認對接基礎：
+> `/chat` 無伺服器端 session（對話歷史由 client 全量攜帶，天然可斷線重試）；
+> `/reports` 含 `latitude`/`longitude` 欄位；API 目前**完全無認證**（其 roadmap
+> P3 自承待補）——故一切存取必須經 EC-3 代理層，學校機器不得直接面對公網。
+>
+> **EC 不變量（疊加在 Stage E 六條不變量之上；違反＝任務 FAIL）**：
+> 1. **SOS 零延遲**：一切 EC 功能（彈窗／對話／通報轉發）只發生在 SOS 本體
+>    **已完成發送之後**；EC 任何失敗不得阻擋、延遲、改變 SOS 的 mesh 廣播與
+>    雲端上行。實作鐵則：SOS 發佈路徑**禁止 import 任何 EC 程式碼**（grep gate 釘死）。
+> 2. **E-CARE 程式碼零改動**：所有黏合層位於本專案 repo（App／gateway cloud／
+>    VPS 設定）。任何「需要對方改 X 才能接」的做法＝設計錯誤，走 G8 回報 Owner。
+> 3. **隱私紅線**：禁止呼叫 E-CARE `/users`（該表含實名／電話／地址 PII）；
+>    `/chat` 禁止攜帶 `user_context`；`POST /reports` 只送事件欄位（category／
+>    location 文字／lat/lng／risk／description；description 內容限 anon8、安全
+>    狀態、時間，禁任何 PII）。送往 E-CARE 之資料視同離開本系統信任邊界（OD-13）。
+> 4. **可用性降級**：E-CARE 不可用（timeout／5xx／斷網／合作中止）＝**正常狀態**。
+>    App 逾時後無聲降級回本地圖卡；禁止無限轉圈、禁止 crash；重試上限與退避
+>    依各任務明定。
+> 5. **AI 輸出只進顯示層**：E-CARE 的回覆／風險判斷一律不回寫 wire、DB、SOS 狀態
+>    （同 A10b「顯示層」紀律）。
+> 6. **wire 契約零變更**（承襲 E 不變量 1）。v1 範圍**不含**「AI 對話經 mesh 中繼」
+>    ——該構想屬 wire 契約修訂，明確標 future、Owner 另案核可，AGENT 不得擅自實作。
+
+### EC-1 — App：SOS 後援對話（本地圖卡＋E-CARE AI）（施工 AI；前置：E4）
+
+UX 流程（Owner 2026-06-12 拍板）：SOS 送出成功**之後** → 非阻擋式 bottom sheet
+「需要進一步協助嗎？」→ 同意 → 對話畫面：無網路或場域未設 E-CARE → 輸入文字觸發
+關鍵字→本地急救圖卡；有網路且場域已設 E-CARE → AI 對話。拒絕／忽略彈窗＝零影響。
+
+1. `lib/app/services/ecare_client.dart`：constructor 注入 HTTP client（MultiProvider
+   接線，禁 `.instance`）；方法 `chat()`／`createReport()`／`updateReportStatus()`；
+   全部回傳 Result 型別（不向外拋例外）；timeout 10s、重試 ≤1 次（指數退避）；
+   端點與欄位以附錄 B「EC 對接面」基準為準。
+2. 設定來源：E1 之 `ecare_base_url`／`ecare_api_key` 隨 app-bundle 下行（E4 既有
+   輪詢）；記憶體持有＋`SharedPreferences` 快取（key `ecare_cfg_<field_id_hex>`）；
+   **不新增 DB schema**。空值＝AI 對話入口隱藏（圖卡模式仍可用）。debug build 允許
+   TEST-ONLY 手動覆寫欄位（沿 A2 debug-secret 模式；release 不可見，widget test 釘死）。
+3. SOS 後彈窗：訂閱既有 SOS 發佈完成訊號（實作時以實際 API 為準、錨點記 STATUS）；
+   bottom sheet 顯示路徑不得 await 任何網路呼叫。
+4. 對話畫面（`ui/screens/`；facade 規則＋500 行上限＋Controller/View 拆分）：
+   - 本地模式：`assets/first_aid_cards_v1.json`（內容取自 E-CARE
+     `backend/data/first_aid_guides.json` 快照；檔頭標注來源 repo／commit／日期）；
+     關鍵字比對＝純函式 `first_aid_matcher.dart`（可單測）。
+   - 連線模式：messages 全量帶上 `POST /chat`；顯示 `reply`＋`next_question`；
+     `risk_level` 僅顯示（EC 不變量 5）；失敗→無聲切回本地模式＋單行非阻擋提示。
+5. SOS 通報 hook：SOS 送出後網路可用→fire-and-forget `createReport()`
+   （title=`烽傳 SOS <anon8>`、category=`災防求救`、座標取 SOS 自帶位置、
+   description 開頭含 `[IGNI:<event_id 前 8 hex>]` 供對帳）；成功記 report_id
+   （同上 SharedPreferences key 空間）；後續**本人** SOS 安全狀態變更→
+   `updateReportStatus()`。映射表**必須窮舉本專案 safety state enum 全部值**
+   （switch 禁 default 漏接；單測逐值斷言）：語意吻合者用 E-CARE 終態詞
+   （如 SAFE→「我已安全」），無對應者 status=`現場更新`、狀態原文入 note。
+6. 測試：client 成功/timeout/5xx/降級；「彈窗路徑拋例外，SOS pipeline 照常完成」
+   widget test；關鍵字→圖卡；映射窮舉；release 無覆寫欄位。
+
+**DoD**：D1 GATE-TEST 綠（新測試檔名列 STATUS）；D2 GATE-LAYERS／GATE-ANALYZE 綠；
+D3 grep gate＝SOS 發佈路徑零 EC 引用：`grep -rni "ecare" lib/app/controllers/ lib/app/mesh/`
+→ **0 行**（指令＋輸出貼 STATUS）；D4 E-CARE 不可用情境之降級證據（測試輸出）。
+**禁止**：在 SOS 發佈路徑 await EC 呼叫或 import EC 程式碼；AI 輸出回寫 wire/DB/
+SOS 狀態；呼叫 `/users` 或攜帶 `user_context`；UI 自建 HTTP client（必須注入）；
+新增 DB 欄位；release 出現 URL 覆寫欄位。
+
+### EC-2 — 雲端→E-CARE 通報轉發 adapter（施工 AI；前置：E3）
+
+**只跑在 cloud 形態**（單一轉發點；現場 LAN 閘道不轉發——避免雙重通報與金鑰外散）。
+
+1. 設定：per-field `ecare_base_url`／`ecare_api_key`（cloud_config，權限 600；
+   repo 只放 `*.example`）；未設定的場域＝完全跳過（零行為、零 log noise）。
+2. 訂閱**已通過驗證管線**的 SOS 事件（post-pipeline hook；非 SOS 一律不轉發）；
+   非同步佇列處理——E-CARE 失敗不得回壓 ingest 路徑。
+3. 映射：同 EC-1 步驟 5 的欄位規則（title／category／座標／`[IGNI:]` 標記／無 PII）。
+   E-CARE `POST /reports` **非冪等**→本地持久化 `event_id → report_id` 映射
+   （成功後寫入；重啟以映射防重複 create；崩潰窗口可能殘留單次重複，以 `[IGNI:]`
+   可對帳——此已知限制必須寫進 EC-3 部署文件）。
+4. 本人 SOS 之 STATUS_UPDATE（SAFE 等）→`POST /reports/{id}/status`（同映射表）。
+5. 重試：指數退避、上限 5 次，之後進 dead-letter log（檔案）；log 禁含金鑰全文。
+6. 測試（mock E-CARE server）：轉發一次性／5xx 重試／dead-letter／非 SOS 不轉發／
+   **無 PII 斷言**（對送出 JSON 全文掃 name/phone 類欄位）／重啟不重複 create／
+   未設定場域零呼叫。
+
+**DoD**：D1 GATE-GW 綠（新測試數列 STATUS）；D2 mock 收到之 JSON 樣本貼 STATUS；
+D3 grep gate：repo 內無真實 URL／金鑰（只允許 example／測試值；指令＋輸出貼 STATUS）；
+D4 LAN 形態零退化（C2/C4 測試原樣全綠）。
+**禁止**：在 LAN 形態啟用；直寫 E-CARE DB；轉發非 SOS 事件；同步阻塞 ingest；
+呼叫 `/users`；金鑰入 repo 或 log。
+
+### EC-3 — E-CARE 代理與金鑰佈建（施工 AI 寫文件；執行＝USER-GATE；前置：E2）
+
+產出 `ignirelay-gateway/docs/DEPLOY_ECARE_PROXY.md`，必含小節：
+
+1. **Owner 協調清單**（執行前 Owner 親自向 E-CARE 團隊取得並記 STATUS）：
+   base URL／服務常駐時段／同意經 Owner VPS 代理對外。三項齊才得執行後續。
+2. 學校機器→VPS 反向通道（主推方案擇一寫死步驟；學校機器**不開任何公網 port**）。
+3. VPS 反向代理 `location /ecare/`：對外要求 header `X-Igni-Ecare-Key`
+   （per-field 金鑰，與 E1 下行給 App 者一致）、無效→401；per-key rate limit；
+   TLS 沿用 E2 憑證；金鑰檔權限 600、repo 只放 `*.example`。
+4. 驗收指令（Owner 逐字執行回填）：無 key→401/403；有 key `GET /ecare/reports`→200；
+   App 對話 round-trip 一次成功。
+5. 金鑰輪換＋「合作中止」處置程序（拆代理＝EC 全功能自動降級，App 不需改版）。
+
+**DoD**：D1 文件全小節齊且指令可逐字執行；D2 Owner 回填全項證據。
+**禁止**：學校機器直開公網；任何真實 URL／金鑰／tunnel token 入 repo；
+要求 E-CARE 端改碼。
+
+### EC-4 — 雲端後台「E-CARE 通報」分頁（施工 AI；前置：EC-2、E6）
+
+1. cloud server 加讀代理：`GET /api/v1/fields/{fid}/ecare/reports`（與
+   `…/ecare/reports/{rid}/status`）——伺服器端以場域金鑰經代理取 E-CARE 資料後
+   原欄位轉發（**金鑰永不到瀏覽器**）；owner/staff session 保護；E-CARE 逾時→
+   504＋webapp 顯示「E-CARE 暫不可用」空狀態（不是錯誤畫面）。
+2. webapp 加「E-CARE 通報」分頁（同一份 webapp、依 capabilities 顯示；
+   DESIGN_LANGUAGE 全約束）：案件列表（risk chips 用 tokens 色）、`[IGNI:]` 案件
+   標注「來自烽傳」、狀態歷程展開。**v1 唯讀**（建立／改狀態由 EC-1/EC-2 自動流負責）。
+3. 測試：代理端點角色矩陣（member 401/403）／E-CARE down→504 路徑／
+   `data-sample`=0／DESIGN_LANGUAGE §6 gates。
+
+**DoD**：D1 GATE-GW 綠；D2 設計 gates＋data-sample=0 證據；D3 金鑰不出現於任何
+回應 body／前端原始碼（grep 證據）。
+**禁止**：瀏覽器直連 E-CARE；金鑰進前端；fork webapp；在本分頁提供寫操作。
+
 ### §E.8 Stage E Exit
 
 全部滿足，`STAGE-E-EXIT: PASS` 記 gateway repo STATUS.md：
@@ -1272,6 +1416,12 @@ D4 App/後台疊加 smoke＋設計 gates 過；D5 通用 gate 全綠。
    地圖疊加、QR 海報列印視圖各一張截圖；手機行動網路下發 SOS → 後台 **≤30 秒**
    浮現（截圖＋秒數）。
 4. E2 的備份還原演練至少實際執行一次（Owner 回填）。
+5. **（v1.3）EC 附加驗收（條件項）**：OD-13 合作生效中＝必要項。實連情境
+   （Owner 回填）：手機發 SOS → E-CARE `GET /reports` 出現對應 `[IGNI:]` 案件
+   （≤60 秒）；後台「E-CARE 通報」分頁顯示同案件（截圖）；App AI 對話 round-trip
+   一次成功（截圖）。若 Owner 於 STATUS 書面記錄合作中止 → EC-1～EC-4 標
+   SUSPENDED 並自本項移除——**此判定只有 Owner 能做**，AGENT 不得以
+   「連不上／沒回應」自行豁免或跳過。
 
 ---
 
@@ -1311,6 +1461,7 @@ LoRa 區域參數：台灣 AS923（923MHz）頻段；功率/duty 依法規；場
 | OD-10 | 節點**不加** NB-IoT | 蜂巢回程若日後需要，正確位置=閘道（單 SIM/單數據機）；封存為 future，D5 場試見到實際覆蓋缺口再評估 | 與離線前提衝突（同基地台依賴）、每節點 SIM 營運負擔、Stage E 已覆蓋「任一端有網路即上雲」多數需求（Owner 2026-06-11 核） |
 | OD-11 | 角色/可見性 = 服務層概念，不進 wire | `owner/staff/member` 與 `peer_visibility∈{all,staff_only}` 存雲端 DB；**SOS 永遠對全場域成員可見，政策不可遮蔽**；離線 mesh 下可見性=App 端遵守（文件如實標註） | wire 契約零變更；信封簡單性與凍結狀態不受商業功能污染（Owner 2026-06-11 核） |
 | OD-12 | 場域地圖 = 場域主上傳圖像＋對位點配準（不採線上圖磚） | 2–10 對位點、局部等距投影＋2D 相似變換最小平方；App 與後台兩端過同一份 vectors；只存點集 | 零外網、零圖資授權、自製圖比官方圖磚更貼場域；演算法純函式可測（Owner 2026-06-11 核） |
+| OD-13 | E-CARE 跨專案合作＝零改動掛接（v1.3） | 資料層用 E-CARE 後端（`/chat`、`/reports`、status log）；管理畫面＝本專案雲端後台自建分頁讀其 API（EC-4）；存取一律經 Owner VPS 代理＋per-field 金鑰（學校機器不開公網）；禁 `/users` 與 `user_context`（PII）；SOS 零延遲不變量；E-CARE 不可用＝正常態（App 無聲降級）；「AI 對話經 mesh」標 future | E-CARE API 無認證且跑在學校資源（可用性不可控）——代理＋金鑰把安全與停用開關收在 Owner 手上；零改動＝不產生跨團隊維護 fork（Owner 2026-06-12 核） |
 
 ### 9.2 風險表
 
@@ -1326,6 +1477,9 @@ LoRa 區域參數：台灣 AS923（923MHz）頻段；功率/duty 依法規；場
 | VPS 被入侵 → 該場域 MAC 金鑰外洩（v1.2） | 可偽造該場域事件 | OD-9 單場域爆炸半徑＋E2 換鑰程序＋hardening checklist＋E3 rate limit |
 | 雲端 ingest 被濫用（垃圾上傳/灌爆）（v1.2） | 資料污染、資源耗盡 | 信封自證（無效即棄不入庫）＋E3 per-IP/per-field 限流＋429 測試 |
 | 場域地圖校準不準 → 疊加誤導搜救（v1.2） | 安全風險 | E1 規格強制顯示 RMS 殘差；E7 疊加沿用 A10 可信度/年齡降級；文案鐵則「最後可信位置」 |
+| E-CARE 不可用（學校機器關機/學期空窗/合作中止）（v1.3） | AI 對話與通報轉發失效 | EC 不變量 4 降級設計＋EC-3 中止處置（拆代理即全降級）＋SOS 本體零依賴＋§E.8 第 5 項 SUSPEND=Owner-only |
+| E-CARE API 無認證遭濫用（v1.3） | 學校資源被盜用、資料污染 | EC-3：學校機器不開公網、只經 VPS 代理＋per-field 金鑰＋限流＋可輪換 |
+| 通報重複/遺失（E-CARE `POST /reports` 非冪等）（v1.3） | 儀表板出現重複/缺漏案件 | EC-2 `event_id→report_id` 持久映射＋`[IGNI:]` 對帳標記＋dead-letter log |
 
 ---
 
@@ -1410,6 +1564,7 @@ west build -b nrf54l15bsim/nrf54l15/cpuapp tests/core        # ztest
 | `ignirelay-gateway/docs/specs/cloud_api_v1.md` | E1 產出後凍結 |
 | `docs/specs/map_calibration_v1.md` + `map_calibration_v1_vectors.json` + `tool/generate_map_calibration_v1.dart` | E1 產出後凍結；vectors generator-only（G7） |
 | QR 內容格式 `IGNI1` 五段式（§5 A7 步驟 2） | A7 落地後凍結；「未知尾段必須忽略」鐵則永久有效 |
+| EC 對接面：E-CARE `/chat`／`/reports`／`/reports/{id}/status` 之請求/回應欄位（基準＝E-CARE repo commit `4e4543d` 之 `API_SPEC.md`＋`backend/models.py`） | v1.3 起管制：EC 任務開工前必須 diff 上游同三介面，有變更→G8 報 Owner 重核；禁止靜默適配 |
 
 ## 附錄 C — LORA-WIRE v1 草案（B1 落定為 normative 前的唯一基準）
 
@@ -1482,4 +1637,20 @@ crc16 = CRC-16/CCITT-FALSE(hdr‖body‖mac8)，poly 0x1021 init 0xFFFF
   地圖=配準不採圖磚）；風險表加 3 列；附錄 B 凍結清單加 cloud_api/map_calibration/
   QR 格式；附錄 F 加 `http`（App）與 `Pillow`（gateway cloud）。
   ⑦wire 契約（信封/LORA-WIRE/GATT）**零變更**——Stage E 全部掛在服務層。
+  作者：Claude（Owner 委託）。
+- v1.3（2026-06-12，Owner 拍板的跨專案合作）：
+  ①新增 **EC 系列（Stage E 附掛）：E-CARE 跨專案串接**——背景＋6 條 EC 不變量；
+  EC-1 App SOS 後援對話（SOS 後彈窗→本地關鍵字圖卡／E-CARE AI 對話＋SOS 通報
+  hook）；EC-2 雲端→E-CARE 通報轉發 adapter（只跑 cloud 形態、event_id 映射防
+  重複）；EC-3 代理／金鑰佈建（USER-GATE；學校機器不開公網）；EC-4 後台
+  「E-CARE 通報」唯讀分頁。§E.8 加第 5 項條件性實連驗收（SUSPEND 判定=Owner-only）。
+  ②E1 契約加場域選用設定 `ecare_base_url`/`ecare_api_key`（nullable，隨 app-bundle
+  下行）；E6 場域管理加 E-CARE 連線設定欄位。
+  ③OD-13 入表；風險表加 3 列；附錄 B 加「EC 對接面」管制列（基準＝E-CARE repo
+  `4e4543d`）；§0.1（補列 E 系列任務編號）/§0.3/§0.4/§1.2/§1.3/§4 同步。
+  ④紅線：SOS 零延遲（SOS 發佈路徑禁 import EC，grep gate）；E-CARE 程式碼零改動；
+  禁 `/users` 與 `user_context`（PII）；AI 輸出只進顯示層；wire 契約零變更
+  （「AI 對話經 mesh」明確標 future）。零新增第三方依賴（App 沿用 `http`、
+  gateway 走 stdlib）。
+  ⑤A0–A12／B／C／D 各任務內容零變更（既有排程不受影響）。
   作者：Claude（Owner 委託）。

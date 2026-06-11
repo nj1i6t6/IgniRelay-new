@@ -27,9 +27,6 @@ class EventType {
   static const int matchAvailable = 11;
   static const int matchGone      = 12;
 
-  // ── Read-model only (local, never on wire) ──
-  static const int presence = 19;
-
   // Backward compat aliases
   static const int matchIntent  = matchOffer;
   static const int matchConfirm = matchAccept;

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:ignirelay_app/app/mesh/event_types.dart';
 import 'package:ignirelay_app/app/mesh/mesh_event_handler.dart';
@@ -42,27 +41,6 @@ class HazardEvent {
       required this.description});
 }
 
-class PresenceUpdate {
-  final String eventId;
-  final String anon8;
-  final int source;
-  final double? lat;
-  final double? lng;
-  final int? accuracy;
-  final int? battery;
-  final int observedMs;
-  PresenceUpdate({
-    required this.eventId,
-    required this.anon8,
-    required this.source,
-    this.lat,
-    this.lng,
-    this.accuracy,
-    this.battery,
-    required this.observedMs,
-  });
-}
-
 /// 通用「事件日誌變動」通知。
 ///
 /// 給只關心「某個事件剛剛抵達/落地，請我重整自己這份 view」的 UI 使用。內容
@@ -103,14 +81,11 @@ class EventStream {
       StreamController<SosAlert>.broadcast();
   final StreamController<HazardEvent> _hazardController =
       StreamController<HazardEvent>.broadcast();
-  final StreamController<PresenceUpdate> _presenceController =
-      StreamController<PresenceUpdate>.broadcast();
   final StreamController<EventLogChanged> _anyEventController =
       StreamController<EventLogChanged>.broadcast();
 
   Stream<SosAlert> get sosAlerts => _sosController.stream;
   Stream<HazardEvent> get hazardEvents => _hazardController.stream;
-  Stream<PresenceUpdate> get presenceUpdates => _presenceController.stream;
 
   /// 「事件日誌有新東西」的通用通知 stream。UI 若只需要「something 變了，
   /// 請重新跑 query」的訊號，就訂閱這個 stream，不要再用 [rawEvents]。
@@ -176,25 +151,6 @@ class EventStream {
             ));
           }
           break;
-        case EventType.presence:
-          if (payload != null) {
-            try {
-              final j = jsonDecode(utf8.decode(payload)) as Map<String, dynamic>;
-              _presenceController.add(PresenceUpdate(
-                eventId: eventId,
-                anon8: (j['anon8'] as String?) ?? '',
-                source: (j['src'] as int?) ?? 0,
-                lat: (j['lat'] as num?)?.toDouble(),
-                lng: (j['lng'] as num?)?.toDouble(),
-                accuracy: (j['acc'] as num?)?.toInt(),
-                battery: (j['battery'] as num?)?.toInt(),
-                observedMs: (j['observed_ms'] as int?) ?? 0,
-              ));
-            } catch (_) {
-              // malformed presence payload — skip silently
-            }
-          }
-          break;
         default:
           break;
       }
@@ -208,7 +164,6 @@ class EventStream {
     await _subscription?.cancel();
     await _sosController.close();
     await _hazardController.close();
-    await _presenceController.close();
     await _anyEventController.close();
   }
 }

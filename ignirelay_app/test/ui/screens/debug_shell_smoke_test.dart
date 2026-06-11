@@ -14,9 +14,7 @@ import 'package:ignirelay_app/app/controllers/mesh_runtime_controller.dart';
 import 'package:ignirelay_app/app/db/database_helper.dart';
 import 'package:ignirelay_app/app/mesh/mesh_event_handler.dart';
 import 'package:ignirelay_app/app/services/event_decoder.dart';
-import 'package:ignirelay_app/app/services/event_publisher_v2_facade.dart';
 import 'package:ignirelay_app/app/services/event_store.dart';
-import 'package:ignirelay_app/app/services/peer_capability_registry.dart';
 import 'package:ignirelay_app/ui/shell/debug_shell.dart';
 
 Widget _wrap(Widget child) {
@@ -28,11 +26,6 @@ Widget _wrap(Widget child) {
       ),
       Provider<EventStore>(
         create: (_) => EventStore(databaseHelper: DatabaseHelper()),
-      ),
-      Provider<EventPublisherV2Facade>(
-        create: (_) => EventPublisherV2Facade(
-          registry: PeerCapabilityRegistry(),
-        ),
       ),
       Provider<EventStream>(
         create: (ctx) => EventStream(
@@ -59,7 +52,7 @@ void main() {
     await DatabaseHelper().resetForTest();
   });
 
-  testWidgets('DebugShell renders mesh control, send buttons, event log',
+  testWidgets('DebugShell renders mesh control, send placeholders, event log',
       (tester) async {
     await tester.pumpWidget(_wrap(const DebugShell()));
     await tester.pump();
@@ -72,13 +65,9 @@ void main() {
     expect(find.byType(FilledButton), findsOneWidget);
     expect(find.text('啟動'), findsOneWidget);
 
-    // PRESENCE / SOS buttons — PRESENCE is now real, SOS still placeholder
+    // PRESENCE / SOS placeholder buttons
     expect(find.text('發 PRESENCE'), findsOneWidget);
     expect(find.text('發 SOS'), findsOneWidget);
-
-    // position card — shows "尚無 PRESENCE evidence" initially
-    expect(find.text('最後可信位置'), findsOneWidget);
-    expect(find.text('尚無 PRESENCE evidence'), findsOneWidget);
 
     // event log section
     expect(find.text('事件 log（最新 50）'), findsOneWidget);

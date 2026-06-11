@@ -5,10 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/controllers/mesh_runtime_controller.dart';
-import 'package:ignirelay_app/app/services/anon_identity.dart';
-import 'package:ignirelay_app/app/services/event_publisher_v2_facade.dart';
 import 'package:ignirelay_app/app/services/event_store.dart';
-import 'package:ignirelay_app/app/services/location_evidence_builder.dart';
 
 /// Phase 0b mapless debug shell.
 ///
@@ -31,18 +28,13 @@ class _DebugShellState extends State<DebugShell> {
   late final MeshRuntimeController _runtime;
   late final EventStream _events;
   late final EventStore _store;
-  late final EventPublisherV2Facade _facade;
-  final AnonIdentity _anonIdentity = AnonIdentity();
-  final LocationEvidenceBuilder _locationBuilder = LocationEvidenceBuilder();
 
   StreamSubscription<EventLogChanged>? _logSub;
   StreamSubscription<TransportState>? _stateSub;
-  StreamSubscription<PresenceUpdate>? _presenceSub;
 
   List<Map<String, dynamic>> _recent = const [];
   TransportState? _state;
   bool _busy = false;
-  PresenceUpdate? _lastPresence;
 
   @override
   void initState() {
@@ -50,7 +42,6 @@ class _DebugShellState extends State<DebugShell> {
     _runtime = context.read<MeshRuntimeController>();
     _events = context.read<EventStream>();
     _store = context.read<EventStore>();
-    _facade = context.read<EventPublisherV2Facade>();
     _state = _runtime.transportActive
         ? TransportState.running
         : TransportState.stopped;
@@ -63,9 +54,6 @@ class _DebugShellState extends State<DebugShell> {
       // transportActive / transportStats 仍 null-safe,略過狀態訂閱即可。
     }
     _logSub = _events.anyEventChanges.listen((_) => _refresh());
-    _presenceSub = _events.presenceUpdates.listen((p) {
-      if (mounted) setState(() => _lastPresence = p);
-    });
     _refresh();
   }
 
@@ -73,7 +61,6 @@ class _DebugShellState extends State<DebugShell> {
   void dispose() {
     _logSub?.cancel();
     _stateSub?.cancel();
-    _presenceSub?.cancel();
     super.dispose();
   }
 
@@ -109,31 +96,6 @@ class _DebugShellState extends State<DebugShell> {
 
   void _todoWire(String what) => _snack(
       '$what 尚未接線 — 隨 v2 wire（PRESENCE/SOS/field_id）在後續 Phase 0b commit 接上');
-
-  Future<void> _publishPresence() async {
-    setState(() => _busy = true);
-    try {
-      final anonId = await _anonIdentity.getOrCreate();
-      final evidence = _locationBuilder.build();
-      final outcome = await _facade.publishPresence(
-        anonUserId: anonId,
-        latDegrees: evidence?.latDegrees,
-        lngDegrees: evidence?.lngDegrees,
-        accuracyM: evidence?.accuracyM ?? 0,
-      );
-      if (!mounted) return;
-      final status = outcome.queued
-          ? 'queued (depth ${outcome.pendingDepth})'
-          : outcome.anyAccepted
-              ? 'sent to ${outcome.attempted} peer(s)'
-              : 'no peers';
-      _snack('PRESENCE: $status');
-    } catch (e) {
-      _snack('PRESENCE failed: $e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -219,7 +181,7 @@ class _DebugShellState extends State<DebugShell> {
             const SizedBox(height: 8),
             Wrap(spacing: 8, children: [
               OutlinedButton.icon(
-                onPressed: _busy ? null : _publishPresence,
+                onPressed: () => _todoWire('PRESENCE'),
                 icon: const Icon(Icons.my_location, size: 18),
                 label: const Text('發 PRESENCE'),
               ),
@@ -236,37 +198,19 @@ class _DebugShellState extends State<DebugShell> {
   }
 
   Widget _positionCard() {
-    final p = _lastPresence;
-    return Card(
+    return const Card(
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('最後可信位置', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            if (p == null)
-              const Text(
-                '尚無 PRESENCE evidence',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              )
-            else ...[
-              Text('anon: ${p.anon8}',
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
-              if (p.lat != null && p.lng != null)
-                Text(
-                  'lat ${p.lat!.toStringAsFixed(6)}  lng ${p.lng!.toStringAsFixed(6)}'
-                  '${p.accuracy != null ? '  acc ~${p.accuracy}m' : ''}',
-                  style: const TextStyle(fontSize: 12),
-                ),
-              if (p.battery != null && p.battery! > 0)
-                Text('battery: ${p.battery}%',
-                    style: const TextStyle(fontSize: 12)),
-              Text(
-                'observed: ${DateTime.fromMillisecondsSinceEpoch(p.observedMs).toIso8601String().substring(11, 19)}',
-                style: const TextStyle(fontSize: 11, color: Colors.grey),
-              ),
-            ],
+            Text('最後可信位置', style: TextStyle(fontWeight: FontWeight.bold)),
+            SizedBox(height: 4),
+            Text(
+              'mapless 定位（§3.6）：anchor 節點 / 距離方位 / 可信度 / 誤差半徑。\n'
+              'LocationEvidence + PositionEstimate 隨 v2 wire 接上,本 commit 為占位。',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
           ],
         ),
       ),

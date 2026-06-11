@@ -63,3 +63,26 @@
   - `flutter analyze` → exit 0（Dart 端僅 parity 工具變更）
 - deviations: D3 遞延（計畫 A1 DoD 明文允許之 PARTIAL 路徑）
 - next: 設計語言規範 + Web 範本（DL 任務），再 A4/A5/A12/B1 細化
+
+---
+
+## [2026-06-11] DL DONE（設計語言規範 + Web 範本）
+
+- repo/commit: IgniRelay @（見本 commit）＋ ignirelay-gateway @ 347ae52（webapp 範本）
+- 執行者: Claude（主理 AI）
+- 交付:
+  - 本 repo `docs/DESIGN_LANGUAGE.md`：normative 凍結規範。§1 立場（ops-console）、
+    §2 tokens（hex 取自 App `IgniPalette` dark 實值）、§3 Web 規則（必須沿用範本、
+    tokens.css 唯一色彩來源）、§4 App 規則（IgniPalette/IgniTokens/ui-widgets 強制、
+    screens 禁 `Colors.*`）、§5 禁用清單、§6 enforcement gates（grep/python 指令）、
+    §7 範本檔案清單 + data-sample 移除 gate。
+  - gateway repo `webapp/`：`tokens.css`（CSS vars）、`app.css`（元件樣式，僅 var()）、
+    `index.html`（殼 + SOS 看板完成例，假資料節點全標 `data-sample`）、`app.js`
+    （tabs/clock/relTime/setConn；`apiGet()` 刻意 throw 防假接線）、
+    `DESIGN_README.md`（接手 AGENT 第一頁，6 條硬規則）。
+- gates（DESIGN_LANGUAGE §6 自查，於範本交付時執行）:
+  - 漸層掃描（`gradient`）→ 0 件；CDN/外部 URL 掃描 → 0 件（僅相對路徑）
+  - `app.css`/`index.html`/`app.js` 色彩字面值掃描 → 0 件（hex 僅存在 tokens.css）
+  - emoji 掃描（Python codepoint 檢查）→ 0 件
+- deviations: none
+- next: MASTER_EXECUTION_PLAN v1.1（分工表 + A4/A5/A12/B1 施工筆記 + C3/G7/附錄 B 增補）

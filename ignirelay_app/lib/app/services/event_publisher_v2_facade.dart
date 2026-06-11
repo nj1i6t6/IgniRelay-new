@@ -431,6 +431,49 @@ class EventPublisherV2Facade {
     );
   }
 
+  /// Publish a PRESENCE event — the device's "last footprint" for mesh
+  /// visibility. Payload is [PresenceData] (anon_user_id + optional
+  /// LocationEvidence + battery hint). Spec §11.2 PRESENCE TTL = 4 h;
+  /// maxHops = 4 (short reach, near-field footprints).
+  ///
+  /// Accepts plain Dart types so UI callers do not need to import proto/
+  /// LocationEvidence. lat/lng are degrees; accuracy is metres.
+  Future<BroadcastOutcome> publishPresence({
+    required Uint8List anonUserId,
+    double? latDegrees,
+    double? lngDegrees,
+    int accuracyM = 0,
+    int batteryHint = 0,
+  }) {
+    final location = (latDegrees != null && lngDegrees != null)
+        ? LocationEvidence.fromDegrees(
+            source: LocationSource.gps,
+            frame: LocationFrame.subject,
+            latDegrees: latDegrees,
+            lngDegrees: lngDegrees,
+            accuracyM: accuracyM,
+            observedAt: _hlcNow(),
+          )
+        : const LocationEvidence();
+    final data = PresenceData(
+      anonUserId: anonUserId,
+      location: location,
+      batteryHint: batteryHint,
+    );
+    return _broadcast(
+      eventType: EventTypeV2.presence,
+      priority: PriorityV2.normal,
+      payload: data.encode(),
+      ttlOffset: const Duration(hours: 4), // §11.2 PRESENCE default
+      maxHops: EventTypeV2.maxHopsDefault(EventTypeV2.presence) ?? 4,
+    );
+  }
+
+  HlcTimestampV2 _hlcNow() {
+    final hlc = HLC.now();
+    return HlcTimestampV2(msSinceEpoch: hlc.timestamp, counter: hlc.counter);
+  }
+
   // ── Core broadcast loop ───────────────────────────────────────────────
 
   Future<BroadcastOutcome> _broadcast({

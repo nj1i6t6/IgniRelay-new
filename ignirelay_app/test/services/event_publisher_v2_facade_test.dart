@@ -378,6 +378,47 @@ void main() {
       );
     }
   });
+
+  test('publishPresence sends PRESENCE event with correct type/priority/TTL',
+      () async {
+    final registry = PeerCapabilityRegistry(
+      helloTimeout: const Duration(seconds: 5),
+    );
+    final bridge = await _makeRecordingBridge(registry);
+    final facade = EventPublisherV2Facade(
+      registry: registry,
+      bridge: bridge,
+    );
+    addTearDown(() async {
+      await facade.dispose();
+      await registry.dispose();
+    });
+    _markPeerActive(registry, 'MM:NN');
+
+    final anonId = Uint8List.fromList(List<int>.generate(16, (i) => i + 1));
+    await facade.publishPresence(
+      anonUserId: anonId,
+      latDegrees: 25.04,
+      lngDegrees: 121.56,
+      accuracyM: 15,
+      batteryHint: 80,
+    );
+
+    expect(bridge.invocations.length, 1);
+    final call = bridge.invocations.single;
+    expect(call.eventType, EventTypeV2.presence);
+    expect(call.priority, PriorityV2.normal);
+    expect(call.maxHops, 4);
+
+    final decoded = PresenceData.decode(call.payload);
+    expect(decoded.anonUserId, orderedEquals(anonId));
+    expect(decoded.batteryHint, 80);
+    expect(decoded.location.source, LocationSource.gps);
+    expect(decoded.location.frame, LocationFrame.subject);
+    expect((decoded.location.latDegrees - 25.04).abs() < 1e-6, isTrue);
+    expect((decoded.location.lngDegrees - 121.56).abs() < 1e-6, isTrue);
+    expect(decoded.location.accuracyM, 15);
+  });
 }
 
 class _SendInvocation {

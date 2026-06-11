@@ -112,6 +112,9 @@ class V2InboundProjector {
         case EventTypeV2.statusUpdate:
           await _projectStatus(accepted, eventId);
           break;
+        case EventTypeV2.presence:
+          await _projectPresence(accepted, eventId);
+          break;
         default:
           // Not a UI-surfaced type (supply / match / official / control);
           // nothing to project into the v1 read-model.
@@ -243,5 +246,33 @@ class V2InboundProjector {
       default:
         return 'SOS';
     }
+  }
+
+  Future<void> _projectPresence(DispatchAccepted a, String eventId) async {
+    final p = PresenceData.decode(a.envelope.payload);
+    final anonHex = p.anonUserId
+        .map((b) => b.toRadixString(16).padLeft(2, '0'))
+        .join();
+    final anon8 = anonHex.length >= 8 ? anonHex.substring(0, 8) : anonHex;
+    final snapshot = <String, dynamic>{
+      'anon8': anon8,
+      'src': p.location.source,
+    };
+    if (p.location.latE7 != 0 || p.location.lngE7 != 0) {
+      snapshot['lat'] = p.location.latDegrees;
+      snapshot['lng'] = p.location.lngDegrees;
+      snapshot['acc'] = p.location.accuracyM;
+    }
+    if (p.batteryHint > 0) snapshot['battery'] = p.batteryHint;
+    snapshot['observed_ms'] = p.location.observedAt.msSinceEpoch;
+    await _ingest(
+      eventId: eventId,
+      v1EventType: EventType.presence,
+      urgency: 0,
+      payload: utf8.encode(jsonEncode(snapshot)),
+      accepted: a,
+      lat: snapshot['lat'] as double?,
+      lng: snapshot['lng'] as double?,
+    );
   }
 }

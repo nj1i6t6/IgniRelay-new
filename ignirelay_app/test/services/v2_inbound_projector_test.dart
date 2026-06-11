@@ -231,4 +231,97 @@ void main() {
     await h.projector.dispose();
     await h.dispatcher.dispose();
   });
+
+  test('PRESENCE projects to Event_Logs + presenceUpdates stream', () async {
+    final h = await makeHarness();
+    final eventStream = EventStream(
+      handler: MeshEventHandler(),
+      decoder: EventDecoder(),
+      store: EventStore(databaseHelper: DatabaseHelper()),
+    )..start();
+    final presenceFuture = eventStream.presenceUpdates.first;
+
+    final anonId = Uint8List.fromList(List<int>.generate(16, (i) => i + 1));
+    final presenceData = PresenceData(
+      anonUserId: anonId,
+      location: LocationEvidence.fromDegrees(
+        source: LocationSource.gps,
+        frame: LocationFrame.subject,
+        latDegrees: 25.04,
+        lngDegrees: 121.56,
+        accuracyM: 15,
+      ),
+      batteryHint: 80,
+    );
+    final published = await h.publisher.send(
+      eventType: EventTypeV2.presence,
+      priority: PriorityV2.normal,
+      payload: presenceData.encode(),
+      createdAtHlc: HlcTimestampV2(msSinceEpoch: 1000, counter: 0),
+      expiresAtHlc: HlcTimestampV2(msSinceEpoch: 5000, counter: 0),
+      maxHops: 4,
+      negotiatedMtu: 247,
+      fieldId: Uint8List(16),
+    );
+
+    final projectedId = h.projector.projectedEventIds.first;
+    final outcome = await h.dispatcher
+        .onReceiveEnvelopeBytes(published.wireBytes, peerId: 'DD:EE:FF');
+    expect(outcome, isA<DispatchAccepted>());
+
+    final eventId = await projectedId.timeout(const Duration(seconds: 2));
+    final db = await DatabaseHelper().database;
+    final logs = await db
+        .query('Event_Logs', where: 'event_id = ?', whereArgs: [eventId]);
+    expect(logs.length, 1);
+    expect(logs.first['event_type'], EventType.presence);
+
+    final update = await presenceFuture.timeout(const Duration(seconds: 2));
+    expect(update.anon8, '01020304');
+    expect(update.source, LocationSource.gps);
+    expect(update.lat, isNotNull);
+    expect(update.battery, 80);
+
+    await eventStream.dispose();
+    await h.projector.dispose();
+    await h.dispatcher.dispose();
+  });
+
+  test('duplicate PRESENCE envelope projects only one Event_Logs row',
+      () async {
+    final h = await makeHarness();
+
+    final anonId = Uint8List.fromList(List<int>.generate(16, (i) => i + 10));
+    final presenceData = PresenceData(anonUserId: anonId);
+    final published = await h.publisher.send(
+      eventType: EventTypeV2.presence,
+      priority: PriorityV2.normal,
+      payload: presenceData.encode(),
+      createdAtHlc: HlcTimestampV2(msSinceEpoch: 1000, counter: 0),
+      expiresAtHlc: HlcTimestampV2(msSinceEpoch: 5000, counter: 0),
+      maxHops: 4,
+      negotiatedMtu: 247,
+      fieldId: Uint8List(16),
+    );
+
+    // First projection
+    final projectedId1 = h.projector.projectedEventIds.first;
+    final outcome1 = await h.dispatcher
+        .onReceiveEnvelopeBytes(published.wireBytes, peerId: 'FF:GG:HH');
+    expect(outcome1, isA<DispatchAccepted>());
+    final eventId = await projectedId1.timeout(const Duration(seconds: 2));
+
+    // Second projection of the same envelope — dispatcher should dedup
+    final outcome2 = await h.dispatcher
+        .onReceiveEnvelopeBytes(published.wireBytes, peerId: 'FF:GG:HH');
+    expect(outcome2, isA<DispatchDropped>());
+
+    final db = await DatabaseHelper().database;
+    final logs = await db
+        .query('Event_Logs', where: 'event_id = ?', whereArgs: [eventId]);
+    expect(logs.length, 1);
+
+    await h.projector.dispose();
+    await h.dispatcher.dispose();
+  });
 }

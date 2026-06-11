@@ -137,3 +137,54 @@
 - deviations: none
 - next: 主理 AI 可先行 A12/B1；E1 排在 C1 凍結後。施工 AI 維持 A2 起跑（A2 開工前
   重檢 ActiveFieldController 是否已存在，見 A2 步驟 4 排程注意）
+
+---
+
+## [2026-06-11] A2 DONE（4-4：PRESENCE 發佈/接收/顯示接線）
+
+- repo/commit: IgniRelay @ acf7172
+- 執行者: 施工 AI
+- 變更:
+  - `lib/app/services/anon_identity.dart`（新）：16B 隨機 `anon_user_id`，
+    存 `flutter_secure_storage`（key `anon_user_id_v1`），`getOrCreate()` 幂等。
+    不使用 Ed25519 pubkey（OD-7 隱私分離）。A5 會補 rotate API。
+  - `lib/app/services/location_evidence_builder.dart`（新）：包 `LocationService`，
+    GPS 可用→`LocationEvidence(source:GPS, frame:SUBJECT, 1e7 round-to-nearest,
+    observed_at=HLC.now())`；不可用→null。`forTest()` 注入自訂 provider。
+  - `lib/app/services/event_publisher_v2_facade.dart`：+`publishPresence(anonUserId,
+    latDegrees?, lngDegrees?, accuracyM, batteryHint)` → `PresenceData.encode()`，
+    `EventTypeV2.presence`，`PriorityV2.normal`，TTL=4h（spec §11.2），maxHops=4。
+    UI 層不需 import proto（facade 收 plain double）。
+  - `lib/app/services/v2_inbound_projector.dart`：+`case EventTypeV2.presence` →
+    `_projectPresence()`：解 `PresenceData`，寫 `Event_Logs`（event_type=19，
+    read-model only, never on wire），content 存 JSON snapshot（anon8/src/lat/lng/
+    acc/battery/observed_ms）。
+  - `lib/app/mesh/event_types.dart`：+`static const int presence = 19`（read-model
+    only, never on wire）。
+  - `lib/app/controllers/event_stream.dart`：+`PresenceUpdate` wrapper 型別、
+    `presenceUpdates` typed stream、`EventType.presence` dispatch case（JSON decode
+    snapshot）。
+  - `lib/ui/shell/debug_shell.dart`：PRESENCE 按鈕 → `_publishPresence()` 真實呼叫
+    `facade.publishPresence()`；位置卡改為渲染最新 `PresenceUpdate` evidence
+    （anon8/座標/accuracy/battery/時間），取代 `_todoWire` 占位。
+  - `ActiveFieldController`/`FieldSessionStore` 不存在 → 未引入
+    `kDebugFieldJoinSecretHex`（field ID 由 bridge `zeroFieldId()` 處理，
+    dispatcher field-scope 仍 OFF；A5 收回）。
+- DoD:
+  - D1 ✅ `publishPresence` 全鏈 facade→publisher v3 簽章+field_mac→bridge 單元測試綠
+  - D2 ✅ inbound PRESENCE → `Event_Logs` 投影 + `presenceUpdates` 流測試綠
+    （含重複投影僅一筆 dedup）
+  - D3 ✅ debug shell PRESENCE 按鈕為真實作（widget test 斷言非 snackbar 占位文案）
+  - D4 ✅ 通用 gate 全綠
+- gates:
+  - `dart run tool/check_layers.dart --strict` → exit 0，
+    `ok — no boundary violations`
+  - `flutter analyze --no-fatal-infos --no-fatal-warnings` → exit 0，0 errors
+    （2 個既有 info：battery_optimization_guide use_build_context_synchronously）
+  - `flutter test --exclude-tags golden` → exit 0，
+    `00:12 +477 ~3: All tests passed!`（+8 新測試）
+  - `flutter test test/conformance/wire_conformance_corpus_test.dart` → exit 0，
+    +21 全綠
+- deviations: none（field secret 過渡步驟因 ActiveFieldController 不存在而跳過，
+  依 A2 步驟 4 排程注意允許）
+- next: A3（HAZARD typed payload）/ A4（SOS location）/ A5（FieldSession + field-scope）

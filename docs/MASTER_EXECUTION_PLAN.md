@@ -1,6 +1,6 @@
 # 烽傳 IgniRelay — 總施工計畫 MASTER EXECUTION PLAN
 
-> **版本 v1.0 · 2026-06-10 · Owner: simon（本文件中稱「Owner」）**
+> **版本 v1.1 · 2026-06-10 · Owner: simon（本文件中稱「Owner」）**
 > 範圍：從本日現況，一路到「手機 App + 實體 Field Node + Gateway + 管理者 Web 後台」
 > 整套產品跑通為止的完整施工路線。**本文件是給施工 AI（以下稱 AGENT）逐字遵守的施工規格**，
 > 不是參考建議。所有任務的完成定義（DoD）、驗證指令、證據要求、禁止事項都是硬規則。
@@ -40,6 +40,20 @@
 4. **Stage D：實體硬體**——模擬器全綠、採購 gate 通過之後，Owner 才買開發板（nRF54L15 DK + SX1262）與配件，進入實機 bring-up。
 
 > 標注「**可並行**」的任務允許在不違反前置條件下提前做；沒有標注的一律照編號順序。
+
+### 0.4 任務分工（Owner 2026-06-10 拍板；不得擅自越界）
+
+| 執行者 | 任務 | 理由 |
+|---|---|---|
+| **主理 AI（Claude，Owner 授權 session）** | A0、A1、**DL（設計語言）**、A4、A5、A12、B1、各 Stage 稽核（§10.2） | 動凍結 wire / 密碼學 / 契約圖紙 / corpus 重生 / 視覺定調——錯誤會污染全下游 |
+| **施工 AI（其他 AGENT）** | A2、A3、A6、A7–A10、A11 腳本撰寫、B2–B9、C2–C7、其餘 | 有 corpus/vectors/grep gate 自動抓偷工，爆炸半徑受控 |
+
+- 施工 AI **不得**執行分工表中主理 AI 的任務；遇到依賴時走 G8 BLOCKED。
+- DL 任務（設計語言規範 + Web 範本）已由主理 AI 交付：規範 =
+  `docs/DESIGN_LANGUAGE.md`（G6 凍結）；範本 = `ignirelay-gateway/webapp/`
+  （`tokens.css`/`app.css`/`index.html`/`app.js`/`DESIGN_README.md`）。
+  **任何 UI 任務（A7–A10、C3）開工前必須先讀 `DESIGN_LANGUAGE.md` 全文**，
+  其 §6 enforcement gates 視同該任務 DoD 的必要項。
 
 ---
 
@@ -195,7 +209,11 @@ python -m unittest（ignirelay-gateway）    → 3 OK
   位元組」）自行改契約。
 - **G7（corpus 單一來源）**：`docs/specs/wire_conformance_v1.json` 與一切 vector 檔**只能由
   generator 重生**（`tool/generate_wire_conformance_v1.dart` 等），禁止手編 JSON。generator 本身的
-  修改視同契約修改（走 G6）。
+  修改視同契約修改（走 G6）。**同刀規則（v1.1 增補）**：任何 `corpus_revision` / vectors meta
+  版本字串變更，必須在**同一個任務的同一刀**內，同步更新所有硬編該字串的三端測試
+  （Kotlin `WireConformanceInstrumentationTest.kt`、Swift `WireConformanceTests.swift`、
+  Dart conformance 測試）並各自跑綠後才算完成；漏任一端 = 該任務 FAIL。
+  （教訓來源：4-3 bump corpus 後漏改 Kotlin/Swift 斷言，跨端不一致由 A1 補修。）
 - **G8（BLOCKED 程序）**：遇到（a）環境缺工具、（b）需要 Owner 決策、（c）gate 與 spec 衝突、
   （d）發現本計畫錯誤——一律：在該 repo `STATUS.md` 寫 `BLOCKED` 條目（§10 模板），說明已嘗試什麼，
   **然後停止該任務**。禁止繞道、禁止自行代替 Owner 做契約級決策、禁止假完成。
@@ -288,6 +306,12 @@ B5 環境安裝可隨時先做（經 Owner 同意）；C1–C3 可在 B4 後與 
 > Stage A 全程在 App repo。每個任務收尾必跑：GATE-LAYERS、GATE-ANALYZE、GATE-TEST、
 > GATE-PARITY（動到常數時）、GATE-CONF-DART（動到 wire 時）。以下不再重複列，
 > **視為每個 A 任務 DoD 的隱含必要項**。
+>
+> **A7–A10 共同追加 DoD（設計，v1.1）**：畫面實作必須遵守
+> `docs/DESIGN_LANGUAGE.md` §4（IgniPalette/IgniTokens/既有 `ui/widgets/` 元件、
+> showcase 同步、急難可及性、§3.6 位置文案鐵則）與 §5 禁用清單；
+> 結案驗證追加 `grep -rn "Colors\." lib/ui/screens/ | grep -v debug_shell.dart`
+> 輸出為 0（debug_shell 為既存豁免，A7+ 汰換時一併清除豁免）。
 
 ### A0 — 基線修復：把 2 個紅燈修成綠（最高優先，其他任務一律排後）
 
@@ -373,6 +397,9 @@ B5 環境安裝可隨時先做（經 Owner 同意）；C1–C3 可在 B4 後與 
    值任選 32B），由它派生 field_id/mac_key 餵 publisher 與一個 `FieldKeyStore.fromSecrets`
    實例（dispatcher 端 check 此時仍 OFF）。**A5 的 DoD 含「此常數從 production 程式碼徹底移除」
   （grep gate）**。
+   > **排程注意（v1.1）**：A5 由主理 AI 負責且可能先於 A2 落地。若開工時
+   > `ActiveFieldController`/`FieldSessionStore` 已存在（A5 已 DONE），**跳過本步驟**，
+   > 直接從 ActiveFieldController 取 fieldId/macKey，禁止再引入 debug 常數。
 5. **接收投影**：`V2InboundProjector` 加 `case EventTypeV2.presence → _projectPresence`：
    解 `PresenceData`，寫入 `Event_Logs` read-model（id=`v2-<hex>` 前綴沿用；read-model 的
    event_type 用既有 v1 enum 無對應 → 依 projector 現行模式擴一個 read-model 專用值，
@@ -438,8 +465,28 @@ B5 環境安裝可隨時先做（經 Owner 同意）；C1–C3 可在 B4 後與 
    Owner 核准書面依據，commit message 引用 `MASTER_EXECUTION_PLAN OD-1`）。
 
 **DoD**：D1 roundtrip + 帶位置 SOS 端到端（facade→dispatcher→projector）測試綠；
-D2 無位置 SOS 不退化（向後相容測試）；D3 corpus 重生且 GATE-CONF-DART 綠；D4 通用 gate 綠。
+D2 無位置 SOS 不退化（向後相容測試）；D3 corpus 重生且 GATE-CONF-DART 綠；D4 通用 gate 綠；
+D5（v1.1）corpus_revision bump 後，`WireConformanceInstrumentationTest.kt` 與
+`WireConformanceTests.swift` 的 metadata 斷言**在同一刀內**同步更新並重過
+GATE-KOTLIN-BUILD。
 **禁止**：把 location 塞進 needs[] 或 note 字串等旁門位置；手改 corpus JSON。
+
+> **施工筆記（v1.1，主理 AI 用；逐點核對後才動手）**
+> 1. 欄位號實證：`StatusUpdateData.encode/decode`（`event_envelope_v2.dart:605-634`）
+>    目前僅用 field 1（safetyState enum）與 2（needs repeated message）→ **field 3 可用**，
+>    decode 加 `case 3:` message → `LocationEvidence.decode`；absent → Dart 端 `null`。
+> 2. **payload hash 變 → 既有 statusUpdate envelope 樣本簽章全部失效**：必須跑
+>    `tool/generate_wire_conformance_v1.dart` 整批重生；`corpus_revision` bump 為
+>    `v0.3-phase0b-4-6-1`；generator 內**新增**帶 location 的 statusUpdate 樣本
+>    （含 bearing absent 與 bearing=正北 0 兩型，覆蓋 4-1r 的 +1 編碼）。
+> 3. SOS 預算：`SOS_ENVELOPE_BUDGET_BYTES = 240`（三端常數）。LocationEvidence
+>    全欄位約 +38B——新增測試斷言「TRAPPED + 2 needs + 完整 location」編出的信封
+>    ≤240B，超出即 fail（不是調預算，是砍欄位）。
+> 4. `v2_inbound_projector.dart` `_projectStatus` 現有註解明寫 "carries no
+>    location"——同刀更新註解與投影（location 進 read-model snapshot JSON）。
+> 5. `test/wire_conformance/scenarios/sos_red_minimal.yaml` 等情境檔含 payload
+>    期望值——以情境工具重生，不得手改 hex。
+> 6. `impliedPriorityFloor()` 不受 location 影響（明確不改，加回歸測試釘住）。
 
 ---
 
@@ -476,6 +523,27 @@ publisher 用真場域、**dispatcher 的 field-scope + field-mac 檢查在 prod
 - D5 通用 gate 全綠。
 **禁止**：為了測試方便把 `enableFieldScopeCheck` 在 production 留 OFF；把 secret 存
 SharedPreferences/SQLite 明文（必須 secure storage）。
+
+> **施工筆記（v1.1，主理 AI 用）**
+> 1. **fieldId 真正的接點是 `ble_v2_bridge.dart:285`**：`sendEnvelope()` 目前硬寫
+>    `fieldId: FieldAuthV2.zeroFieldId()`（檔內註解明說等 join flow）。A5 把
+>    `BleV2Bridge.sendEnvelope` 增加 `fieldId`/`fieldMacKey` 參數（或建構時注入
+>    ActiveFieldController），由 facade 傳入；**`protocol_hello_service.dart:109`
+>    的 zeroFieldId 是 control 框，正確，不得改**（§21.7）。
+> 2. DB：`database_helper.dart` 現為 `version: 12` → `Field_Sessions` 表 bump 13；
+>    onUpgrade 測試比照 4-3 的「建舊 schema→塞列→升級→斷言」模式（CI 唯一會走
+>    onUpgrade 的路）。
+> 3. **Outbox_V2 與場域的綁定**：信封簽章發生在 drain 時（envelope_id 先配、
+>    簽章後到），若 drain 時用「當下作用場域」，切換場域會把舊佇列事件簽到新場域。
+>    定案：`Outbox_V2` 加 `field_id BLOB(16)` 欄（同次 migration），enqueue 時寫入、
+>    drain 時取該列場域之 macKey；該場域已離開 → 刪列並 trace。
+> 4. 啟動順序：secure storage 載 secrets → `FieldKeyStore.fromSecrets`（async）→
+>    才建 dispatcher（`enableFieldScopeCheck: true, fieldKeys: store`）→ bridge.start。
+>    `_startV2Bridge()` 本來就 async，把 FieldKeyStore 載入插在 keypair 載入旁。
+> 5. 守 production 開關的測試：新增 main-wiring 測試斷言 dispatcher 以
+>    `enableFieldScopeCheck: true` 建構（防止日後被「順手」關掉）。
+> 6. 多場域：v1 僅一個「作用中場域」用於發送；接收端 FieldKeyStore 可持多場域
+>    （isJoined 全部成立）。切換 UI 在 A7；A5 先給 setActive API + debug 卡片。
 
 ---
 
@@ -601,9 +669,30 @@ AGENT 不得代填）。Stage A 在 D2 完成前不得宣告 Exit。
 
 **DoD**：D1 `app_node_gatt_v1.md` 完整（UUID/HELLO 欄位/RECEIPT/chunking 全 normative，
 無 TBD 字樣）；D2 EventType 105 + corpus + 解碼測試綠；D3 通用 gate + GATE-CONF-DART 綠；
-D4 Owner 簽核（STATUS 記 `A12 contract sign-off: <日期>`）。
+D4 Owner 簽核（STATUS 記 `A12 contract sign-off: <日期>`）；
+D5（v1.1）corpus_revision bump 與 Kotlin/Swift metadata 斷言同刀更新（同 A4-D5）。
 **禁止**：發明新 GATT UUID（必須沿用現值——兩端既有韌體/手機已綁定）；
 在 spec 留「待定」欄位（要嘛定案，要嘛明確標 `RESERVED-未用`）。
+
+> **施工筆記（v1.1，主理 AI 用）**
+> 1. NODE_RECEIPT=105 的 matrix 條目比照 PROTOCOL_HELLO 模式：priority 僅
+>    NORMAL（其餘 drop）、`maxHopsDefault = 0`（link-local，不轉送）、LWW = null、
+>    control range → zero field_id / 無 field_mac / dispatcher 豁免（§21.7 自動涵蓋
+>    100–129，驗證測試要含 105）。
+> 2. payload 手寫 struct 比照 `CheckpointData` 風格：`1 ref_envelope_id bytes(16)`
+>    `2 status u8` `3 queue_depth u32`；decode 對未知欄位 skip（與既有 reader 一致）。
+> 3. App 收端：`V2InboundProjector` **不**投影 receipt 到 Event_Logs（非場域事件）；
+>    改走新 `EventStream.nodeReceipts` typed 流 → debug shell 在對應送出列顯示
+>    「已送達節點」。對應鍵 = ref_envelope_id ↔ facade 預配的 envelope_id。
+> 4. `ProtocolHelloData` 附加欄位（node_id/node_lat_1e7/node_lng_1e7/
+>    install_accuracy_m）：先確認現 decode 對未知 tag 是 skip（是——手寫 reader
+>    模式），舊手機相容即成立；欄位號接在現有欄位之後，文件記 reserved 區。
+> 5. GATT 文件中 UUID 逐字取自 `IgniRelayConstants.kt:14-18`（SERVICE
+>    `a4d11949-…`、EVENT `a932d89d-…`、BLOOM `9b60940f-…`、HANDSHAKE
+>    `24b532d3-…`、CCCD 標準值）；chunk framing 引 `native_transport_v1` §4
+>    原文，不另寫一份（避免雙源漂移）。
+> 6. 「三段收據」語意表（PHASE3 §7.2）原文收進 spec：PHONE_TO_NODE_ACCEPTED ≠
+>    HOP_ACKED ≠ GATEWAY_CONFIRMED；NODE_RECEIPT 只承諾第一段。
 
 ### §5.13 Stage A Exit（「App 完成」的定義）
 
@@ -655,6 +744,28 @@ D4 Owner 簽核（STATUS 記 `A12 contract sign-off: <日期>`）。
 （generator 內建 self-check：encode→decode→re-encode bit 一致）；D3 Owner 簽核記錄。
 **禁止**：手寫 vectors JSON；spec 與 generator 數字不一致（單一來源=spec，generator 註明
 spec 章節）。
+
+> **施工筆記（v1.1，主理 AI 用）**
+> 1. 金鑰派生掛在既有 `FieldAuthV2`（`lib/app/crypto/field_auth_v2.dart`）：新增
+>    `deriveLoraMacKey(secret)`，HKDF 參數與 `deriveFieldMacKey` 相同惟
+>    `info = "ignirelay/lora-mac/v1"`；單元測試含「兩把 key 必不相等」
+>    （domain separation 實證）。
+> 2. CRC-16/CCITT-FALSE 釘死參數：poly 0x1021、init 0xFFFF、不反轉、xorout 0；
+>    spec 與測試都收標準驗證值 `"123456789" → 0x29B1`，外加兩個自選向量。
+> 3. hlc 48-bit 截斷規則寫死：`ms & 0xFFFF_FFFF_FFFF`（LE 序），溢位年 ~10889，
+>    spec 註明；counter 取低 16 bit。
+> 4. vectors JSON schema（generator 輸出，檔名 `lora_wire_v1_vectors.json`）：
+>    `{meta:{spec_rev, generated_by, test_field_join_secret_b64(TEST-ONLY)},
+>    frames:[{name, ptype, fields…, frame_hex, mac8_hex, crc16_hex}],
+>    negative:[{name, frame_hex, expect_reason}]}`；正樣本 ≥40（每事件型別 ×
+>    邊界長度 × flags 組合）、負樣本 ≥10（§6 B1 步驟 3 清單全覆蓋）。
+> 5. 測試金鑰**沿用 corpus 既有 TEST-ONLY `field_join_secret`**（讓 envelope 與
+>    LoRa 向量同鑰可交叉驗），generator 從 corpus JSON 讀取而非另設常數。
+> 6. spec 內 radio profile（AS923/BW/SF/功率）標明「**附章 draft、Phase D 場試前
+>    凍結**」——訊框格式與電波參數是兩件事，前者本刀凍結、後者不是；
+>    不得因此把訊框留 TBD。
+> 7. 緊湊 payload 對照表（附錄 C）逐欄位元寬照抄進 spec；SOS 70B > 64B 理想線
+>    的偏差聲明也要原文收錄（128B 審查線內）。
 
 ### B2 — Python 參考實作（lab repo；可在 A5 後並行先做 envelope 部分）
 
@@ -832,20 +943,37 @@ SOS active 的 LWW 衍生邏輯單元測試（TRAPPED→SAFE 後不再 active）
 
 ### C3 — Web UI（vanilla，零外部資源）
 
-`webapp/`：`index.html` 單頁 + `app.js` + `style.css`（手寫，無框架、無 build 步驟）。
-頁籤與驗收標準：
-1. **總覽**：事件數/活躍 SOS 數/節點數/最後封包時間；3 秒輪詢 `since_ms` 增量。
+> **起點不是空白畫布（v1.1）**：殼與設計系統已由 DL 任務交付並凍結於
+> `ignirelay-gateway/webapp/`（`tokens.css`、`app.css`、`index.html` 殼＋SOS 看板完成例、
+> `app.js`、`DESIGN_README.md`）。C3 = **在此範本上接線**，不是重寫。開工第一步：
+> 讀完 `webapp/DESIGN_README.md` 與本 repo `docs/DESIGN_LANGUAGE.md` §3/§5/§6，
+> STATUS.md 開工條目須註明「已讀」二者，否則任務無效。
+
+`webapp/`：`index.html` 單頁 + `app.js` + `tokens.css`/`app.css`（手寫，無框架、無 build
+步驟；檔案結構以已交付範本為準，不得增刪改名——新增 JS 模組除外，須經 `app.js` 掛載）。
+頁籤與驗收標準（殼之 KPI 列與五頁籤已存在，逐一接真資料）：
+1. **KPI 列（常駐）**：活躍 SOS / 24h 事件 / 在場人員 / 節點在線；3 秒輪詢
+   `since_ms` 增量。
 2. **SOS 看板**：紅卡列表（anon8、狀態、位置、已過時間、最後節點）、`ack` 按鈕、
-   已解除區（SAFE 後灰卡）。
+   已解除區（SAFE 後灰卡）。範本內已有紅/黃/已解除三張完成例卡——資料接上後
+   **整段 data-sample 節點刪除**，新卡照其密度、類名、文案風格產生。
 3. **事件表**：篩選 type/priority、分頁、點開看 routes/packets。
 4. **人員足跡**：presence 表（anon8/最後節點/時間/電量），>10min 標黃、>30min 標紅。
 5. **節點健康**：heartbeat 表，stale 紅標。
 6. **匯出**：CSV/JSON 下載按鈕。
 7. 登入：首次輸入 token 存 `localStorage`；401 時清除並要求重輸。
+8. **資料路徑單一**：一切請求經 `app.js` 的 `apiGet()`（token/Bearer/401/`setConn()`
+   集中於此實作）；不得另開第二條 fetch 路徑。`apiGet()` 現為刻意 `throw`，
+   接線即移除 throw——禁止改成假回傳混過測試。
 **DoD**：D1 `grep -rn "http://\|https://" webapp/` 僅允許出現相對路徑與註解（零外部 URL）；
 D2 以 Python 端對端測試（TestClient 抓 `/` 與靜態檔 200）+ AGENT 以 headless 工具或
-curl 驗證 API 流；D3 視覺驗收 = USER-GATE（C5 一併）。
-**禁止**：引入 npm/webpack/CDN；token 寫進原始碼。
+curl 驗證 API 流；D3 視覺驗收 = USER-GATE（C5 一併）；
+D4 `grep -n "data-sample" webapp/index.html` 輸出 **0 行**（假資料節點全數移除）；
+D5 `DESIGN_LANGUAGE.md` §6 全部 enforcement gates 逐字執行且通過
+（漸層/CDN/外部 URL/色彩字面值/emoji 掃描，指令與輸出貼進 STATUS.md）。
+**禁止**：引入 npm/webpack/CDN；token 寫進原始碼；重做殼（appbar/kpis/tabs/panel 結構）；
+在 `tokens.css` 之外出現任何 hex/rgb 色彩定義；繞過 `apiGet()` 直接 fetch；
+保留任何 data-sample 節點「當佔位」。
 
 ### C4 — 即時看板 E2E（lab → gateway → web）
 
@@ -1001,6 +1129,8 @@ west build -b nrf54l15bsim/nrf54l15/cpuapp tests/core        # ztest
 | `docs/specs/node_provisioning_v1.md` | B1 產出後凍結 |
 | `docs/API_V1.md`（gateway repo） | C1 產出後凍結 |
 | GATT UUID（`IgniRelayConstants.kt/.swift/mesh_constants.dart` 內三組 UUID） | 永久鎖定 |
+| `docs/DESIGN_LANGUAGE.md`（repo 根 docs/） | 已凍結（DL 任務交付；v1.1 起） |
+| `ignirelay-gateway/webapp/` 範本（`tokens.css`/`app.css`/`index.html` 殼/`app.js`/`DESIGN_README.md`） | 已凍結（殼與 tokens 不得重做；C3 僅准接線與依完成例鋪 panel） |
 
 ## 附錄 C — LORA-WIRE v1 草案（B1 落定為 normative 前的唯一基準）
 
@@ -1047,3 +1177,10 @@ crc16 = CRC-16/CCITT-FALSE(hdr‖body‖mac8)，poly 0x1021 init 0xFFFF
 
 - v1.0（2026-06-10）：初版。基線稽核（含 2 紅燈）、Stage A–D 全任務、G1–G18、OD-1–8、
   附錄 A–F。作者：Claude（Owner 委託）。
+- v1.1（2026-06-11）：①新增 §0.4 分工表（主理 AI vs 施工 AI）；②A4 / A5 / A12 / B1
+  各補「施工筆記」（實檔錨點、整合點、D5 同刀提醒）；③A2 加排程註記（A5 先行則略過
+  debug-secret 墊片步驟）；④§5 補 A7–A10 設計 DoD（`Colors.*` grep gate）；⑤C3 改寫為
+  「接線既有 `webapp/` 範本」並新增 D4 data-sample=0、D5 DESIGN_LANGUAGE §6 gates；
+  ⑥G7 增補同刀規則；⑦附錄 B 增列 `DESIGN_LANGUAGE.md` 與 webapp 範本為凍結項。
+  基線狀態：A0 DONE（f2026a3）、A1 PARTIAL—D3 連線測試移 A11（c39070f）、
+  DL DONE（gateway repo 347ae52）。作者：Claude（Owner 委託）。

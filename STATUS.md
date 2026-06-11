@@ -86,3 +86,24 @@
   - emoji 掃描（Python codepoint 檢查）→ 0 件
 - deviations: none
 - next: MASTER_EXECUTION_PLAN v1.1（分工表 + A4/A5/A12/B1 施工筆記 + C3/G7/附錄 B 增補）
+
+---
+
+## [2026-06-11] PLAN-v1.1 DONE（計畫修訂，G11 Owner 授權路徑）
+
+- repo/commit: IgniRelay @（見本 commit）
+- 執行者: Claude（主理 AI，Owner 本 session 明示授權修訂）
+- 變更（v1.0 → v1.1，詳文末 Changelog）:
+  1. §0.4 分工表：主理 AI（A0/A1/DL/A4/A5/A12/B1/階段稽核）vs 施工 AI（其餘）。
+  2. A4 / A5 / A12 / B1 各補「施工筆記」：實檔錨點（如 `ble_v2_bridge.dart:285`
+     zeroFieldId、DB version 12→13、`StatusUpdateData` field 3 空位、
+     NODE_RECEIPT=105、HKDF info 字串、CRC 驗證值 0x29B1）、整合點、D5 同刀提醒。
+  3. A2 排程註記：A5 先行則略過 debug-secret 墊片。
+  4. §5 A7–A10 設計 DoD：`Colors.*` grep gate。
+  5. C3 改寫：起點 = 已凍結 webapp 範本；新增 D4（data-sample=0）、
+     D5（DESIGN_LANGUAGE §6 gates）；禁止重做殼/繞 apiGet()/假回傳。
+  6. G7 同刀規則：corpus_revision 變更必須同刀更新三端硬編斷言（4-3 教訓）。
+  7. 附錄 B 增列 `DESIGN_LANGUAGE.md` 與 webapp 範本為凍結項。
+- DoD: 計畫版號 bump ✅ / Changelog 條目 ✅ / 凍結清單同步 ✅
+- deviations: none
+- next: 主理 AI 待 A2/A3（施工 AI）落地後接 A4/A5；A12/B1 可先行（無 A2/A3 依賴）

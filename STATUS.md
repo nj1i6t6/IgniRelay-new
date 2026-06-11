@@ -181,3 +181,26 @@
 - deviations: none
 - next: 施工 AI 續 A2；EC-1～EC-4 待 Stage E 窗口（EC-1 前置 E4、EC-2 前置 E3、
   EC-3 前置 E2、EC-4 前置 EC-2+E6）；E1 動工時記得納入 ecare 設定欄位
+
+---
+
+## [2026-06-12] DOC-WP DONE（對外白皮書 + README 重寫，Owner 委託）
+
+- repo/commit: IgniRelay @ `6aa2495`（文件本體；本條目為後續 commit）
+- 執行者: Claude（主理 AI，Owner 委託——比賽/合作文件之基礎藍圖）
+- 交付:
+  - `docs/WHITEPAPER.md` 對外版 v1.0：問題/方案/降級階梯/信封架構/
+    **E-CARE 整章（§4，成果具名歸屬其團隊）**/誠實定位與自訂地圖/安全模型/
+    場域即服務商業模式/五階段路線圖（✅🔧📋💡 四態誠實標注）/規格速查/名詞表。
+    開頭聲明與內部《技術白皮書 v2.0》之區隔（工程文件引用「白皮書 §x」指後者）。
+  - `README.zh-Hant.md`（主）/`README.md`（英）重寫：fork 基線之舊產品描述
+    （物資媒合/聊天室/醫療卡/離線圖磚）汰換為重建方向；保留仍有效之
+    quick start/品質檢查/OSM attribution。
+- 紀律: 所有「已完成」陳述皆有測試/commit 依據；規劃中項目一律標 📋/💡，
+  不以現況語氣陳述（比賽答辯防穿幫）。E-CARE 能力描述以其 repo @ 4e4543d
+  實際程式碼為準（微調 LLM/PFA/情緒辨識/雙層風險引擎/本地 TTS/77+36+52 測試）。
+- 待 Owner 回填: 白皮書 §9 與 README 之〔待填〕——正式姓名/系所、E-CARE 團隊
+  成員名單、指導教授；授權確認（fork 基線標示 AGPL-3.0 但 repo 無 LICENSE 檔，
+  對外發布前須補齊）。
+- deviations: none
+- next: Owner 校閱兩份文件；比賽文件自 WHITEPAPER 裁切

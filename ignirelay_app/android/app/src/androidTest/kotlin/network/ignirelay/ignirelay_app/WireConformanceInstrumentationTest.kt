@@ -57,7 +57,7 @@ class WireConformanceInstrumentationTest {
     @Test
     fun corpusMetadata() {
         val corpus = loadCorpus()
-        assertEquals("v0.3-phase0b-4-3-1", corpus.getString("corpus_revision"))
+        assertEquals("v0.3-phase0b-4-6-1", corpus.getString("corpus_revision"))
         assertEquals("2026-05-13", corpus.getString("spec_date"))
         assertTrue(
             "corpus must be deterministic; live timestamp leaked in",

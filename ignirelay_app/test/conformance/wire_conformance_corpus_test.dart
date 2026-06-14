@@ -53,7 +53,7 @@ void main() {
 
   group('wire conformance corpus v1 — metadata', () {
     test('has corpus_revision + spec_date and NO generated_at_iso', () {
-      expect(corpus['corpus_revision'], 'v0.3-phase0b-4-3-1');
+      expect(corpus['corpus_revision'], 'v0.3-phase0b-4-6-1');
       expect(corpus['spec_date'], '2026-05-13');
       expect(corpus.containsKey('generated_at_iso'), isFalse,
           reason: 'corpus must be deterministic; no live timestamp allowed');

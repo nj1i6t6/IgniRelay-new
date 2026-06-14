@@ -210,7 +210,15 @@ class V2InboundProjector {
       return;
     }
     // Represent as a v1 SOS (requestBroadcast + urgency>=2), matching how the
-    // legacy path models SOS. StatusUpdateData carries no location.
+    // legacy path models SOS. #4-6: StatusUpdateData now self-carries an
+    // optional location (field 3); when present, project lat/lng into the
+    // read-model row (received_lat/lng) so the SOS list shows the last trusted
+    // position. Absent (null) → no coords, back-compat unchanged.
+    final loc = s.location;
+    final hasLoc = loc != null &&
+        (loc.source != LocationSource.unknown ||
+            loc.latE7 != 0 ||
+            loc.lngE7 != 0);
     final req = pb.RequestData()
       ..requestId = eventId
       ..resourceType = ''
@@ -223,6 +231,8 @@ class V2InboundProjector {
       urgency: urgency,
       payload: req.writeToBuffer(),
       accepted: a,
+      lat: hasLoc ? loc.latDegrees : null,
+      lng: hasLoc ? loc.lngDegrees : null,
     );
   }
 

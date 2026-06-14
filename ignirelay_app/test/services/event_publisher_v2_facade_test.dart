@@ -560,6 +560,44 @@ void main() {
     }
   });
 
+  test('publishSosStatus carries LocationEvidence into the payload (#4-6)',
+      () async {
+    final registry = PeerCapabilityRegistry(
+      helloTimeout: const Duration(seconds: 5),
+    );
+    final bridge = await _makeRecordingBridge(registry);
+    final facade = EventPublisherV2Facade(
+      registry: registry,
+      bridge: bridge,
+    );
+    addTearDown(() async {
+      await facade.dispose();
+      await registry.dispose();
+    });
+    _markPeerActive(registry, 'LO:01');
+
+    await facade.publishSosStatus(
+      safetyState: SafetyState.trapped,
+      location: LocationEvidence.fromDegrees(
+        source: LocationSource.gps,
+        frame: LocationFrame.subject,
+        latDegrees: 25.0339805,
+        lngDegrees: 121.5654177,
+      ),
+    );
+    // No-location SOS still publishes (back-compat).
+    await facade.publishSosStatus(safetyState: SafetyState.trapped);
+
+    expect(bridge.invocations.length, 2);
+    final withLoc = StatusUpdateData.decode(bridge.invocations[0].payload);
+    expect(withLoc.location, isNotNull);
+    expect(withLoc.location!.latE7, 250339805);
+    expect(withLoc.location!.lngE7, 1215654177);
+
+    final withoutLoc = StatusUpdateData.decode(bridge.invocations[1].payload);
+    expect(withoutLoc.location, isNull);
+  });
+
   test('publishHazardMarker encodes a typed HazardMarkerData payload (#4-5)',
       () async {
     final registry = PeerCapabilityRegistry(

@@ -597,9 +597,20 @@ class StatusUpdateData {
   final int safetyState;
   final List<NeedEntry> needs;
 
+  /// Optional self-reported location (#4-6 / MASTER_EXECUTION_PLAN OD-1).
+  /// Additive proto3 field 3: `null` == absent (no location). SOS thus
+  /// self-contains its evidence and does not depend on pairing with the most
+  /// recent PRESENCE; the MCU/Gateway SOS display chain is the shortest. The
+  /// field number 3 is FROZEN once shipped.
+  final LocationEvidence? location;
+
+  // Reserved tags:
+  //   4..15 reserved
+
   const StatusUpdateData({
     required this.safetyState,
     this.needs = const <NeedEntry>[],
+    this.location,
   });
 
   Uint8List encode() {
@@ -608,6 +619,11 @@ class StatusUpdateData {
     for (final n in needs) {
       w.writeMessage(2, n.encode());
     }
+    // Field 3 emitted iff a location is attached (null == absent), keeping
+    // no-location SOS byte-identical to the pre-4-6 encoding.
+    if (location != null) {
+      w.writeMessage(3, location!.encode());
+    }
     return w.toBytes();
   }
 
@@ -615,6 +631,7 @@ class StatusUpdateData {
     final r = ProtoReader(bytes);
     var state = 0;
     final needs = <NeedEntry>[];
+    LocationEvidence? location;
     while (!r.isAtEnd) {
       final tag = r.readTag();
       final field = tagFieldNumber(tag);
@@ -626,11 +643,18 @@ class StatusUpdateData {
         case 2:
           needs.add(NeedEntry.decode(r.readLengthDelimited()));
           break;
+        case 3:
+          if (wire != wireLengthDelimited) {
+            throw ProtoDecodeException('status.location wire-type');
+          }
+          location = LocationEvidence.decode(r.readLengthDelimited());
+          break;
         default:
           r.skipValue(wire);
       }
     }
-    return StatusUpdateData(safetyState: state, needs: needs);
+    return StatusUpdateData(
+        safetyState: state, needs: needs, location: location);
   }
 
   /// Spec §5.3 — sender-side priority floor derived from payload contents.

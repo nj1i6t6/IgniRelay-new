@@ -140,6 +140,7 @@ class _SpyEventPublisherV2Facade extends EventPublisherV2Facade {
   Future<BroadcastOutcome> publishStatusUpdate({
     required int safetyState,
     List<NeedEntry> needs = const <NeedEntry>[],
+    LocationEvidence? location,
     int priority = PriorityV2.status,
   }) {
     statusCalls.add(_StatusCall(

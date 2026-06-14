@@ -39,6 +39,7 @@ import 'package:ignirelay_app/app/crypto/field_auth_v2.dart';
 import 'package:ignirelay_app/app/mesh/chunker.dart';
 import 'package:ignirelay_app/app/mesh/iblt.dart';
 import 'package:ignirelay_app/app/mesh/mesh_constants.dart';
+import 'package:ignirelay_app/app/proto/event_envelope_v2.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -47,7 +48,10 @@ import 'package:ignirelay_app/app/mesh/mesh_constants.dart';
 const String _scenariosDir = 'test/wire_conformance/scenarios';
 const String _outputPath = '../docs/specs/wire_conformance_v1.json';
 // Phase 0b #4-3 bumped the wire to v3 (canonical 124→141, field_id + field_mac).
-const String _corpusRevision = 'v0.3-phase0b-4-3-1';
+// #4-6 adds typed-payload samples: StatusUpdateData with LocationEvidence
+// (field 3; bearing absent + bearing=north-0) and a typed HazardMarkerData
+// (#4-5 follow-up) — payload bytes change → revision bump.
+const String _corpusRevision = 'v0.3-phase0b-4-6-1';
 const String _specDate = '2026-05-13';
 
 // Phase 0b #4-3: one corpus-wide test field. All envelope samples ride this
@@ -225,12 +229,14 @@ Future<Map<String, dynamic>> buildCorpus() async {
 // ─────────────────────────────────────────────────────────────────────────────
 // Procedural envelope samples
 //
-// 100 cases total split across:
+// 103 cases total split across:
 //   - 30  per-type × per-priority sweep (broad coverage)
 //   - 18  SOS boundary @ priorities 1, 2 × sizes near 240B
 //   - 10  ALERT chunking-required @ priority 3
 //   - 12  NORMAL multi-chunk @ priorities 4, 5, 6
 //   - 30  Ed25519-signed cases with deterministic per-case private keys
+//   -  3  typed-payload samples (#4-6 StatusUpdateData+location ×2, #4-5
+//         HazardMarkerData ×1) — real proto encodings committed as payload_hex
 // ─────────────────────────────────────────────────────────────────────────────
 
 const List<int> _eventTypes = [1, 10, 11, 12, 20, 30, 40, 50, 60, 70, 80, 90];
@@ -312,6 +318,103 @@ Future<List<Map<String, dynamic>>> _buildProceduralEnvelopeSamples() async {
     ));
   }
 
+  // ── Group F: typed-payload samples (#4-6 status+location, #4-5 hazard)
+  out.addAll(await _buildTypedPayloadSamples());
+
+  return out;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Typed-payload samples (#4-6 / #4-5)
+//
+// Unlike the procedural LCG payloads, these carry REAL proto encodings so the
+// corpus locks the typed-payload bytes (and their signature / field_mac) for
+// cross-platform consumers. All are Ed25519-signed and committed as
+// `payload_hex`. Covered:
+//   - StatusUpdateData TRAPPED + 2 needs + full LocationEvidence, bearing ABSENT
+//   - StatusUpdateData TRAPPED + full LocationEvidence, bearing = 0 (due north;
+//     pins the bearing_deg_plus_one +1 encoding so 0° ≠ absent)
+//   - HazardMarkerData FLOOD + location + description (closes the #4-5 deferred
+//     typed-HAZARD corpus sample)
+// ─────────────────────────────────────────────────────────────────────────────
+
+Future<List<Map<String, dynamic>>> _buildTypedPayloadSamples() async {
+  final out = <Map<String, dynamic>>[];
+
+  // Full GPS fix reused across samples. 25.0339805°, 121.5654177° (the known
+  // 1e7 round-to-nearest trap value), 12 m accuracy, observed at base HLC.
+  LocationEvidence fullLocation({int? bearingDeg}) => LocationEvidence(
+        source: LocationSource.gps,
+        frame: LocationFrame.subject,
+        latE7: 250339805,
+        lngE7: 1215654177,
+        accuracyM: 12,
+        observedAt:
+            const HlcTimestampV2(msSinceEpoch: _baseHlcMs, counter: 0),
+        bearingDeg: bearingDeg,
+      );
+
+  const twoNeeds = <NeedEntry>[
+    NeedEntry(
+      category: NeedCategory.water,
+      severity: NeedSeverity.urgent,
+      expiresAtHlc:
+          HlcTimestampV2(msSinceEpoch: _baseHlcMs + 3600000, counter: 0),
+    ),
+    NeedEntry(
+      category: NeedCategory.medicine,
+      severity: NeedSeverity.need,
+      expiresAtHlc:
+          HlcTimestampV2(msSinceEpoch: _baseHlcMs + 7200000, counter: 0),
+    ),
+  ];
+
+  // F1 — SOS_RED TRAPPED + 2 needs + full location, bearing ABSENT.
+  out.add(await _emitProceduralEnvelope(
+    caseSeed: 6001,
+    name: 'status_trapped_loc_bearing_absent',
+    eventType: 1, // STATUS_UPDATE
+    priority: 1, // SOS_RED
+    payloadSize: 0,
+    withSignature: true,
+    explicitPayload: StatusUpdateData(
+      safetyState: SafetyState.trapped,
+      needs: twoNeeds,
+      location: fullLocation(),
+    ).encode(),
+  ));
+
+  // F2 — SOS_RED TRAPPED + full location, bearing = 0 (due north). Pins the
+  // +1 encoding: 0° must be distinct from absent.
+  out.add(await _emitProceduralEnvelope(
+    caseSeed: 6002,
+    name: 'status_trapped_loc_bearing_north0',
+    eventType: 1,
+    priority: 1,
+    payloadSize: 0,
+    withSignature: true,
+    explicitPayload: StatusUpdateData(
+      safetyState: SafetyState.trapped,
+      location: fullLocation(bearingDeg: 0),
+    ).encode(),
+  ));
+
+  // F3 — typed HAZARD_MARKER (#4-5). ALERT priority, FLOOD + location.
+  out.add(await _emitProceduralEnvelope(
+    caseSeed: 6003,
+    name: 'hazard_typed_flood',
+    eventType: 50, // HAZARD_MARKER
+    priority: 3, // ALERT
+    payloadSize: 0,
+    withSignature: true,
+    explicitPayload: HazardMarkerData(
+      hazardType: HazardType.flood,
+      severity: 3,
+      location: fullLocation(),
+      description: 'flood rising',
+    ).encode(),
+  ));
+
   return out;
 }
 
@@ -322,12 +425,18 @@ Future<Map<String, dynamic>> _emitProceduralEnvelope({
   required int priority,
   required int payloadSize,
   required bool withSignature,
+  Uint8List? explicitPayload,
 }) async {
   final envelopeId = _proceduralEnvelopeId(caseSeed);
   final createdMs = _baseHlcMs + caseSeed * 1000;
   final expiresMs = createdMs + 86400 * 1000; // +24h
   final maxHops = 6 + (caseSeed % 4); // 6..9
-  final payload = _lcgPayload(seed: caseSeed, size: payloadSize);
+  // #4-6: typed-payload samples pass explicit bytes (a real StatusUpdateData /
+  // HazardMarkerData encoding) which are NOT LCG-reproducible, so they are
+  // always committed inline as `payload_hex`. Procedural samples keep the LCG
+  // generator.
+  final payload =
+      explicitPayload ?? _lcgPayload(seed: caseSeed, size: payloadSize);
   final payloadHash = await CanonicalEncoderV2.hashPayload(payload);
   final payloadSha256 = _hex(crypto_pkg.sha256.convert(payload).bytes);
 
@@ -395,7 +504,7 @@ Future<Map<String, dynamic>> _emitProceduralEnvelope({
     'sig_algo': 1,
     'is_experimental': false,
   };
-  if (payloadSize <= 64) {
+  if (explicitPayload != null || payloadSize <= 64) {
     envelopeStruct['payload_hex'] = _hex(payload);
   } else {
     envelopeStruct['payload_generator'] = {

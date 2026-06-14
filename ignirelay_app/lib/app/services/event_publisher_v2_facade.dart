@@ -380,10 +380,12 @@ class EventPublisherV2Facade {
   Future<BroadcastOutcome> publishSosStatus({
     required int safetyState,
     List<NeedEntry> needs = const [],
+    LocationEvidence? location,
   }) {
     return publishStatusUpdate(
       safetyState: safetyState,
       needs: needs,
+      location: location,
       priority: PriorityV2.sosRed,
     );
   }
@@ -409,9 +411,17 @@ class EventPublisherV2Facade {
   Future<BroadcastOutcome> publishStatusUpdate({
     required int safetyState,
     List<NeedEntry> needs = const [],
+    LocationEvidence? location,
     int priority = PriorityV2.status,
   }) {
-    final data = StatusUpdateData(safetyState: safetyState, needs: needs);
+    // #4-6 (OD-1): SOS self-carries its best current location evidence
+    // (null → no GPS, still sent). Location does NOT affect the §5.3 implied
+    // priority floor.
+    final data = StatusUpdateData(
+      safetyState: safetyState,
+      needs: needs,
+      location: location,
+    );
     // Spec §5.3 — sender priority MUST be at least as severe as the
     // payload-implied floor. PriorityV2.moreSevere returns the smaller
     // numeric value (lower = more severe) per priority_matrix_v2.dart.

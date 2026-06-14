@@ -1,5 +1,5 @@
 {
-  "corpus_revision": "v0.3-phase0b-4-3-1",
+  "corpus_revision": "v0.3-phase0b-4-6-1",
   "spec_date": "2026-05-13",
   "spec_envelope": "docs/specs/envelope_v2_spec_2026-05-13.md",
   "spec_transport": "docs/specs/native_transport_v1_2026-05-13.md",
@@ -3365,6 +3365,102 @@
       "expected_signature_hex": "56c55833ea0d5d408d54b563de7014df3d4081b309dbccbc43bc42ad3c40412ea9752168c5f6b2177fcd468cd6e471894fd0492f0b0c11bc0ef97af2bd8e1406",
       "derived_author_key_hex": "ac6bf56b9a04ae233e8da2acdcaceb173ce7e076f5f34740e17b99d1b02cfe09",
       "test_only_private_key_hex": "55565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f7071727374"
+    },
+    {
+      "kind": "envelope",
+      "name": "status_trapped_loc_bearing_absent",
+      "description": "Procedural envelope sample (case_seed=6001).",
+      "envelope_struct": {
+        "protocol_version": 3,
+        "envelope_id_hex": "0190000000007918a736455463728190",
+        "field_id_hex": "83b7a8ed859053c81d818870fab1f8b1",
+        "field_mac_hex": "f73fad98708116593448d552c038b067",
+        "event_type": 1,
+        "priority": 1,
+        "created_at_hlc": {
+          "ms_since_epoch": 1747356001000,
+          "counter": 0
+        },
+        "expires_at_hlc": {
+          "ms_since_epoch": 1747442401000,
+          "counter": 0
+        },
+        "max_hops": 7,
+        "author_key_hex": "882d0ea3b2864e7a587f3e698cea4459998312e655e05fa5e8b5119d8baac8cd",
+        "sig_algo": 1,
+        "is_experimental": false,
+        "payload_hex": "0804120d080110031a0708808090b3ed32120d080310021a070880ddebb4ed321a1b0801100118ba87dfee0120c2a4ab8709280c32070880a3b4b1ed32"
+      },
+      "payload_sha256_hex": "8693948ee50942ba9f5bc5f7065ca3b24c4bd4edd4998ad54c2a9c82f2c8849a",
+      "expected_canonical_sig_input_hex": "03000000100190000000007918a7364554637281901083b7a8ed859053c81d818870fab1f8b10100000001000000e8a288d69601000000000000e8feaedb96010000000000000700000020882d0ea3b2864e7a587f3e698cea4459998312e655e05fa5e8b5119d8baac8cd01208693948ee50942ba9f5bc5f7065ca3b24c4bd4edd4998ad54c2a9c82f2c8849a",
+      "expected_canonical_sig_input_bytes": 141,
+      "expected_signature_hex": "8aa85f0aad18ce5d4aded8c8b29313e37ed7b29b80bde201cbdd9765f1ed8a2356baa50b58e8fc439611cc9d2084e93dbf42d907aa0eef10f0b34f32a621ea01",
+      "derived_author_key_hex": "882d0ea3b2864e7a587f3e698cea4459998312e655e05fa5e8b5119d8baac8cd",
+      "test_only_private_key_hex": "6162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f80"
+    },
+    {
+      "kind": "envelope",
+      "name": "status_trapped_loc_bearing_north0",
+      "description": "Procedural envelope sample (case_seed=6002).",
+      "envelope_struct": {
+        "protocol_version": 3,
+        "envelope_id_hex": "0190000000007837865564738291a0af",
+        "field_id_hex": "83b7a8ed859053c81d818870fab1f8b1",
+        "field_mac_hex": "45c1571017edb47395e42eeffc572062",
+        "event_type": 1,
+        "priority": 1,
+        "created_at_hlc": {
+          "ms_since_epoch": 1747356002000,
+          "counter": 0
+        },
+        "expires_at_hlc": {
+          "ms_since_epoch": 1747442402000,
+          "counter": 0
+        },
+        "max_hops": 8,
+        "author_key_hex": "ed2aa7be90b6397fc2f7cc2c246d0f801078d521d42d19bde1104832ffc5e42d",
+        "sig_algo": 1,
+        "is_experimental": false,
+        "payload_hex": "08041a1d0801100118ba87dfee0120c2a4ab8709280c32070880a3b4b1ed324801"
+      },
+      "payload_sha256_hex": "de42cbd74408cb24edee9e17eabdc414677bf4bb9f8def4ea6b29b46e026bc6e",
+      "expected_canonical_sig_input_hex": "03000000100190000000007837865564738291a0af1083b7a8ed859053c81d818870fab1f8b10100000001000000d0a688d69601000000000000d002afdb96010000000000000800000020ed2aa7be90b6397fc2f7cc2c246d0f801078d521d42d19bde1104832ffc5e42d0120de42cbd74408cb24edee9e17eabdc414677bf4bb9f8def4ea6b29b46e026bc6e",
+      "expected_canonical_sig_input_bytes": 141,
+      "expected_signature_hex": "ad540cd0538b5dfcf43935cd1fbb6238c129b6701ca85da8869296f1f9e5e5ae4270e7fbb863f62a5b08d48924b285e175ce6345e6317e0cc04044d9fe914008",
+      "derived_author_key_hex": "ed2aa7be90b6397fc2f7cc2c246d0f801078d521d42d19bde1104832ffc5e42d",
+      "test_only_private_key_hex": "52535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f7071"
+    },
+    {
+      "kind": "envelope",
+      "name": "hazard_typed_flood",
+      "description": "Procedural envelope sample (case_seed=6003).",
+      "envelope_struct": {
+        "protocol_version": 3,
+        "envelope_id_hex": "0190000000007756a5748392a1b0bfce",
+        "field_id_hex": "83b7a8ed859053c81d818870fab1f8b1",
+        "field_mac_hex": "162a73dc981d5e98002cef3db0eaea3c",
+        "event_type": 50,
+        "priority": 3,
+        "created_at_hlc": {
+          "ms_since_epoch": 1747356003000,
+          "counter": 0
+        },
+        "expires_at_hlc": {
+          "ms_since_epoch": 1747442403000,
+          "counter": 0
+        },
+        "max_hops": 9,
+        "author_key_hex": "e83ad950188597d403ad3bbc1e08051b691e287ada3707b0d4f641bfde3a35dd",
+        "sig_algo": 1,
+        "is_experimental": false,
+        "payload_hex": "10021803221b0801100118ba87dfee0120c2a4ab8709280c32070880a3b4b1ed322a0c666c6f6f6420726973696e67"
+      },
+      "payload_sha256_hex": "df11bc05f1c425192a0c6b6fb13ee133005a4f2c50b63d538c75af03879b429d",
+      "expected_canonical_sig_input_hex": "03000000100190000000007756a5748392a1b0bfce1083b7a8ed859053c81d818870fab1f8b13200000003000000b8aa88d69601000000000000b806afdb96010000000000000900000020e83ad950188597d403ad3bbc1e08051b691e287ada3707b0d4f641bfde3a35dd0120df11bc05f1c425192a0c6b6fb13ee133005a4f2c50b63d538c75af03879b429d",
+      "expected_canonical_sig_input_bytes": 141,
+      "expected_signature_hex": "fe315e9c10609c9bfd6d43befa9968072b4987293781004ec98d18e8189b8ec82c6d0ceed58b216f4e5dc4ece6aa8f14df35a4ce2805f4ee54457859c03af207",
+      "derived_author_key_hex": "e83ad950188597d403ad3bbc1e08051b691e287ada3707b0d4f641bfde3a35dd",
+      "test_only_private_key_hex": "434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162"
     }
   ],
   "chunking_samples": [

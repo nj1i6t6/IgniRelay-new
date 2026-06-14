@@ -16,6 +16,7 @@ import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/controllers/message_publisher_v2.dart';
 import 'package:ignirelay_app/app/db/database_helper.dart';
 import 'package:ignirelay_app/app/mesh/event_types.dart';
+import 'package:ignirelay_app/app/mesh/mesh_constants.dart';
 import 'package:ignirelay_app/app/mesh/mesh_event_handler.dart';
 import 'package:ignirelay_app/app/proto/event_envelope_v2.dart';
 import 'package:ignirelay_app/app/services/author_rate_limiter.dart';
@@ -168,6 +169,120 @@ void main() {
     expect(sos.description, '受困');
 
     await eventStream.dispose();
+    await h.projector.dispose();
+    await h.dispatcher.dispose();
+  });
+
+  test('#4-6 SOS with location projects lat/lng into the read-model', () async {
+    final h = await makeHarness();
+    final payload = StatusUpdateData(
+      safetyState: SafetyState.trapped,
+      location: LocationEvidence.fromDegrees(
+        source: LocationSource.gps,
+        frame: LocationFrame.subject,
+        latDegrees: 25.0339805,
+        lngDegrees: 121.5654177,
+      ),
+    ).encode();
+    final published = await h.publisher.send(
+      eventType: EventTypeV2.statusUpdate,
+      priority: PriorityV2.sosRed,
+      payload: payload,
+      createdAtHlc: HlcTimestampV2(msSinceEpoch: 1000, counter: 0),
+      expiresAtHlc: HlcTimestampV2(msSinceEpoch: 2000, counter: 0),
+      maxHops: 6,
+      negotiatedMtu: 247,
+      fieldId: Uint8List(16),
+    );
+
+    final projectedId = h.projector.projectedEventIds.first;
+    final outcome = await h.dispatcher
+        .onReceiveEnvelopeBytes(published.wireBytes, peerId: 'AA:BB:CC');
+    expect(outcome, isA<DispatchAccepted>());
+
+    final eventId = await projectedId.timeout(const Duration(seconds: 2));
+    final db = await DatabaseHelper().database;
+    final logs = await db
+        .query('Event_Logs', where: 'event_id = ?', whereArgs: [eventId]);
+    expect(logs.length, 1);
+    expect((logs.first['received_lat'] as num?)?.toDouble(),
+        closeTo(25.0339805, 1e-7));
+    expect((logs.first['received_lng'] as num?)?.toDouble(),
+        closeTo(121.5654177, 1e-7));
+
+    await h.projector.dispose();
+    await h.dispatcher.dispose();
+  });
+
+  test('#4-6 SOS without location projects with null coords (back-compat)',
+      () async {
+    final h = await makeHarness();
+    final published = await h.publisher.send(
+      eventType: EventTypeV2.statusUpdate,
+      priority: PriorityV2.sosRed,
+      payload: StatusUpdateData(safetyState: SafetyState.trapped).encode(),
+      createdAtHlc: HlcTimestampV2(msSinceEpoch: 1000, counter: 0),
+      expiresAtHlc: HlcTimestampV2(msSinceEpoch: 2000, counter: 0),
+      maxHops: 6,
+      negotiatedMtu: 247,
+      fieldId: Uint8List(16),
+    );
+    final projectedId = h.projector.projectedEventIds.first;
+    await h.dispatcher
+        .onReceiveEnvelopeBytes(published.wireBytes, peerId: 'AA:BB:CC');
+    final eventId = await projectedId.timeout(const Duration(seconds: 2));
+    final db = await DatabaseHelper().database;
+    final logs = await db
+        .query('Event_Logs', where: 'event_id = ?', whereArgs: [eventId]);
+    expect(logs.length, 1);
+    expect(logs.first['received_lat'], isNull);
+    expect(logs.first['received_lng'], isNull);
+
+    await h.projector.dispose();
+    await h.dispatcher.dispose();
+  });
+
+  test('#4-6 budget: TRAPPED + 2 needs + full location envelope <= 240B',
+      () async {
+    final h = await makeHarness();
+    final payload = StatusUpdateData(
+      safetyState: SafetyState.trapped,
+      needs: [
+        NeedEntry(
+          category: NeedCategory.water,
+          severity: NeedSeverity.urgent,
+          expiresAtHlc: HlcTimestampV2(msSinceEpoch: 1000, counter: 0),
+        ),
+        NeedEntry(
+          category: NeedCategory.medicine,
+          severity: NeedSeverity.need,
+          expiresAtHlc: HlcTimestampV2(msSinceEpoch: 2000, counter: 0),
+        ),
+      ],
+      location: LocationEvidence.fromDegrees(
+        source: LocationSource.gps,
+        frame: LocationFrame.subject,
+        latDegrees: 25.0339805,
+        lngDegrees: 121.5654177,
+        accuracyM: 12,
+        bearingDeg: 270,
+      ),
+    ).encode();
+    // SOS_RED publish must SUCCEED (no over-budget-sos-rejected) and the wire
+    // envelope must fit the locked 240B SOS budget. If this ever fails the fix
+    // is to cut payload fields, NOT to raise the budget (spec §9.2).
+    final published = await h.publisher.send(
+      eventType: EventTypeV2.statusUpdate,
+      priority: PriorityV2.sosRed,
+      payload: payload,
+      createdAtHlc: HlcTimestampV2(msSinceEpoch: 1000, counter: 0),
+      expiresAtHlc: HlcTimestampV2(msSinceEpoch: 87400000, counter: 0),
+      maxHops: 6,
+      negotiatedMtu: 247,
+      fieldId: Uint8List(16),
+    );
+    expect(published.wireBytes.length, lessThanOrEqualTo(kSosEnvelopeBudgetBytes));
+
     await h.projector.dispose();
     await h.dispatcher.dispose();
   });

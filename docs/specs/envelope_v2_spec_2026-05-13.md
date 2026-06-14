@@ -340,10 +340,14 @@ message StatusUpdateData {
 
   SafetyState safety_state  = 1;
   repeated NeedEntry needs  = 2;
+  // #4-6 (MASTER_EXECUTION_PLAN OD-1): SOS self-carries its location so the
+  // alert does not depend on pairing with the most recent PRESENCE. Additive
+  // proto3: absent (0/unset) == no location. Field number FROZEN once shipped.
+  LocationEvidence location  = 3;
   // No "delta" or "clear" fields: sender always transmits full state.
   // Empty `needs` = "no current needs". A new STATUS_UPDATE with empty
   // needs CLEARS prior needs (snapshot replace).
-  reserved 3 to 15;                      // headroom in single-byte tags
+  reserved 4 to 15;                      // headroom in single-byte tags
 }
 ```
 

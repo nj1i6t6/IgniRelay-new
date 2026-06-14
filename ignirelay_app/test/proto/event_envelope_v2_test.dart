@@ -167,6 +167,94 @@ void main() {
       expect(out.needs.first.expiresAtHlc.msSinceEpoch, 100);
     });
 
+    test('#4-6 location field 3 round-trips (bearing absent)', () {
+      final s = StatusUpdateData(
+        safetyState: SafetyState.trapped,
+        needs: const [
+          NeedEntry(
+            category: NeedCategory.water,
+            severity: NeedSeverity.urgent,
+            expiresAtHlc: HlcTimestampV2(msSinceEpoch: 100, counter: 0),
+          ),
+        ],
+        location: LocationEvidence.fromDegrees(
+          source: LocationSource.gps,
+          frame: LocationFrame.subject,
+          latDegrees: 25.0339805,
+          lngDegrees: 121.5654177,
+          accuracyM: 12,
+        ),
+      );
+      final out = StatusUpdateData.decode(s.encode());
+      expect(out.location, isNotNull);
+      expect(out.location!.source, LocationSource.gps);
+      expect(out.location!.latE7, 250339805);
+      expect(out.location!.lngE7, 1215654177);
+      expect(out.location!.bearingDeg, isNull);
+      expect(out.safetyState, SafetyState.trapped);
+      expect(out.needs.length, 1);
+    });
+
+    test('#4-6 bearing = 0 (due north) survives round-trip (≠ absent)', () {
+      final s = StatusUpdateData(
+        safetyState: SafetyState.trapped,
+        location: LocationEvidence.fromDegrees(
+          source: LocationSource.gps,
+          frame: LocationFrame.subject,
+          latDegrees: 25.0,
+          lngDegrees: 121.0,
+          bearingDeg: 0,
+        ),
+      );
+      final out = StatusUpdateData.decode(s.encode());
+      expect(out.location, isNotNull);
+      expect(out.location!.bearingDeg, 0,
+          reason: 'due-north 0° must not be conflated with absent');
+    });
+
+    test('#4-6 no location → absent (back-compat byte-identical, decodes null)',
+        () {
+      final withoutLoc =
+          StatusUpdateData(safetyState: SafetyState.injured).encode();
+      // Byte-identical to the pre-4-6 encoding (field 3 simply not emitted).
+      final legacyShape = StatusUpdateData(
+        safetyState: SafetyState.injured,
+      ).encode();
+      expect(withoutLoc, orderedEquals(legacyShape));
+      final out = StatusUpdateData.decode(withoutLoc);
+      expect(out.location, isNull);
+    });
+
+    test('#4-6 location does NOT change impliedPriorityFloor (regression)', () {
+      final loc = LocationEvidence.fromDegrees(
+        source: LocationSource.gps,
+        frame: LocationFrame.subject,
+        latDegrees: 25.0,
+        lngDegrees: 121.0,
+      );
+      // SAFE + non-urgent stays STATUS whether or not a location is attached.
+      expect(
+        StatusUpdateData(
+          safetyState: SafetyState.safe,
+          needs: const [
+            NeedEntry(
+              category: NeedCategory.water,
+              severity: NeedSeverity.want,
+              expiresAtHlc: HlcTimestampV2.zero,
+            ),
+          ],
+          location: loc,
+        ).impliedPriorityFloor(),
+        PriorityV2.status,
+      );
+      // TRAPPED stays SOS_RED with a location attached.
+      expect(
+        StatusUpdateData(safetyState: SafetyState.trapped, location: loc)
+            .impliedPriorityFloor(),
+        PriorityV2.sosRed,
+      );
+    });
+
     test('impliedPriorityFloor: TRAPPED → SOS_RED', () {
       final s = StatusUpdateData(safetyState: SafetyState.trapped);
       expect(s.impliedPriorityFloor(), PriorityV2.sosRed);

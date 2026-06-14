@@ -478,3 +478,61 @@
   用 `:app:assembleDebugAndroidTest`（綠）**，conformance Kotlin 測試所在模組不受影響。
 - deviations: 無偏離 A5 範圍。A4/A5 未混刀。未碰 corpus/generator（A5 不動 wire）。
 - next: A6（舊產品殘留清理，OD-6）。
+
+---
+
+## [2026-06-14] A5-docfix DONE（ble_v2_bridge 過時註解）
+
+- repo/commit: IgniRelay @ `96e037f`
+- 執行者: Claude（主理 AI）
+- 變更: `ble_v2_bridge.dart` `sendEnvelope` 兩段註解仍寫「dispatcher field-scope
+  check stays OFF until A5」「A2 debug field seam」，A5 完成後失效會誤導。改述為
+  fieldId/macKey 由 facade 經 ActiveFieldController 解析自作用場域；A5 起 production
+  dispatcher 於收方強制 field-scope + field-mac（§21.6）。**純註解，0 code 變更**。
+- gates: `flutter analyze lib/app/services/ble_v2_bridge.dart` → No issues。
+- next: A6。
+
+---
+
+## [2026-06-14] A6 DONE（舊產品殘留清理，OD-6）
+
+- repo/commit: IgniRelay @ `a7b0b0f`
+- 執行者: Claude（主理 AI；Owner 收窄為 8 點範圍）
+- 變更（移除 CHAT_MESSAGE 發佈/投影路徑 + 刪死檔）:
+  - `EventPublisherV2Facade.publishChatMessage` 移除（無 production 呼叫端；3 個
+    facade 測試借用它作泛用 raw-payload publish → 改 `publishPresence`，以
+    anon_user_id[0] 區分佇列項驗 FIFO）。header migration 註解同步移除 CHAT 條目。
+  - `V2InboundProjector` 移除 `case EventTypeV2.chatMessage` 與 `_projectChat`
+    （收到 type-30 落 default no-op，不再投影）。§17 TRANSLATION 註解同步更新。
+  - `EventStream` chat typed stream：早於 #3B-4 已移除（僅留註解，無殘留可移）。
+  - `EventTypeV2.chatMessage = 30` **保留並凍結**（編號永不重用），加 reserved 註解；
+    `maxHopsDefault`/`isKnown` 的 `case chatMessage` 為 reserved 型別 spec metadata，保留。
+  - spec **§4.1** `EVENT_TYPE_CHAT_MESSAGE = 30` 注記 RETIRED/RESERVED（引用 A6/OD-6；
+    編號凍結不重用；非 wire 變更）。
+- 刪檔（D2，逐檔 rg 證 0 引用）:
+  - `lib/app/data/supply_category_data.dart`（`SupplyCategory`/`supplyCategories`/
+    `findCategory`/`SupplyCategoryLocalizer` 全自引用，外部 0；−1181 行）。
+  - `lib/app/services/room_display_name_resolver.dart`（lib 0 引用，僅其測試）
+    ＋ `test/room_display_name_resolver_test.dart`。
+  - `lib/app/mesh/hazard_manager.dart` 仍被 `event_manager.dart` 引用 → **保留**
+    （計畫條件「若 projector 已不經它」不成立）。
+- 範疇界定（Owner 收窄 8 點 + G5，逐項註明未動）:
+  - 未動 `priority_matrix_v2.dart` / `tombstone_sweeper.dart` 的 `EventTypeV2.chatMessage`
+    （reserved 型別之 §6 matrix / tombstone TTL metadata，非發佈/投影路徑，不在 Owner
+    具名清單）。
+  - 未動 v1 `EventType.chatMessage = 13`（v1 解碼相容期保留）。
+  - **plan step 3（v1 enum 標 `@Deprecated`）遞延**：不在 Owner 收窄範圍，且需先界定
+    「read-model 仍用的 v1 值」清單，留待後續專責清理。
+  - 未碰 corpus/wire/FieldSession/A7 QR。
+- DoD: D1 ✅（chat 發佈/投影路徑 0 殘留：`grep publishChatMessage lib/` 僅剩註解；
+  `EventTypeV2.chatMessage` 僅剩 enum 定義＋reserved 註解＋reserved 型別 metadata）
+  / D2 ✅（刪檔逐檔 0 引用證據如上）/ D3 ✅（通用 gate 全綠）
+- gates（G17 逐字，皆 exit 0）:
+  - `dart run tool/check_layers.dart --strict` → `ok — no boundary violations`
+  - `flutter analyze` → `2 issues found`（2 既有 info），**0 errors**
+  - `flutter test` → `00:15 +510 ~3: All tests passed!`（A5 +526 → +510：刪
+    `room_display_name_resolver_test` 之 16 測試；facade 測試遷移非刪）
+  - `dart run tool/generate_wire_conformance_v1.dart --check` → 確定性 OK（未碰 corpus）
+  - `cd android; ./gradlew :app:assembleDebugAndroidTest` → `BUILD SUCCESSFUL`
+- deviations: 無偏離 Owner 收窄範圍；plan step 3 遞延如上。
+- next: A7（場域加入 UX：QR / 代碼；依附錄 F 加 `qr_flutter`/`mobile_scanner`）。

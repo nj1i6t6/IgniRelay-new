@@ -92,8 +92,10 @@
 //     - PROTOCOL_HELLO  (already shipped per wave 3A; ProtocolHelloService)
 //     - SOS_RED / SOS_YELLOW STATUS_UPDATE  (this facade, publishSosStatus)
 //     - HAZARD_MARKER                       (this facade, publishHazardMarker)
-//     - CHAT_MESSAGE                        (this facade, publishChatMessage)
 //     - STATUS_UPDATE (non-SOS)             (this facade, publishStatusUpdate)
+//     - PRESENCE                            (this facade, publishPresence)
+//   (CHAT_MESSAGE retired in A6 / OD-6 — no publish path; wire number 30 is
+//    reserved, see EventTypeV2.chatMessage.)
 //   Dual-write entry points (legacy v0.2 + v2):
 //     - EventPublisher.publishEvent              → publishStatusUpdate
 //       (urgency mapped to safetyState; the facade applies the spec §5.3
@@ -104,12 +106,6 @@
 //       priority-derivation path. publishSosStatus is now a thin
 //       priority-hinted wrapper for direct callers that already know.)
 //     - EventPublisher.publishHazard             → publishHazardMarker
-//     - EventPublisher.publishChatMessage        → publishChatMessage
-//     - ChatService.sendMessage                  → publishChatMessage
-//       (the production chat UI calls ChatService directly, bypassing
-//       EventPublisher, so ChatService also attaches this facade at
-//       startup. Without that mirror path, local chat rows never traverse
-//       the v0.3 chunked BLE bridge.)
 //
 //   Still on legacy path only (NOT 0d-eligible; legacy EventPublisher → v0.2):
 //     - SUPPLY_REQUEST / SUPPLY_OFFER       (existing match/supply flow)
@@ -503,20 +499,8 @@ class EventPublisherV2Facade {
     );
   }
 
-  /// Publish a CHAT_MESSAGE. Payload is the UTF-8 encoded chat text plus
-  /// any room-routing prefix the ChatService chooses. The facade is
-  /// agnostic to chat envelope shape; it only wraps + signs + dispatches.
-  Future<BroadcastOutcome> publishChatMessage({
-    required Uint8List payload,
-  }) {
-    return _broadcast(
-      eventType: EventTypeV2.chatMessage,
-      priority: PriorityV2.normal,
-      payload: payload,
-      ttlOffset: const Duration(hours: 24), // §11.2 CHAT_MESSAGE default
-      maxHops: EventTypeV2.maxHopsDefault(EventTypeV2.chatMessage) ?? 6,
-    );
-  }
+  // CHAT_MESSAGE publish path removed in A6 (OD-6) — the chat product is
+  // retired. `EventTypeV2.chatMessage = 30` stays reserved (spec §4.1).
 
   /// Publish a PRESENCE footprint (#4-4). [anonUserId] is the 16-byte
   /// rotatable anon id (NOT the author key — see `AnonIdentityService`);

@@ -243,7 +243,11 @@ enum EventType {
   EVENT_TYPE_NEGOTIATION          = 23;
   EVENT_TYPE_RELAY_TO_CONTACT     = 24;
   reserved 25 to 29;                      // headroom for coordination
-  EVENT_TYPE_CHAT_MESSAGE         = 30;   // peer-to-peer / room chat (NORMAL priority)
+  EVENT_TYPE_CHAT_MESSAGE         = 30;   // RETIRED/RESERVED (App, A6/OD-6): the
+                                          // chat product is removed — the App no
+                                          // longer sends/receives this type. The
+                                          // enum value + number 30 are KEPT and
+                                          // FROZEN (never reused/renumbered).
   reserved 31 to 49;                      // further headroom for coordination
 
   // ── 50-79: Hazard / disaster report ────────────────────────────────

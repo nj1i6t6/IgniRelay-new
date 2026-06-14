@@ -34,6 +34,12 @@ class EventTypeV2 {
   static const int matchIntent = 22;
   static const int negotiation = 23;
   static const int relayToContact = 24;
+
+  /// RESERVED (A6 / OD-6) — the chat product is retired; the App no longer
+  /// sends or receives CHAT_MESSAGE (no `publishChatMessage`, no projector
+  /// case). The wire number 30 is **frozen and never reused** (spec §4.1). The
+  /// value is kept here, and in [maxHopsDefault] / [isKnown], purely so the
+  /// reserved slot stays a recognized spec number — do NOT delete or renumber.
   static const int chatMessage = 30;
 
   // 50-79 hazard

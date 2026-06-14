@@ -14,8 +14,8 @@
 //
 // TRANSLATION (only the UI-surfaced types are projected)
 //
-//   • CHAT_MESSAGE   (v2 30 → v1 13): the v2 payload is already the same JSON
-//     shape v1 chat uses ({room_id, room_type, content, reply_to}); passthrough.
+//   • (CHAT_MESSAGE removed in A6 / OD-6 — chat retired; v2 number 30 reserved.
+//      A received type-30 envelope now falls through to the default no-op.)
 //   • HAZARD_MARKER  (v2 50 → v1 4):  the v2 wire carries a typed
 //     `HazardMarkerData` payload (#4-5); decoded and rebuilt into a v1
 //     `pb.HazardData` proto so the existing Hazards_State projection +
@@ -105,9 +105,8 @@ class V2InboundProjector {
     final eventId = eventIdOf(env.envelopeId);
     try {
       switch (env.eventType) {
-        case EventTypeV2.chatMessage:
-          await _projectChat(accepted, eventId);
-          break;
+        // CHAT_MESSAGE (v2 30) projection removed in A6 (OD-6) — chat retired;
+        // a received type-30 envelope falls through to the default no-op below.
         case EventTypeV2.hazardMarker:
           await _projectHazard(accepted, eventId);
           break;
@@ -151,17 +150,6 @@ class V2InboundProjector {
       sourceNodeId: accepted.peerId ?? 'v2',
     );
     if (!_projected.isClosed) _projected.add(eventId);
-  }
-
-  Future<void> _projectChat(DispatchAccepted a, String eventId) async {
-    // v2 chat payload is already the v1 chat JSON shape; pass it through.
-    await _ingest(
-      eventId: eventId,
-      v1EventType: EventType.chatMessage,
-      urgency: 0,
-      payload: a.envelope.payload,
-      accepted: a,
-    );
   }
 
   Future<void> _projectHazard(DispatchAccepted a, String eventId) async {

@@ -43,8 +43,8 @@ void main() {
       await registry.dispose();
     });
 
-    final queued =
-        await facade.publishChatMessage(payload: Uint8List.fromList([1]));
+    // No ActiveFieldController attached → zero-field path; the publish queues.
+    final queued = await facade.publishPresence(anonUserId: Uint8List(16));
     expect(queued.queued, isTrue);
     expect(facade.pendingQueueDepth, 1);
 
@@ -58,7 +58,7 @@ void main() {
     await _drainMicrotasks();
     expect(bridge.invocations.length, 1);
     expect(bridge.invocations.single.peerId, 'AA:BB');
-    expect(bridge.invocations.single.eventType, EventTypeV2.chatMessage);
+    expect(bridge.invocations.single.eventType, EventTypeV2.presence);
     expect(facade.pendingQueueDepth, 0);
   });
 
@@ -104,9 +104,10 @@ void main() {
 
     const cap = EventPublisherV2Facade.kMaxPendingEntries;
     const total = cap + 3;
+    // Distinguish entries by anon_user_id[0] so we can assert FIFO eviction.
     for (var i = 0; i < total; i++) {
-      await facade.publishChatMessage(
-        payload: Uint8List.fromList([i % 256]),
+      await facade.publishPresence(
+        anonUserId: Uint8List.fromList(List<int>.filled(16, i % 256)),
       );
     }
     expect(facade.pendingQueueDepth, cap);
@@ -117,8 +118,14 @@ void main() {
     await _drainMicrotasks();
 
     expect(bridge.invocations.length, cap);
-    expect(bridge.invocations.first.payload.single, (total - cap) % 256);
-    expect(bridge.invocations.last.payload.single, (total - 1) % 256);
+    expect(
+      PresenceData.decode(bridge.invocations.first.payload).anonUserId.first,
+      (total - cap) % 256,
+    );
+    expect(
+      PresenceData.decode(bridge.invocations.last.payload).anonUserId.first,
+      (total - 1) % 256,
+    );
     expect(facade.pendingQueueDepth, 0);
   });
 
@@ -169,13 +176,11 @@ void main() {
       await registry.dispose();
     });
 
-    final queued = await facade.publishChatMessage(
-      payload: Uint8List.fromList([0x7A]),
-    );
+    final queued = await facade.publishPresence(anonUserId: Uint8List(16));
     expect(queued.queued, isTrue);
 
     final rows = await _waitForOutboxRowCount(db, 1);
-    expect(rows.single['event_type'], EventTypeV2.chatMessage);
+    expect(rows.single['event_type'], EventTypeV2.presence);
     expect(
       Uint8List.fromList(rows.single['envelope_id'] as List<int>),
       orderedEquals(expectedEnvelopeId),

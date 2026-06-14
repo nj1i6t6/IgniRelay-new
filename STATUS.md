@@ -330,3 +330,59 @@
   - `flutter test test/conformance/wire_conformance_corpus_test.dart` → `+21 All tests passed!`
 - deviations: 無偏離 A3 範圍。step 5 corpus 增補移交主理 AI（理由如上）。
 - next: A4（4-6 SOS 自帶位置，OD-1）或 A6（殘留清理）；A4/A5 為主理 AI 任務。
+
+### A3 step-5 CLOSURE（角色變更：本 session 經 Owner 指派接任主理 AI）
+
+- Owner 2026-06-14 指派本 session 接任 IgniRelay 主理 AI（原主理 AI 不可用）。
+  A3 step 5（typed HAZARD conformance 樣本）原因角色分工 deferred，現由本 session
+  以主理 AI 身分於 A4 corpus 重生一併補上（Owner 授權「A4 corpus 更新一併補」）。
+  **已於 A4 commit `f49889e` 完成**：generator Group F 新增 typed HazardMarkerData
+  樣本（`hazard_typed_flood`），經 generator 重生（非手改 corpus）。此債清除。
+
+---
+
+## [2026-06-14] A4 DONE（4-6 SOS 自帶位置；OD-1）
+
+- repo/commit: IgniRelay @ `f49889e`（變更本體；本條目為後續 commit）
+- 執行者: 主理 AI（Claude，Owner 2026-06-14 指派接任）
+- 依據: MASTER_EXECUTION_PLAN OD-1（Owner 書面核准，additive proto3 欄位 3）。
+- 變更（皆在 `f49889e`）:
+  - `StatusUpdateData`：加 nullable `location`（field 3，null=absent）；encode 僅在
+    `location!=null` 時發 field 3（**無位置 SOS 與 4-6 前 byte-identical**）；decode 加
+    `case 3`。欄位號 3 凍結。`impliedPriorityFloor` 不受 location 影響。
+  - facade `publishStatusUpdate`/`publishSosStatus`：接 `LocationEvidence?`（無 GPS=null 照發）。
+  - projector `_projectStatus`：location present → 投影 lat/lng 進 read-model
+    （`received_lat/lng`）；absent → null（back-compat）。更新「carries no location」舊註解。
+  - spec `envelope_v2_spec_2026-05-13.md §5.1`：proto fragment 加
+    `LocationEvidence location = 3`，`reserved 3..15` → `4..15`（G6：OD-1 書面依據）。
+  - generator：新增 typed-payload emitter（`explicitPayload`，always `payload_hex`）+
+    Group F 三樣本（StatusUpdateData TRAPPED+2needs+full location bearing-absent、
+    TRAPPED+location bearing=0 正北、typed HazardMarkerData FLOOD）。
+    `corpus_revision` bump `v0.3-phase0b-4-3-1` → `v0.3-phase0b-4-6-1`，
+    **generator 重生（非手改）**；corpus diff = +97/−1（1 行 revision + 3 樣本，
+    既有 104 樣本 byte-identical）。envelope_samples 104 → 107。
+  - 三端 `corpus_revision` 同刀對齊（G7）：Dart conformance test / Kotlin
+    `WireConformanceInstrumentationTest.kt` / Swift `WireConformanceTests.swift`
+    （數量門檻皆 `>=`，新增樣本不破門檻）。
+- 測試（新增/更新，皆綠）:
+  - `event_envelope_v2_test`：location roundtrip（bearing absent + bearing 0 ≠ absent）
+    + no-location byte-identical + decode null + `impliedPriorityFloor` 不變回歸（施工筆記 #6）。
+  - `event_publisher_v2_facade_test`：`publishSosStatus` location passthrough
+    （payload decode 對齊；no-location 照發）。
+  - `v2_inbound_projector_test`：e2e SOS+location → read-model `received_lat/lng`；
+    no-location → null；**budget：TRAPPED+2needs+full location 信封 ≤240B**（施工筆記 #3）。
+  - `event_publisher_dual_write_test`：spy `publishStatusUpdate` override 補 location 參數。
+- DoD: D1 ✅ / D2 ✅ / D3 ✅ / D4 ✅ / D5 ✅（三端同刀 + GATE-KOTLIN-BUILD 綠）
+- gates（G17 逐字執行，皆 exit 0）:
+  - `dart run tool/check_layers.dart --strict` → `[check_layers] ok — no boundary violations`
+  - `flutter analyze --no-fatal-infos --no-fatal-warnings` → `2 issues found`（2 既有
+    info：battery_optimization_guide），**0 errors**
+  - `flutter test --exclude-tags golden` → `00:14 +498 ~3: All tests passed!`（A3 後 +490 → +498）
+  - `flutter test test/conformance/wire_conformance_corpus_test.dart` → `+21 All tests passed!`
+    （另：`dart run tool/generate_wire_conformance_v1.dart --check` → 確定性 OK）
+  - `cd android; .\gradlew.bat :app:assembleDebugAndroidTest` → `BUILD SUCCESSFUL in 39s`
+- ENV-GATE 註記: GATE-KOTLIN-RUN（on-device instrumentation，驗 corpus_revision/樣本）
+  無實機，遞延 A11 USER-GATE（比照 A1 D3）。Swift 因 Windows 無法編譯（R3 既知）。
+- deviations: 無偏離 A4 範圍。A4/A5 未混刀（未碰 FieldSession/ActiveFieldController）。
+- next: A5（4-7 FieldSession + field-scope 開啟）；其前置 A2/A3/A4 已備。A5 須一併移除
+  A2 過渡 `kDebugFieldJoinSecretHex`（grep gate）並補 Outbox_V2 `field_id` 欄持久化。

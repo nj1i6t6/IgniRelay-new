@@ -1,6 +1,3 @@
-import 'dart:convert';
-import 'dart:typed_data';
-
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -85,13 +82,18 @@ void main() {
     expect(hazardRows.length, 1);
     expect(hazardRows.first['type'], 'FIRE');
 
-    expect(spy.hazardPayloads.length, 1);
-    final map = jsonDecode(
-      utf8.decode(spy.hazardPayloads.single),
-    ) as Map<String, dynamic>;
-    expect(map['type'], 'FIRE');
-    expect(map['severity'], 3);
-    expect(map['schema'], 'hazard_marker_v0_3_json_shim');
+    // #4-5: the v2 dual-write now hands the facade STRUCTURED args (typed
+    // HazardMarkerData), not a JSON shim. The legacy 'FIRE' string maps to the
+    // wire HazardType enum; lat/lng become a LocationEvidence.
+    expect(spy.hazardCalls.length, 1);
+    final call = spy.hazardCalls.single;
+    expect(call.hazardType, HazardType.fire);
+    expect(call.severity, 3);
+    expect(call.description, 'smoke seen');
+    expect(call.location, isNotNull);
+    expect(call.location!.source, LocationSource.gps);
+    expect(call.location!.latDegrees, closeTo(25.03, 1e-6));
+    expect(call.location!.lngDegrees, closeTo(121.56, 1e-6));
   });
 }
 
@@ -107,9 +109,25 @@ class _StatusCall {
   });
 }
 
+class _HazardCall {
+  final int hazardType;
+  final int severity;
+  final LocationEvidence? location;
+  final String description;
+  final bool isConfirmation;
+
+  _HazardCall({
+    required this.hazardType,
+    required this.severity,
+    required this.location,
+    required this.description,
+    required this.isConfirmation,
+  });
+}
+
 class _SpyEventPublisherV2Facade extends EventPublisherV2Facade {
   final List<_StatusCall> statusCalls = <_StatusCall>[];
-  final List<Uint8List> hazardPayloads = <Uint8List>[];
+  final List<_HazardCall> hazardCalls = <_HazardCall>[];
 
   _SpyEventPublisherV2Facade()
       : super(
@@ -134,10 +152,20 @@ class _SpyEventPublisherV2Facade extends EventPublisherV2Facade {
 
   @override
   Future<BroadcastOutcome> publishHazardMarker({
-    required Uint8List payload,
+    required int hazardType,
+    int severity = 0,
+    LocationEvidence? location,
+    String description = '',
+    bool isConfirmation = false,
     int priority = PriorityV2.alert,
   }) {
-    hazardPayloads.add(Uint8List.fromList(payload));
+    hazardCalls.add(_HazardCall(
+      hazardType: hazardType,
+      severity: severity,
+      location: location,
+      description: description,
+      isConfirmation: isConfirmation,
+    ));
     return Future<BroadcastOutcome>.value(BroadcastOutcome.noActivePeers());
   }
 }

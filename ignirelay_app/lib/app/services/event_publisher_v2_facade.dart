@@ -426,18 +426,43 @@ class EventPublisherV2Facade {
     );
   }
 
-  /// Publish a HAZARD_MARKER (raw payload bytes; the facade does NOT yet
-  /// decode HazardMarkerData because that proto is still in `lib/app/mesh/`
-  /// legacy land. Callers SHOULD construct the bytes themselves until the
-  /// v0.4 HazardMarkerData v2 proto lands).
+  /// Publish a HAZARD_MARKER (#4-5 — typed payload). Builds a
+  /// [HazardMarkerData] from structured args and encodes it; callers no longer
+  /// hand-roll a JSON shim. [hazardType] is a `HazardType.*` enum value;
+  /// [location] is the hazard's position (null → no location, still sent).
+  ///
+  /// Spec §9: HAZARD rides at ALERT (≤800B total envelope, enforced by the
+  /// publisher). As a publish-time guard we reject an over-budget
+  /// [description] up front with [ArgumentError] (the typed codec itself stays
+  /// lenient by design — see [HazardMarkerData]). Thrown synchronously so
+  /// callers get an immediate failure rather than a queued bad envelope.
   Future<BroadcastOutcome> publishHazardMarker({
-    required Uint8List payload,
+    required int hazardType,
+    int severity = 0,
+    LocationEvidence? location,
+    String description = '',
+    bool isConfirmation = false,
     int priority = PriorityV2.alert,
   }) {
+    if (description.length > HazardMarkerData.kDescriptionMaxLen) {
+      throw ArgumentError.value(
+        description.length,
+        'description',
+        'exceeds HazardMarkerData.kDescriptionMaxLen '
+            '(${HazardMarkerData.kDescriptionMaxLen}); spec §9 HAZARD/ALERT ≤800B',
+      );
+    }
+    final data = HazardMarkerData(
+      hazardType: hazardType,
+      severity: severity,
+      location: location ?? const LocationEvidence(),
+      description: description,
+      isConfirmation: isConfirmation,
+    );
     return _broadcast(
       eventType: EventTypeV2.hazardMarker,
       priority: priority,
-      payload: payload,
+      payload: data.encode(),
       ttlOffset: const Duration(hours: 24), // §11.2 HAZARD_MARKER default
       maxHops: EventTypeV2.maxHopsDefault(EventTypeV2.hazardMarker) ?? 10,
     );

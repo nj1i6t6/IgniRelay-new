@@ -7,7 +7,6 @@
 // ignore_for_file: prefer_const_constructors
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
@@ -80,19 +79,21 @@ void main() {
     )..start();
     final hazardFuture = eventStream.hazardEvents.first;
 
-    final shim = utf8.encode(jsonEncode({
-      'type': 'FLOOD',
-      'severity': 3,
-      'lat': 25.04,
-      'lng': 121.56,
-      'radius_m': 300.0,
-      'description': '瘛寞偌',
-      'schema': 'hazard_marker_v0_3_json_shim',
-    }));
+    final payload = HazardMarkerData(
+      hazardType: HazardType.flood,
+      severity: 3,
+      location: LocationEvidence.fromDegrees(
+        source: LocationSource.gps,
+        frame: LocationFrame.observer,
+        latDegrees: 25.04,
+        lngDegrees: 121.56,
+      ),
+      description: '洪水警戒',
+    ).encode();
     final published = await h.publisher.send(
       eventType: EventTypeV2.hazardMarker,
       priority: PriorityV2.alert,
-      payload: Uint8List.fromList(shim),
+      payload: payload,
       createdAtHlc: HlcTimestampV2(msSinceEpoch: 1000, counter: 0),
       expiresAtHlc: HlcTimestampV2(msSinceEpoch: 2000, counter: 0),
       maxHops: 10,

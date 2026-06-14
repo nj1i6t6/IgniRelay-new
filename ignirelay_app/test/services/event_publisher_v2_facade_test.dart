@@ -559,6 +559,83 @@ void main() {
       );
     }
   });
+
+  test('publishHazardMarker encodes a typed HazardMarkerData payload (#4-5)',
+      () async {
+    final registry = PeerCapabilityRegistry(
+      helloTimeout: const Duration(seconds: 5),
+    );
+    final bridge = await _makeRecordingBridge(registry);
+    final facade = EventPublisherV2Facade(
+      registry: registry,
+      bridge: bridge,
+    );
+    addTearDown(() async {
+      await facade.dispose();
+      await registry.dispose();
+    });
+    _markPeerActive(registry, 'HZ:01');
+
+    final outcome = await facade.publishHazardMarker(
+      hazardType: HazardType.flood,
+      severity: 4,
+      location: LocationEvidence.fromDegrees(
+        source: LocationSource.gps,
+        frame: LocationFrame.observer,
+        latDegrees: 25.04,
+        lngDegrees: 121.56,
+      ),
+      description: '河水暴漲',
+      isConfirmation: true,
+    );
+    expect(outcome.anyAccepted, isTrue);
+    expect(bridge.invocations.length, 1);
+
+    final call = bridge.invocations.single;
+    // §6 matrix: HAZARD → ALERT; §11.2 max_hops 10.
+    expect(call.eventType, EventTypeV2.hazardMarker);
+    expect(call.priority, PriorityV2.alert);
+    expect(call.maxHops, 10);
+
+    // Payload is a typed HazardMarkerData (NOT a JSON shim) and round-trips.
+    final hm = HazardMarkerData.decode(call.payload);
+    expect(hm.hazardType, HazardType.flood);
+    expect(hm.severity, 4);
+    expect(hm.isConfirmation, isTrue);
+    expect(hm.description, '河水暴漲');
+    expect(hm.location.source, LocationSource.gps);
+    expect(hm.location.latE7, 250400000);
+    expect(hm.location.lngE7, 1215600000);
+  });
+
+  test('publishHazardMarker rejects an over-budget description (ArgumentError)',
+      () async {
+    final registry = PeerCapabilityRegistry(
+      helloTimeout: const Duration(seconds: 5),
+    );
+    final facade = EventPublisherV2Facade(registry: registry);
+    addTearDown(() async {
+      await facade.dispose();
+      await registry.dispose();
+    });
+
+    final tooLong = 'x' * (HazardMarkerData.kDescriptionMaxLen + 1);
+    expect(
+      () => facade.publishHazardMarker(
+        hazardType: HazardType.fire,
+        description: tooLong,
+      ),
+      throwsArgumentError,
+    );
+
+    // Exactly at the cap is allowed (no throw; no peer → queued).
+    final atCap = 'y' * HazardMarkerData.kDescriptionMaxLen;
+    final outcome = await facade.publishHazardMarker(
+      hazardType: HazardType.fire,
+      description: atCap,
+    );
+    expect(outcome.queued, isTrue);
+  });
 }
 
 class _SendInvocation {

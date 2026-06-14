@@ -1,11 +1,11 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
 import 'package:ignirelay_app/app/mesh/event_manager.dart';
 import 'package:ignirelay_app/app/proto/event_envelope_v2.dart';
 import 'package:ignirelay_app/app/services/event_publisher_v2_facade.dart';
+import 'package:ignirelay_app/app/services/hazard_type_codec.dart';
 
 /// EventPublisher — UI/app-layer facade over [EventManager] (legacy v0.2
 /// publish path) with optional dual-write to [EventPublisherV2Facade]
@@ -159,23 +159,22 @@ class EventPublisher {
   }) {
     final v2 = _v2;
     if (v2 == null) return;
-    // v2 HazardMarkerData proto is not yet defined (tracked in the
-    // facade's docstring as v0.4 follow-up). Until then, encode a
-    // forward-compatible JSON blob that hazard_marker decoders can
-    // upgrade to the typed proto without breaking the wire signature.
-    final json = jsonEncode(<String, dynamic>{
-      'type': type,
-      'severity': severity,
-      'lat': lat,
-      'lng': lng,
-      'radius_m': radiusMeters,
-      'description': description,
-      'schema': 'hazard_marker_v0_3_json_shim',
-    });
-    final payload = Uint8List.fromList(utf8.encode(json));
-    unawaited(v2
-        .publishHazardMarker(payload: payload)
-        .catchError((Object e, StackTrace s) {
+    // #4-5: typed HazardMarkerData payload (the JSON shim is gone). The legacy
+    // `type` STRING maps to the wire `HazardType` enum via HazardTypeCodec;
+    // lat/lng become a LocationEvidence (the typed payload carries no radius —
+    // radiusMeters stays on the v1 read-model path only).
+    final fut = v2.publishHazardMarker(
+      hazardType: HazardTypeCodec.fromV1String(type),
+      severity: severity,
+      location: LocationEvidence.fromDegrees(
+        source: LocationSource.gps,
+        frame: LocationFrame.observer,
+        latDegrees: lat,
+        lngDegrees: lng,
+      ),
+      description: description,
+    );
+    unawaited(fut.catchError((Object e, StackTrace s) {
       debugPrint('[EventPublisher] v2 publishHazardMarker failed: $e');
       return BroadcastOutcome.noActivePeers();
     }));

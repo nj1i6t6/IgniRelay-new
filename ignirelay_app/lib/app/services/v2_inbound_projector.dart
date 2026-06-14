@@ -16,10 +16,11 @@
 //
 //   • CHAT_MESSAGE   (v2 30 → v1 13): the v2 payload is already the same JSON
 //     shape v1 chat uses ({room_id, room_type, content, reply_to}); passthrough.
-//   • HAZARD_MARKER  (v2 50 → v1 4):  the v2 wire carries hazard as a JSON shim
-//     (`hazard_marker_v0_3_json_shim`, see event_publisher.dart); rebuilt into a
-//     v1 `pb.HazardData` proto so the existing Hazards_State projection +
-//     EventStream.hazardEvents decode unchanged.
+//   • HAZARD_MARKER  (v2 50 → v1 4):  the v2 wire carries a typed
+//     `HazardMarkerData` payload (#4-5); decoded and rebuilt into a v1
+//     `pb.HazardData` proto so the existing Hazards_State projection +
+//     EventStream.hazardEvents decode unchanged. The wire `HazardType` enum
+//     maps to the v1 read-model string via `HazardTypeCodec`.
 //   • STATUS_UPDATE  (v2 1): SOS-class only (safetyState TRAPPED/INJURED) →
 //     v1 requestBroadcast SOS, matching how the legacy path models SOS. Non-SOS
 //     status (SAFE/UNSAFE) has no v1 UI surface yet (the v0.3 Now/status tab)
@@ -50,6 +51,7 @@ import 'package:ignirelay_app/app/mesh/event_types.dart';
 import 'package:ignirelay_app/app/mesh/mesh_event_handler.dart';
 import 'package:ignirelay_app/app/proto/event_envelope_v2.dart';
 import 'package:ignirelay_app/app/proto/mesh_protocol.pb.dart' as pb;
+import 'package:ignirelay_app/app/services/hazard_type_codec.dart';
 
 class V2InboundProjector {
   V2InboundProjector({
@@ -163,23 +165,23 @@ class V2InboundProjector {
   }
 
   Future<void> _projectHazard(DispatchAccepted a, String eventId) async {
-    final decoded = jsonDecode(utf8.decode(a.envelope.payload));
-    if (decoded is! Map) return;
-    final j = Map<String, dynamic>.from(decoded);
-    final lat = (j['lat'] as num?)?.toDouble() ?? 0;
-    final lng = (j['lng'] as num?)?.toDouble() ?? 0;
+    final hm = HazardMarkerData.decode(a.envelope.payload);
+    final lat = hm.location.latDegrees;
+    final lng = hm.location.lngDegrees;
     // _handleHazardEvent requires non-zero coordinates to project.
     if (lat == 0 || lng == 0) return;
     final hazard = pb.HazardData()
       ..hazardId = eventId
-      ..hazardType = (j['type'] as String?) ?? 'UNKNOWN'
-      ..severity = (j['severity'] as num?)?.toInt() ?? 1
+      ..hazardType = HazardTypeCodec.toV1String(hm.hazardType)
+      ..severity = hm.severity
       ..centerLat = lat
       ..centerLng = lng
-      ..radiusMeters = (j['radius_m'] as num?)?.toDouble() ?? 200.0
+      // Typed HazardMarkerData carries no radius (reserved tag); the v1
+      // read-model keeps a default. radius rides only the legacy v1 path.
+      ..radiusMeters = 200.0
       ..observedAt = fixnum.Int64(a.envelope.createdAtHlc.msSinceEpoch)
-      ..description = (j['description'] as String?) ?? ''
-      ..isConfirmation = false;
+      ..description = hm.description
+      ..isConfirmation = hm.isConfirmation;
     await _ingest(
       eventId: eventId,
       v1EventType: EventType.hazardMarker,

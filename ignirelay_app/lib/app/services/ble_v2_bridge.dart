@@ -235,14 +235,15 @@ class BleV2Bridge {
   /// is what makes receiver-side dedup idempotent across the queue → disk
   /// → process-restart → re-drain window; see
   /// `event_publisher_v2_facade.dart` PERSISTENCE block.
-  /// `fieldId` / `fieldMacKey` (v0.3 Phase 0b #4-4) — the field-membership
-  /// context this envelope is published under. When `fieldId == null` the
-  /// envelope carries the zero field_id + no field_mac (control-frame / "no
-  /// field joined" behaviour — the historical default before the join flow
-  /// exists). When supplied (e.g. PRESENCE via the A2 debug field seam, later
-  /// the real join flow in A5) the publisher signs over and MACs the field
-  /// context. The dispatcher field-scope check stays OFF in production until
-  /// A5, so a non-zero field_id is not yet enforced on the receive side.
+  /// `fieldId` / `fieldMacKey` (v0.3 Phase 0b #4-4, real join flow #4-7/A5) —
+  /// the field-membership context this envelope is published under. When
+  /// `fieldId == null` the envelope carries the zero field_id + no field_mac
+  /// (control-frame / "no field joined" behaviour). When supplied (the facade
+  /// resolves it from the active field via `ActiveFieldController`) the
+  /// publisher signs over and MACs the field context. As of A5 the production
+  /// dispatcher enforces field-scope + field-mac on the receive side (§21.6),
+  /// so a non-member field_id is dropped (`field-scope-mismatch` /
+  /// `field-mac-invalid`).
   Future<TxOutcome> sendEnvelope({
     required String peerId,
     required int eventType,
@@ -288,11 +289,11 @@ class BleV2Bridge {
         expiresAtHlc: expiresAtHlc,
         maxHops: maxHops,
         negotiatedMtu: mtu,
-        // #4-4: ride the caller's field context when supplied (PRESENCE via the
-        // A2 debug field seam; the real join flow in A5). Absent context falls
-        // back to the zero field_id + no field_mac (control-frame / "no field
-        // joined" default). The dispatcher field-scope check stays OFF in
-        // production until A5, so a non-zero field_id is not yet enforced here.
+        // #4-4 / #4-7: ride the caller's field context when supplied (the
+        // facade resolves it from the active field via ActiveFieldController).
+        // Absent context falls back to the zero field_id + no field_mac
+        // (control-frame / "no field joined" default). As of A5 the production
+        // dispatcher enforces field-scope + field-mac on receive (§21.6).
         fieldId: fieldId ?? FieldAuthV2.zeroFieldId(),
         fieldMacKey: fieldMacKey,
         envelopeId: envelopeId,

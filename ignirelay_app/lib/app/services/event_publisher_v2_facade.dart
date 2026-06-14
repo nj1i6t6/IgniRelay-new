@@ -136,6 +136,7 @@
 
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
@@ -454,11 +455,16 @@ class EventPublisherV2Facade {
     bool isConfirmation = false,
     int priority = PriorityV2.alert,
   }) {
-    if (description.length > HazardMarkerData.kDescriptionMaxLen) {
+    // Budget is measured in UTF-8 BYTES, not Dart code units: the wire carries
+    // `description` as a UTF-8 string and spec §9 HAZARD/ALERT is a byte budget,
+    // so a 280-char CJK/emoji description (~840 B) must be rejected even though
+    // its `.length` is 280. (#4-5 follow-up — GPT review byte-budget guard.)
+    final descriptionBytes = utf8.encode(description).length;
+    if (descriptionBytes > HazardMarkerData.kDescriptionMaxLen) {
       throw ArgumentError.value(
-        description.length,
+        descriptionBytes,
         'description',
-        'exceeds HazardMarkerData.kDescriptionMaxLen '
+        'UTF-8 byte length exceeds HazardMarkerData.kDescriptionMaxLen '
             '(${HazardMarkerData.kDescriptionMaxLen}); spec §9 HAZARD/ALERT ≤800B',
       );
     }

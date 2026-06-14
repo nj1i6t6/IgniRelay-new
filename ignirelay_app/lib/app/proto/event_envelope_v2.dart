@@ -1368,8 +1368,12 @@ class HazardType {
 /// wave only defines the struct). `description` SHOULD stay within
 /// [kDescriptionMaxLen] — enforced at publish time, not in this lenient codec.
 class HazardMarkerData {
-  /// Recommended upper bound for [description] (chars). Publish-time budget,
-  /// not enforced on decode.
+  /// Recommended upper bound for [description], measured in **UTF-8 bytes**
+  /// (NOT Dart code units). The wire carries `description` as a UTF-8 string
+  /// (`writeString`), and the spec §9 HAZARD/ALERT budget is a byte budget, so
+  /// the publish-time guard counts encoded bytes — a 280-char CJK description
+  /// would be ~840 B and must be rejected even though its `.length` is 280.
+  /// Publish-time budget only; not enforced on decode.
   static const int kDescriptionMaxLen = 280;
 
   final String hazardId;

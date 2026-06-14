@@ -1,4 +1,5 @@
 ﻿import 'dart:collection';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
@@ -673,6 +674,22 @@ void main() {
       description: atCap,
     );
     expect(outcome.queued, isTrue);
+
+    // #4-5 follow-up — the budget is UTF-8 BYTES, not Dart code units. A CJK
+    // description whose `.length` is UNDER the cap but whose encoded byte
+    // length is OVER must still be rejected (a 3-byte/char string at 94 chars
+    // = 282 B > 280). The old `description.length` guard wrongly accepted it.
+    final cjkOverBudget = '水' * 94; // 94 code units, 282 UTF-8 bytes
+    expect(cjkOverBudget.length, lessThan(HazardMarkerData.kDescriptionMaxLen));
+    expect(utf8.encode(cjkOverBudget).length,
+        greaterThan(HazardMarkerData.kDescriptionMaxLen));
+    expect(
+      () => facade.publishHazardMarker(
+        hazardType: HazardType.fire,
+        description: cjkOverBudget,
+      ),
+      throwsArgumentError,
+    );
   });
 }
 

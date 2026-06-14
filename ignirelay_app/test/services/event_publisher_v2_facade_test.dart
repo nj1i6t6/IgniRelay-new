@@ -12,6 +12,7 @@ import 'package:ignirelay_app/app/services/author_rate_limiter.dart';
 import 'package:ignirelay_app/app/services/ble_v2_bridge.dart';
 import 'package:ignirelay_app/app/services/envelope_store_v2.dart';
 import 'package:ignirelay_app/app/services/event_publisher_v2_facade.dart';
+import 'package:ignirelay_app/app/services/field_key_store.dart';
 import 'package:ignirelay_app/app/services/mesh_trace_writer.dart';
 import 'package:ignirelay_app/app/services/peer_capability_registry.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -410,6 +411,121 @@ void main() {
     final expectedSecret = _hexToBytes(kDebugFieldJoinSecretHex);
     final expectedFieldId = await FieldAuthV2.deriveFieldId(expectedSecret);
     expect(call.fieldId!, orderedEquals(expectedFieldId));
+  });
+
+  test(
+      'A2 hardening — PRESENCE final wire envelope carries a real, '
+      'receiver-verifiable field_mac (derived from the debug secret)',
+      () async {
+    final registry = PeerCapabilityRegistry(
+      helloTimeout: const Duration(seconds: 5),
+    );
+    addTearDown(() async => registry.dispose());
+    _markPeerActive(registry, 'FM:01');
+
+    // A REAL (non-recording) bridge so sendEnvelope actually signs + MACs the
+    // envelope via MessagePublisherV2 (the recording bridge short-circuits).
+    final db = DatabaseHelper();
+    final trace = MeshTraceWriter(db);
+    final keyPair = await Ed25519().newKeyPair();
+    final authorPub =
+        Uint8List.fromList((await keyPair.extractPublicKey()).bytes);
+    final publisher = MessagePublisherV2(
+      keyPair: keyPair,
+      authorPublicKey: authorPub,
+      trace: trace,
+    );
+    final bridge = BleV2Bridge(
+      store: EnvelopeStoreV2(db),
+      dispatcher: EnvelopeDispatcherV2(
+        store: EnvelopeStoreV2(db),
+        trace: trace,
+        rateLimiter: AuthorRateLimiter(capacity: 100, perSecond: 1000),
+      ),
+      publisher: publisher,
+      registry: registry,
+      selfHelloFactory: () => const ProtocolHelloData(
+        peerKind: PeerKind.phoneV1,
+        maxRxEnvelopeBytes: 2048,
+        supportsChunking: true,
+        supportsIblt: true,
+        supportsBloomV2: true,
+        minNegotiatedMtu: 247,
+        bgState: BgState.foreground,
+      ),
+      nativeEventStream: const Stream<dynamic>.empty(),
+      writeEventToPeer: (_, __) async => true,
+      notifyEventToPeer: (_, __) async => true,
+    );
+
+    // The SAME field context the facade derives from the A2 debug secret.
+    final secret = _hexToBytes(kDebugFieldJoinSecretHex);
+    final fieldId = await FieldAuthV2.deriveFieldId(secret);
+    final macKey = await FieldAuthV2.deriveFieldMacKey(secret);
+
+    const createdAt = HlcTimestampV2(msSinceEpoch: 1000, counter: 0);
+    final tx = await bridge.sendEnvelope(
+      peerId: 'FM:01',
+      eventType: EventTypeV2.presence,
+      priority: PriorityV2.normal,
+      payload: PresenceData(
+        anonUserId: Uint8List.fromList(List<int>.filled(16, 9)),
+      ).encode(),
+      createdAtHlc: createdAt,
+      expiresAtHlc: HlcTimestampV2(
+        msSinceEpoch:
+            createdAt.msSinceEpoch + const Duration(hours: 4).inMilliseconds,
+        counter: 0,
+      ),
+      maxHops: 4,
+      fieldId: fieldId,
+      fieldMacKey: macKey,
+    );
+    expect(tx.sent, isTrue);
+    final published = tx.published!;
+
+    // Decode the FINAL wire bytes (not the in-memory struct) and assert the
+    // field proofs are actually on the wire.
+    final decoded = EventEnvelopeV2.decode(published.wireBytes);
+    expect(FieldAuthV2.isZeroFieldId(decoded.fieldId), isFalse);
+    expect(decoded.fieldId, orderedEquals(fieldId));
+    expect(decoded.fieldMac.length, FieldAuthV2.fieldMacBytes); // 16
+
+    // A receiver in a DIFFERENT field rejects it — proves field_id is real
+    // scoping, not zero/wildcard. (Run first: a dropped envelope is not
+    // stored, so it can't shadow the member-accept below via dedup.)
+    final otherStore = await FieldKeyStore.fromSecrets([
+      Uint8List.fromList(List<int>.filled(32, 0xBB)),
+    ]);
+    final otherDispatcher = EnvelopeDispatcherV2(
+      store: EnvelopeStoreV2(db),
+      trace: trace,
+      rateLimiter: AuthorRateLimiter(capacity: 100, perSecond: 1000),
+      fieldKeys: otherStore,
+      enableFieldScopeCheck: true,
+    );
+    addTearDown(() async => otherDispatcher.dispose());
+    final reject = await otherDispatcher
+        .onReceiveEnvelopeBytes(published.wireBytes, peerId: 'FM:01');
+    expect(reject, isA<DispatchDropped>());
+    expect((reject as DispatchDropped).dropReason, 'field-scope-mismatch');
+
+    // The strongest proof: a receiver that JOINED the same field (field-scope
+    // check ON) ACCEPTS it — i.e. the field_mac genuinely verifies against the
+    // key derived from the debug secret over the canonical sig input.
+    final memberStore = await FieldKeyStore.fromSecrets([secret]);
+    final memberDispatcher = EnvelopeDispatcherV2(
+      store: EnvelopeStoreV2(db),
+      trace: trace,
+      rateLimiter: AuthorRateLimiter(capacity: 100, perSecond: 1000),
+      fieldKeys: memberStore,
+      enableFieldScopeCheck: true,
+    );
+    addTearDown(() async => memberDispatcher.dispose());
+    final accept = await memberDispatcher
+        .onReceiveEnvelopeBytes(published.wireBytes, peerId: 'FM:01');
+    expect(accept, isA<DispatchAccepted>(),
+        reason: 'field_mac must verify for a member of the same field');
   });
 
   test('publishSosStatus routes through status publish and keeps SOS_RED floor',

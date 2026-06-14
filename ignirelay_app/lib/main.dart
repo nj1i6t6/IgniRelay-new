@@ -127,8 +127,9 @@ final PeerCapabilityRegistry _peerCapabilityRegistry = PeerCapabilityRegistry();
 
 /// v0.3 Stage 0c wave 3E — v2 publish facade. Exposed to the UI via
 /// Provider (see MultiProvider below). UI / app services use this in place
-/// of (or in addition to) `EventPublisher` for the four 0d-eligible event
-/// types (SOS_RED STATUS_UPDATE, STATUS_UPDATE, HAZARD_MARKER, CHAT_MESSAGE).
+/// of (or in addition to) `EventPublisher` for the 0d-eligible event types
+/// (SOS_RED STATUS_UPDATE, STATUS_UPDATE, HAZARD_MARKER, PRESENCE).
+/// (CHAT_MESSAGE was one too until A6/OD-6 retired it.)
 ///
 /// Stage 0c wave 3E-r2: now constructed EAGERLY at module-load time with
 /// just the registry; [BleV2Bridge] is attached later via

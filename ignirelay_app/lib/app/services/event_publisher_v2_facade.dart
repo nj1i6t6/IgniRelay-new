@@ -15,10 +15,10 @@
 //
 // Stage 0c waves 3A-3D landed the per-peer v2 pipeline (MessagePublisherV2,
 // BleV2Bridge.sendEnvelope). The 0d real-device gate (see brief §3.5)
-// requires that the CORE event types it tests — SOS_RED, HAZARD_MARKER,
-// STATUS_UPDATE, CHAT_MESSAGE — actually flow through that v2 pipeline,
+// requires that the core event types it tests — SOS_RED, HAZARD_MARKER,
+// STATUS_UPDATE (and PRESENCE) — actually flow through that v2 pipeline,
 // not through the legacy v0.2 EventPublisher → EventManager → raw
-// MeshEvent path.
+// MeshEvent path. (CHAT_MESSAGE was a core type too until A6/OD-6 retired it.)
 //
 // This facade is the migration-window adapter: app-layer callers
 // (EventPublisher dual-write, StatusController, HazardOverlay, ChatService)
@@ -68,8 +68,8 @@
 //     • Wave 3F-r3 fix — earlier 3F implementation let
 //       `MessagePublisherV2.send()` mint a fresh UUIDv7 every drain,
 //       defeating receiver dedup for non-LWW events (SOS_RED,
-//       HAZARD_MARKER, CHAT_MESSAGE) and producing duplicates on the
-//       receiver after a restart-mid-drain. Now closed.
+//       HAZARD_MARKER) and producing duplicates on the receiver after a
+//       restart-mid-drain. Now closed.
 //     • On facade construction (with a non-null `db:` arg) hydration
 //       reads up to `kMaxPendingEntries` rows ordered by `id ASC`
 //       (= FIFO) and rebuilds the in-memory queue, restoring each

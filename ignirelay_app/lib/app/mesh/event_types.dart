@@ -1,36 +1,68 @@
+// A6 (OD-6) step 3 — the alias initializers below reference the (now
+// @Deprecated) v1-legacy canonicals; suppress the same-package deprecation
+// hint just for those internal references.
+// ignore_for_file: deprecated_member_use_from_same_package
+
 /// 事件類型常數（對應 Protobuf EventType enum）
 /// 唯一定義來源 — event_manager / mesh_event_handler 皆 import 此檔
+///
+/// A6 (OD-6) — 多數 v1 值屬已下線產品（媒合 / 物資 / 聊天 / 據點 / 巡檢 / 導航）
+/// 的 **wire-legacy**，標 `@Deprecated('v1 wire legacy')`：值與編號**保留、不刪、
+/// 不重排**（v1 解碼相容期仍需 — 見 `mesh_event_handler` 的 decode switch），僅以
+/// 標記引導後續閱讀。read-model 仍在用的 `requestBroadcast`(1) / `hazardMarker`(4)
+/// **不標**。唯二 sanctioned 消費端（`mesh_event_handler` / `ble_manager`）以
+/// file-level ignore 抑制 self-package deprecation hint。
 class EventType {
   // ── Broadcast ──
-  static const int resourceRegister = 0;
-  static const int requestBroadcast = 1;
-  // ── Match negotiation ──
-  static const int matchOffer   = 2;       // was matchIntent
+  @Deprecated('v1 wire legacy')
+  static const int resourceRegister = 0; // 舊：物資供給（下線）
+  static const int requestBroadcast = 1; // read-model live（SOS / 求援廣播）
+  // ── Match negotiation（已下線產品）──
+  @Deprecated('v1 wire legacy')
+  static const int matchOffer = 2; // was matchIntent
+  @Deprecated('v1 wire legacy')
   static const int physicalHandshake = 3;
-  static const int matchAccept  = 8;       // was matchConfirm
-  static const int matchDecline = 9;       // was matchReject
-  static const int matchCancel  = 6;
-  // ── New slots ──
-  static const int matchRequest      = 15;
+  @Deprecated('v1 wire legacy')
+  static const int matchAccept = 8; // was matchConfirm
+  @Deprecated('v1 wire legacy')
+  static const int matchDecline = 9; // was matchReject
+  @Deprecated('v1 wire legacy')
+  static const int matchCancel = 6;
+  // ── New slots（已下線產品：媒合 / 據點）──
+  @Deprecated('v1 wire legacy')
+  static const int matchRequest = 15;
+  @Deprecated('v1 wire legacy')
   static const int handshakeComplete = 16;
-  static const int stationClaim      = 17;
-  static const int stationResponse   = 18;
-  // ── Navigation ──
+  @Deprecated('v1 wire legacy')
+  static const int stationClaim = 17;
+  @Deprecated('v1 wire legacy')
+  static const int stationResponse = 18;
+  // ── Navigation（已下線）──
+  @Deprecated('v1 wire legacy')
   static const int locationUpdate = 14;
   // ── Non-match ──
-  static const int hazardMarker    = 4;
-  static const int quarantineVote  = 5;
-  static const int fireAlarmRf     = 7;
-  static const int chatMessage     = 13;
-  // ── Deprecated (ignored but don't crash) ──
-  static const int matchInquiry   = 10;
+  static const int hazardMarker = 4; // read-model live（HAZARD）
+  @Deprecated('v1 wire legacy')
+  static const int quarantineVote = 5;
+  @Deprecated('v1 wire legacy')
+  static const int fireAlarmRf = 7;
+  @Deprecated('v1 wire legacy')
+  static const int chatMessage = 13; // 舊：聊天（v1 13；v3 30 已 reserved，下線）
+  // ── 永久保留（legacy，ignored but don't crash）──
+  @Deprecated('v1 wire legacy')
+  static const int matchInquiry = 10;
+  @Deprecated('v1 wire legacy')
   static const int matchAvailable = 11;
-  static const int matchGone      = 12;
+  @Deprecated('v1 wire legacy')
+  static const int matchGone = 12;
 
-  // Backward compat aliases
-  static const int matchIntent  = matchOffer;
+  // Backward compat aliases（已下線產品）
+  @Deprecated('v1 wire legacy')
+  static const int matchIntent = matchOffer;
+  @Deprecated('v1 wire legacy')
   static const int matchConfirm = matchAccept;
-  static const int matchReject  = matchDecline;
+  @Deprecated('v1 wire legacy')
+  static const int matchReject = matchDecline;
 }
 
 /// Local-only read-model `event_type` markers.

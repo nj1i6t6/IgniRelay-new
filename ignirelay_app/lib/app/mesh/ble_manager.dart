@@ -1,3 +1,8 @@
+// Excludes v1 CHAT_MESSAGE from broadcast/notify via the @Deprecated('v1 wire
+// legacy') EventType.chatMessage constant (A6/OD-6); suppress the same-package
+// deprecation hint for this sanctioned legacy consumer.
+// ignore_for_file: deprecated_member_use_from_same_package
+
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:ignirelay_app/app/mesh/event_manager.dart';
@@ -588,8 +593,7 @@ class BleManager {
           'ttl',
         ],
         // 排除 v2 投影列：它們無 v1 簽章，送出去對端只會拒收。
-        // 排除 CHAT_MESSAGE：聊天已遷移成 v2-only（走 chunked BLE bridge），
-        // 不再經 v1 wire，避免收件端 v1+v2 雙顯。
+        // 排除 CHAT_MESSAGE：聊天產品已下線（A6/OD-6），v1 chat 不再廣播。
         // 排除 ttl<=0：已耗盡 hop budget 的事件不再轉發（hop-limit 收尾）。
         where:
             'hlc_timestamp > ? AND ttl > 0 AND event_id NOT LIKE ? AND event_type != ?',
@@ -767,7 +771,7 @@ class BleManager {
         'ttl',
       ],
       // 排除 v2 投影列：它們無 v1 簽章，不可進 native Notify outbox。
-      // 排除 CHAT_MESSAGE：聊天已遷移成 v2-only，不再經 v1 wire。
+      // 排除 CHAT_MESSAGE：聊天產品已下線（A6/OD-6），v1 chat 不再廣播。
       // 排除 ttl<=0：已耗盡 hop budget 的事件不再轉發（hop-limit 收尾）。
       where:
           'hlc_timestamp > ? AND ttl > 0 AND event_id NOT LIKE ? AND event_type != ?',

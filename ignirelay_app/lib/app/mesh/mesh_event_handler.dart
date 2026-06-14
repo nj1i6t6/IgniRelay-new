@@ -1,3 +1,9 @@
+// This file is the v1 decode-compat layer: its EventType switch knowingly
+// consumes @Deprecated('v1 wire legacy') values (A6/OD-6 step 3). Those values
+// are KEPT for decode and this is their sanctioned consumer, so suppress the
+// same-package deprecation hint file-wide.
+// ignore_for_file: deprecated_member_use_from_same_package
+
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';

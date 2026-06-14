@@ -267,3 +267,18 @@
   - （附帶，非 A2 必跑）`dart run tool/check_constants_parity.dart` → exit 0
 - deviations: 無偏離 A2 範圍。A2 過渡 `kDebugFieldJoinSecretHex` 將於 A5 移除（grep gate）。
 - next: A3（4-5 HAZARD typed payload，施工 AI）；主理 AI 可接 A4/A5。
+
+### A2 ADDENDUM（review 回應，commit `f2ea83e`）
+
+- review #1（測試證據可更硬）→ **已處理**：新增 hardening 測試
+  `event_publisher_v2_facade_test`「A2 hardening — PRESENCE final wire envelope
+  carries a real, receiver-verifiable field_mac」：經真實 `BleV2Bridge.sendEnvelope`
+  產 `PublishedEnvelope` → `EventEnvelopeV2.decode(wireBytes)` 斷言 field_id 非零、
+  field_mac 16B；再以 `enableFieldScopeCheck:true` + `FieldKeyStore.fromSecrets`
+  證同場域成員 ACCEPT、外場域 `field-scope-mismatch` DROP。
+  GATE-TEST → `+484 ~3 All tests passed!`（exit 0）；其餘三門維持綠。
+- review #2（Outbox 重啟不保留 field context）→ **已知技術債，A2 程式碼註解標明，A5
+  補 schema 收回**（非 A3 blocker）。
+- review #3（live GPS accuracy 無來源，LocationService 僅存 LatLng）→ **已知，
+  builder 支援 accuracyM 但 production 路徑無來源；補 LocationService 屬另刀範圍**
+  （非 A3 blocker）。

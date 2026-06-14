@@ -386,3 +386,95 @@
 - deviations: 無偏離 A4 範圍。A4/A5 未混刀（未碰 FieldSession/ActiveFieldController）。
 - next: A5（4-7 FieldSession + field-scope 開啟）；其前置 A2/A3/A4 已備。A5 須一併移除
   A2 過渡 `kDebugFieldJoinSecretHex`（grep gate）並補 Outbox_V2 `field_id` 欄持久化。
+
+---
+
+## [2026-06-14] A3-fix DONE（GPT review：HAZARD description 預算改 UTF-8 byte）
+
+- repo/commit: IgniRelay @ `51db9aa`
+- 執行者: Claude（主理 AI，Owner 2026-06-14 接任）
+- 根因: `publishHazardMarker` 原以 `description.length`（Dart code units）擋預算，但
+  wire 以 UTF-8 字串攜帶 description、spec §9 HAZARD/ALERT 為 **byte** 預算。280 字
+  中日韓描述約 840B，舊 guard 會誤放行。
+- 變更: facade 改計 `utf8.encode(description).length`；`HazardMarkerData.kDescriptionMaxLen`
+  語意改為「UTF-8 bytes」（doc 同步）。既有 ASCII 測試不受影響；新增中文 94 字
+  （282B > 280）拒發測試釘住。
+- gates: 屬 A5 大刀前置小修，gate 證據併入下方 A5 DONE 全綠。
+
+---
+
+## [2026-06-14] A5 DONE（4-7 FieldSession 最小落地 + field-scope 在 production 開啟）
+
+- repo/commit: IgniRelay @ `93c4556`（程式碼）；前置小修 A3-fix @ `51db9aa`
+- 執行者: Claude（主理 AI，Owner 2026-06-14 接任；覆蓋計畫 §0.4）
+- 目標達成: 場域由「測試 shim」變產品事實——本機可加入場域、金鑰持久化、publisher
+  用真場域、dispatcher 的 field-scope + field-mac 檢查在 production 打開。
+- 新增檔案:
+  - `app/services/field_session_store.dart`：`FieldSession{fieldIdHex,displayName,
+    joinedAtMs,cloudBaseUrl?}`；secret 進 `flutter_secure_storage`（key
+    `field_secret_<hex>`），中繼資料進 SQLite `Field_Sessions`。**secret 絕不入
+    SQLite 明文**（A5 禁止事項）；HKDF mac key 亦不持久化（載入時重生）。
+  - `app/controllers/active_field_controller.dart`（ChangeNotifier）：`initialize`
+    由 secrets 重生 (field_id, mac_key)、`joinBySecret`/`leave`/`setActive`、單一
+    作用場域供發送、`macKeyForFieldId` 供 drain 重綁；持有與 dispatcher **共享的
+    可變 `FieldKeyStore`**（runtime join/leave 立即反映到收方，免重建 dispatcher）。
+  - `app/controllers/v2_pipeline_factory.dart`：`createProductionDispatcherV2` 單一
+    接點，釘住三 production flag（clock-expiry / max-hops / **field-scope ON**）。
+- 改動:
+  - DB version 12→13：`Field_Sessions` 表（onCreate + onUpgrade）；`Outbox_V2` 加
+    `field_id BLOB` 欄（drop+rebuild，沿用 v11/v12 ephemeral 模式）。
+  - facade：**移除 A2 `kDebugFieldJoinSecretHex` 與 `_debugFieldContext`**；`_broadcast`
+    改由 `ActiveFieldController` 解析作用場域，未加入場域→`BroadcastOutcome.noField`
+    （不入佇列、不發送，控制框豁免）；`Outbox_V2` 持久化 `field_id`；drain 依
+    `entry.fieldId` 由 controller 重綁 mac_key，場域已離開→刪列並 trace（施工筆記 3）。
+  - `FieldKeyStore` 改可變（`addDerived`/`removeByHex`）；`EnvelopeDispatcherV2` 加三個
+    `@visibleForTesting` flag getter（守門用）。
+  - `main.dart`：`_startV2Bridge` 先 `await controller.initialize()`（secure storage→
+    重生→填共享 keyStore）→經 factory 建 dispatcher（field-scope ON + 共享 keyStore）→
+    `attachActiveField`（施工筆記 4 啟動順序）；`ListenableProvider` 接
+    `ActiveFieldController`。
+  - debug shell：場域卡片（顯示作用場域 idHex8/名稱、以代碼加入 64-hex、產生新場域
+    隨機 32B、>1 場域時切換作用場域）；PRESENCE 處理 `noField`。
+- 測試（新增/更新，皆綠）:
+  - `field_session_store_test`（5）：secret→secure storage / 中繼資料→SQLite（無
+    secret 欄）、secretFor roundtrip、loadAll 排序、leave 雙刪、join 冪等。
+  - `active_field_controller_test`（5）：initialize 空 / join 設作用+填 keyStore /
+    setActive 切換 / leave 退場+fallback / **restart 重生持久場域**。
+  - `database_migration_v13_test`（D4，2）：v12→v13 onUpgrade 建 Field_Sessions +
+    Outbox_V2.field_id（drop+rebuild 空）；fresh install onCreate 同樣有。
+  - `field_scope_integration_test`（D3，4）：同場域 accept / 異場域
+    `field-scope-mismatch` / 偽造 mac `field-mac-invalid` / 竄改 field_id
+    `signature-invalid`，**四態皆斷言 drop_reason**。
+  - `v2_pipeline_factory_test`（施工筆記 5）：守門斷言 production dispatcher
+    field-scope/clock-expiry/max-hops flag 皆 ON。
+  - `event_publisher_v2_facade_test`：presence 改吃真作用場域、`noField`、Outbox
+    `field_id` 持久化；移除 debug-secret 引用。
+  - `provider_wiring_smoke_test` / `debug_shell_smoke_test`：補 `ActiveFieldController`
+    provider + 場域卡片渲染斷言。
+- DoD: D1 ✅（factory 釘 field-scope ON + 真 FieldKeyStore，守門測試驗證）/ D2 ✅
+  （`grep -rn "kDebugFieldJoinSecretHex" lib/` = 0）/ D3 ✅（跨場域隔離四態）/
+  D4 ✅（Field_Sessions migration onUpgrade）/ D5 ✅（通用 gate 全綠）
+- gates（G17 逐字執行，皆 exit 0）:
+  - `dart run tool/check_layers.dart --strict` → `[check_layers] ok — no boundary violations`
+  - `flutter analyze` → `2 issues found`（2 既有 info：battery_optimization_guide），
+    **0 errors**
+  - `flutter test` → `00:15 +526 ~3: All tests passed!`（A4 後 +498 → +526）
+  - `flutter test test/conformance/wire_conformance_corpus_test.dart`（含於上）+
+    `dart run tool/generate_wire_conformance_v1.dart --check` → 確定性 OK
+    （A5 未碰 wire/corpus，rev 維持 `v0.3-phase0b-4-6-1`）
+  - `grep -rn "kDebugFieldJoinSecretHex" lib/` → 0（D2）
+  - `cd android; ./gradlew :app:assembleDebugAndroidTest` → `BUILD SUCCESSFUL`
+    （corpus 未變，增量；exit 0）
+- ENV-GATE 註記: GATE-KOTLIN-RUN（on-device，驗 corpus）無實機，遞延 A11（比照 A1 D3）。
+  Swift 因 Windows 無法編譯（R3 既知）。
+- 行為轉變（刻意，安全姿態）: field-scope ON 後，未加入場域時非控制事件（PRESENCE/
+  STATUS/HAZARD）發送回 `noField`、收方對未知場域 envelope 回 `field-scope-mismatch`；
+  HELLO 等控制框（100–129，zero field_id）不受影響（§21.7）。新使用者須先於場域卡片
+  加入/產生場域，事件才會流動。
+- 觀察（非 A5 範圍，記錄備查）: 全模組 `./gradlew assembleDebugAndroidTest`（無
+  `:app:` 前綴）會因 `flutter_secure_storage` androidTest 透傳
+  `androidx.exifinterface:1.4.1`（要求 minSdk 21）與 androidTest minSdk 19 衝突而
+  manifest-merger 失敗；與本刀無關（純 plugin 傳遞依賴 + minSdk 設定）。**正式 gate
+  用 `:app:assembleDebugAndroidTest`（綠）**，conformance Kotlin 測試所在模組不受影響。
+- deviations: 無偏離 A5 範圍。A4/A5 未混刀。未碰 corpus/generator（A5 不動 wire）。
+- next: A6（舊產品殘留清理，OD-6）。

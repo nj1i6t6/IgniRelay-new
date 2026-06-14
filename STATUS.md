@@ -534,5 +534,35 @@
     `room_display_name_resolver_test` 之 16 測試；facade 測試遷移非刪）
   - `dart run tool/generate_wire_conformance_v1.dart --check` → 確定性 OK（未碰 corpus）
   - `cd android; ./gradlew :app:assembleDebugAndroidTest` → `BUILD SUCCESSFUL`
-- deviations: 無偏離 Owner 收窄範圍；plan step 3 遞延如上。
+- deviations: 無偏離 Owner 收窄範圍；plan step 3 遞延（已於 A6-polish 補完，見下）。
 - next: A7（場域加入 UX：QR / 代碼；依附錄 F 加 `qr_flutter`/`mobile_scanner`）。
+
+---
+
+## [2026-06-14] A6-polish DONE（過時 chat 註解 + plan A6 step 3）
+
+- repo/commit: IgniRelay @ `fa100ef`
+- 執行者: Claude（主理 AI）
+- 緣由: GPT review 指出 A6 留兩條小尾巴——(a) 仍有把 CHAT_MESSAGE 當 active/core
+  route 的過時註解；(b) plan A6 step 3（v1 enum @Deprecated）被遞延。本刀補完。
+- 變更:
+  - 過時註解修正：`event_publisher_v2_facade.dart`（0d core types / wave 3F-r3 非
+    LWW 清單兩處）、`main.dart`（facade provider 0d-eligible 清單）、`ble_manager.dart`
+    兩處排除註解「v2-only」→「聊天產品已下線（A6/OD-6）」。`event_manager.dart:21`
+    為「#3B-2 已移除方法」之正確歷史記錄（非誤導），刻意保留。
+  - **plan A6 step 3 完成**：`event_types.dart` 對非 read-model 的 v1 wire-legacy
+    常數標 `@Deprecated('v1 wire legacy')`（resourceRegister / match 全系列 + aliases /
+    station / locationUpdate / quarantineVote / fireAlarmRf / physicalHandshake /
+    handshakeComplete / chatMessage(13) / matchInquiry·Available·Gone）。**值與編號
+    不刪、不改、不重排**（v1 解碼相容仍需）。read-model 仍在用的 `requestBroadcast`(1)/
+    `hazardMarker`(4) 不標。sanctioned 消費端 `mesh_event_handler`/`ble_manager` +
+    `event_types` alias 自引用以 file-level `ignore_for_file:
+    deprecated_member_use_from_same_package` 抑制 hint（無新 analyzer info）。
+  - `EventTypeV2.chatMessage = 30` reserved 不動；未碰 A7/QR/corpus/FieldSession。
+- gates（exit 0）: `flutter analyze` → **0 errors**（2 既有 info，無新 deprecation
+  hint）；`dart run tool/check_layers.dart --strict` → ok；`flutter test` →
+  `+510 ~3 All tests passed!`（與 A6 同——純註解/標註，無 runtime 影響）。
+  GATE-KOTLIN-BUILD / GATE-CONF-DART 未重跑（Dart 註解/標註，未動 wire/corpus/Kotlin；
+  A6 已證綠）。
+- deviations: 無。
+- next: A7（場域加入 UX：QR / 代碼）。

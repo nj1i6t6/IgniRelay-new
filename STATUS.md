@@ -204,3 +204,66 @@
   對外發布前須補齊）。
 - deviations: none
 - next: Owner 校閱兩份文件；比賽文件自 WHITEPAPER 裁切
+
+---
+
+## [2026-06-14] A2 DONE（4-4 PRESENCE 發佈/接收/顯示接線）
+
+- repo/commit: IgniRelay @ `e0b4eff`（變更本體；本條目為後續 commit）
+- 執行者: 施工 AI（Claude，Owner 授權 session）
+- 開工前置檢查（A2 步驟 4 排程注意）:
+  - `rg -n "ActiveFieldController|FieldSessionStore" ignirelay_app/lib ignirelay_app/test`
+    → 無結果（A5 未落地）→ 依步驟 4 允許引入 `kDebugFieldJoinSecretHex`
+      （TEST-ONLY + `@visibleForTesting`，定義於 facade，僅 facade 內使用），A5 以
+      grep gate 移除。**未引入 debug secret 以外的任何 field 捷徑。**
+- 變更（皆在 `e0b4eff`）:
+  - 新檔 `lib/app/services/anon_identity.dart`：`AnonIdentityService.getOrCreate()`
+    產 16B CSPRNG `anon_user_id`，存 `flutter_secure_storage`（key `anon_user_id_v1`，
+    hex）；`rotate()` 留介面（Phase 2）；**不以 Ed25519 pubkey 當 id**；`SecureKvStore`
+    抽象供測試注入。
+  - 新檔 `lib/app/services/location_evidence_builder.dart`：包 `LocationService`，
+    GPS 可用→`LocationEvidence(GPS/SUBJECT, 1e7 round-to-nearest, observed_at=HLC.now)`，
+    不可用→`null`。
+  - 新檔 `lib/app/controllers/presence_controller.dart`：app 層編排（anon + location
+    evidence → `facade.publishPresence`），讓 UI 不 import `app/proto`。
+  - `EventPublisherV2Facade.publishPresence({anonUserId, location?, batteryHint?})`：
+    `PresenceData` / `EventTypeV2.presence` / `PriorityV2.normal` / TTL 4h（spec §11.2）/
+    maxHops 4；A2 debug field 派生 field_id/mac_key 餵 publisher（dispatcher
+    field-scope check 仍 OFF）。field 上下文穿過 `_broadcast`/`_PendingPublish`/
+    `_sendToPeers`/`_drainQueue`（in-memory；**Outbox_V2 schema 不動，留 A5**）。
+  - `ble_v2_bridge.sendEnvelope` 增 optional `fieldId`/`fieldMacKey`（null→沿用
+    `zeroFieldId` 既有行為，其餘 publish 路徑不變）。
+  - `event_types.dart`：`LocalReadModelType.presence = 9001`（local read-model only,
+    never on wire）。
+  - `v2_inbound_projector`：PRESENCE case → `Event_Logs`（event_type=9001，
+    payload=JSON snapshot `{anon8,src,lat?,lng?,acc?,battery?,observed_ms}`）；
+    dedup 沿用 `event_id`（`v2-<hex>`）。
+  - `event_stream`：`presenceUpdates` typed stream + `PresenceUpdate`（純 Dart）。
+  - `debug_shell`：「發 PRESENCE」改真 publish（顯示 `BroadcastOutcome`）；位置卡改
+    渲染最近 PRESENCE evidence 清單（anon8/來源/座標/時間）。
+  - `main.dart`：`PresenceController` provider。
+- 測試（新增/更新，皆綠）:
+  - `anon_identity_test`（5）：16B / persist / CSPRNG 非 pubkey / 壞值重生 / rotate 未實作。
+  - `location_evidence_builder_test`（5）：null when no GPS / GPS evidence /
+    1e7 round（含 `25.0339805` → `250339805`）。
+  - `event_publisher_v2_facade_test`：`publishPresence` wire spec（NORMAL/4h/maxHops4）
+    + payload roundtrip + 非零 field_id（= 由 debug secret 派生之 deriveFieldId）。
+  - `v2_inbound_projector_test`：PRESENCE 投影 + presenceUpdates 流；同 envelope
+    投影兩次→一筆（以可控 outcomes stream 餵兩次 DispatchAccepted）。
+  - `debug_shell_smoke_test`：PRESENCE 按鈕真 publish（非占位 `尚未接線`），佇列深度 +1。
+  - `provider_wiring_smoke_test`：補 `PresenceController`。
+- DoD: D1 ✅ / D2 ✅ / D3 ✅ / D4 ✅（GATE-CONF-DART 綠；未動 corpus——PRESENCE wire
+  格式自 4-1 起未變，無需 generator 重生）
+- gates（G17 逐字執行，皆 exit 0）:
+  - `dart run tool/check_layers.dart --strict`
+    → exit 0，`[check_layers] ok — no boundary violations`
+  - `flutter analyze --no-fatal-infos --no-fatal-warnings`
+    → exit 0，`2 issues found`（2 個既有 info：battery_optimization_guide
+      use_build_context_synchronously），**0 errors**
+  - `flutter test --exclude-tags golden`
+    → exit 0，`00:15 +483 ~3: All tests passed!`（基線 A0 為 +469；本刀 +14）
+  - `flutter test test/conformance/wire_conformance_corpus_test.dart`
+    → exit 0，`00:00 +21: All tests passed!`
+  - （附帶，非 A2 必跑）`dart run tool/check_constants_parity.dart` → exit 0
+- deviations: 無偏離 A2 範圍。A2 過渡 `kDebugFieldJoinSecretHex` 將於 A5 移除（grep gate）。
+- next: A3（4-5 HAZARD typed payload，施工 AI）；主理 AI 可接 A4/A5。

@@ -6,6 +6,7 @@
 // persists + projects → EventStream emits a typed event.
 // ignore_for_file: prefer_const_constructors
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -23,6 +24,7 @@ import 'package:ignirelay_app/app/services/event_decoder.dart';
 import 'package:ignirelay_app/app/services/event_store.dart';
 import 'package:ignirelay_app/app/services/envelope_store_v2.dart';
 import 'package:ignirelay_app/app/services/mesh_trace_writer.dart';
+import 'package:ignirelay_app/app/services/priority_matrix_v2.dart';
 import 'package:ignirelay_app/app/services/v2_inbound_projector.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -167,6 +169,119 @@ void main() {
     await eventStream.dispose();
     await h.projector.dispose();
     await h.dispatcher.dispose();
+  });
+
+  test('PRESENCE envelope projects to Event_Logs + presenceUpdates stream',
+      () async {
+    final h = await makeHarness();
+    final eventStream = EventStream(
+      handler: MeshEventHandler(),
+      decoder: EventDecoder(),
+      store: EventStore(databaseHelper: DatabaseHelper()),
+    )..start();
+    final presenceFuture = eventStream.presenceUpdates.first;
+
+    final anon = Uint8List.fromList(List<int>.generate(16, (i) => 0xA0 + i));
+    final payload = PresenceData(
+      anonUserId: anon,
+      location: LocationEvidence.fromDegrees(
+        source: LocationSource.gps,
+        frame: LocationFrame.subject,
+        latDegrees: 25.0339805,
+        lngDegrees: 121.5654177,
+        observedAt: const HlcTimestampV2(msSinceEpoch: 4242, counter: 0),
+      ),
+      batteryHint: 88,
+    ).encode();
+
+    final published = await h.publisher.send(
+      eventType: EventTypeV2.presence,
+      priority: PriorityV2.normal,
+      payload: payload,
+      createdAtHlc: HlcTimestampV2(msSinceEpoch: 1000, counter: 0),
+      expiresAtHlc: HlcTimestampV2(msSinceEpoch: 2000, counter: 0),
+      maxHops: 4,
+      negotiatedMtu: 247,
+      fieldId: Uint8List(16),
+    );
+
+    final projectedId = h.projector.projectedEventIds.first;
+    final outcome = await h.dispatcher
+        .onReceiveEnvelopeBytes(published.wireBytes, peerId: 'AA:BB:CC');
+    expect(outcome, isA<DispatchAccepted>());
+
+    final eventId = await projectedId.timeout(const Duration(seconds: 2));
+    final db = await DatabaseHelper().database;
+    final logs = await db
+        .query('Event_Logs', where: 'event_id = ?', whereArgs: [eventId]);
+    expect(logs.length, 1);
+    expect(logs.first['event_type'], LocalReadModelType.presence);
+
+    final presence = await presenceFuture.timeout(const Duration(seconds: 2));
+    expect(presence.anon8, 'a0a1a2a3'); // first 4 bytes of anon_user_id
+    expect(presence.source, LocationSource.gps);
+    expect(presence.lat, closeTo(25.0339805, 1e-7));
+    expect(presence.lng, closeTo(121.5654177, 1e-7));
+    expect(presence.batteryHint, 88);
+
+    await eventStream.dispose();
+    await h.projector.dispose();
+    await h.dispatcher.dispose();
+  });
+
+  test('re-projecting the same PRESENCE envelope yields exactly one row',
+      () async {
+    // Drive the projector directly with a controllable outcomes stream so we
+    // can feed the SAME accepted envelope twice (the dispatcher would dedup a
+    // second wire delivery before the projector sees it). Asserts the
+    // projector's own ingest is idempotent on event_id.
+    final outcomes = StreamController<DispatchOutcome>.broadcast();
+    final projector = V2InboundProjector(
+      outcomes: outcomes.stream,
+      handler: MeshEventHandler(),
+    )..start();
+
+    final keyPair = await Ed25519().newKeyPair();
+    final pub = await keyPair.extractPublicKey();
+    final publisher = MessagePublisherV2(
+      keyPair: keyPair,
+      authorPublicKey: Uint8List.fromList(pub.bytes),
+      trace: MeshTraceWriter(DatabaseHelper()),
+    );
+    final published = await publisher.send(
+      eventType: EventTypeV2.presence,
+      priority: PriorityV2.normal,
+      payload: PresenceData(
+        anonUserId: Uint8List.fromList(List<int>.filled(16, 7)),
+      ).encode(),
+      createdAtHlc: HlcTimestampV2(msSinceEpoch: 1000, counter: 0),
+      expiresAtHlc: HlcTimestampV2(msSinceEpoch: 2000, counter: 0),
+      maxHops: 4,
+      negotiatedMtu: 247,
+      fieldId: Uint8List(16),
+    );
+    final accepted = DispatchAccepted(
+      envelope: published.envelope,
+      sourceTrust: SourceTrust.unverified,
+      peerId: 'AA:BB:CC',
+    );
+
+    final ids = <String>[];
+    final sub = projector.projectedEventIds.listen(ids.add);
+
+    outcomes.add(accepted);
+    outcomes.add(accepted); // same envelope_id → second ingest is a no-op
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+
+    final db = await DatabaseHelper().database;
+    final eventId = V2InboundProjector.eventIdOf(published.envelope.envelopeId);
+    final logs = await db
+        .query('Event_Logs', where: 'event_id = ?', whereArgs: [eventId]);
+    expect(logs.length, 1, reason: 'duplicate projection must not double-insert');
+
+    await sub.cancel();
+    await projector.dispose();
+    await outcomes.close();
   });
 
   test('v2 projection rows are read-model only — excluded from v1 outbound',

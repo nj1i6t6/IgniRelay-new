@@ -27,6 +27,7 @@ import 'package:ignirelay_app/app/controllers/event_publisher.dart';
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/controllers/handoff_controller.dart';
 import 'package:ignirelay_app/app/controllers/mesh_runtime_controller.dart';
+import 'package:ignirelay_app/app/controllers/presence_controller.dart';
 import 'package:ignirelay_app/app/controllers/tier_manager.dart';
 import 'package:ignirelay_app/app/crypto/identity_manager.dart';
 import 'package:ignirelay_app/app/db/database_helper.dart';
@@ -34,9 +35,11 @@ import 'package:ignirelay_app/app/emergency/emergency_mode_controller.dart';
 import 'package:ignirelay_app/app/mesh/event_manager.dart';
 import 'package:ignirelay_app/app/mesh/mesh_event_handler.dart';
 import 'package:ignirelay_app/app/mesh/transport_factory.dart';
+import 'package:ignirelay_app/app/services/anon_identity.dart';
 import 'package:ignirelay_app/app/services/event_decoder.dart';
 import 'package:ignirelay_app/app/services/event_publisher_v2_facade.dart';
 import 'package:ignirelay_app/app/services/event_store.dart';
+import 'package:ignirelay_app/app/services/location_evidence_builder.dart';
 import 'package:ignirelay_app/app/services/location_service.dart';
 import 'package:ignirelay_app/app/services/peer_capability_registry.dart';
 import 'package:ignirelay_app/platform/mesh_transport.dart';
@@ -111,6 +114,15 @@ Widget _wrapWithRootProviders(Widget child) {
         ),
         dispose: (_, s) => s.dispose(),
       ),
+      Provider<PresenceController>(
+        create: (ctx) => PresenceController(
+          facade: ctx.read<EventPublisherV2Facade>(),
+          anonIdentity: AnonIdentityService(),
+          locationBuilder: LocationEvidenceBuilder(
+            currentLocation: () => ctx.read<LocationService>().currentLocation,
+          ),
+        ),
+      ),
       Provider<MeshTransport>.value(
         value: TransportFactory.create(),
       ),
@@ -151,6 +163,7 @@ void main() {
         reads[HandoffController] = ctx.read<HandoffController>();
         reads[TierManager] = ctx.read<TierManager>();
         reads[EventStream] = ctx.read<EventStream>();
+        reads[PresenceController] = ctx.read<PresenceController>();
         reads[MeshTransport] = ctx.read<MeshTransport>();
       }),
     ));

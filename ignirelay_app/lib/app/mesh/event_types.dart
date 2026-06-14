@@ -32,3 +32,17 @@ class EventType {
   static const int matchConfirm = matchAccept;
   static const int matchReject  = matchDecline;
 }
+
+/// Local-only read-model `event_type` markers.
+///
+/// These values **NEVER appear on any wire** (neither the v1 EventType enum
+/// above nor the v3 `EventTypeV2` enum). They exist solely to tag rows the
+/// `V2InboundProjector` writes into the `Event_Logs` read-model when a wire
+/// event has no matching v1 enum, so UI / typed-streams can recognise them.
+/// Values are ≥9000 to stay clear of every real wire EventType / EventTypeV2.
+class LocalReadModelType {
+  /// Projected PRESENCE footprint. Wire source = `EventTypeV2.presence` (3);
+  /// this is the *read-model* tag for the row, NOT the wire type. The row's
+  /// payload column holds a plain-JSON presence snapshot (NOT a protobuf).
+  static const int presence = 9001;
+}

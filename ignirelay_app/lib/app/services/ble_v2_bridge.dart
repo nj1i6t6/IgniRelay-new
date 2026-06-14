@@ -235,6 +235,14 @@ class BleV2Bridge {
   /// is what makes receiver-side dedup idempotent across the queue → disk
   /// → process-restart → re-drain window; see
   /// `event_publisher_v2_facade.dart` PERSISTENCE block.
+  /// `fieldId` / `fieldMacKey` (v0.3 Phase 0b #4-4) — the field-membership
+  /// context this envelope is published under. When `fieldId == null` the
+  /// envelope carries the zero field_id + no field_mac (control-frame / "no
+  /// field joined" behaviour — the historical default before the join flow
+  /// exists). When supplied (e.g. PRESENCE via the A2 debug field seam, later
+  /// the real join flow in A5) the publisher signs over and MACs the field
+  /// context. The dispatcher field-scope check stays OFF in production until
+  /// A5, so a non-zero field_id is not yet enforced on the receive side.
   Future<TxOutcome> sendEnvelope({
     required String peerId,
     required int eventType,
@@ -244,6 +252,8 @@ class BleV2Bridge {
     required HlcTimestampV2 expiresAtHlc,
     required int maxHops,
     Uint8List? envelopeId,
+    Uint8List? fieldId,
+    Uint8List? fieldMacKey,
     bool isExperimental = false,
   }) async {
     final state = registry.stateFor(peerId);
@@ -278,11 +288,13 @@ class BleV2Bridge {
         expiresAtHlc: expiresAtHlc,
         maxHops: maxHops,
         negotiatedMtu: mtu,
-        // 4-3 placeholder: no field joined yet, so emit a zero field_id and no
-        // field_mac. The real (field_id, field_mac_key) context is threaded
-        // through here when the field-join flow + PRESENCE publish land in 4-4
-        // (the dispatcher field-scope check stays OFF in production until then).
-        fieldId: FieldAuthV2.zeroFieldId(),
+        // #4-4: ride the caller's field context when supplied (PRESENCE via the
+        // A2 debug field seam; the real join flow in A5). Absent context falls
+        // back to the zero field_id + no field_mac (control-frame / "no field
+        // joined" default). The dispatcher field-scope check stays OFF in
+        // production until A5, so a non-zero field_id is not yet enforced here.
+        fieldId: fieldId ?? FieldAuthV2.zeroFieldId(),
+        fieldMacKey: fieldMacKey,
         envelopeId: envelopeId,
         isExperimental: isExperimental,
       );

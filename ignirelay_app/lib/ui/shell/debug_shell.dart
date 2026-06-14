@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/controllers/mesh_runtime_controller.dart';
+import 'package:ignirelay_app/app/controllers/presence_controller.dart';
 import 'package:ignirelay_app/app/services/event_store.dart';
 
 /// Phase 0b mapless debug shell.
@@ -28,11 +29,14 @@ class _DebugShellState extends State<DebugShell> {
   late final MeshRuntimeController _runtime;
   late final EventStream _events;
   late final EventStore _store;
+  late final PresenceController _presence;
 
   StreamSubscription<EventLogChanged>? _logSub;
   StreamSubscription<TransportState>? _stateSub;
+  StreamSubscription<PresenceUpdate>? _presenceSub;
 
   List<Map<String, dynamic>> _recent = const [];
+  final List<PresenceUpdate> _presences = <PresenceUpdate>[];
   TransportState? _state;
   bool _busy = false;
 
@@ -42,6 +46,7 @@ class _DebugShellState extends State<DebugShell> {
     _runtime = context.read<MeshRuntimeController>();
     _events = context.read<EventStream>();
     _store = context.read<EventStore>();
+    _presence = context.read<PresenceController>();
     _state = _runtime.transportActive
         ? TransportState.running
         : TransportState.stopped;
@@ -54,6 +59,15 @@ class _DebugShellState extends State<DebugShell> {
       // transportActive / transportStats 仍 null-safe,略過狀態訂閱即可。
     }
     _logSub = _events.anyEventChanges.listen((_) => _refresh());
+    _presenceSub = _events.presenceUpdates.listen((p) {
+      if (!mounted) return;
+      setState(() {
+        // 最近在前；同 anon 只留最新一筆。
+        _presences.removeWhere((e) => e.anon8 == p.anon8);
+        _presences.insert(0, p);
+        if (_presences.length > 20) _presences.removeRange(20, _presences.length);
+      });
+    });
     _refresh();
   }
 
@@ -61,6 +75,7 @@ class _DebugShellState extends State<DebugShell> {
   void dispose() {
     _logSub?.cancel();
     _stateSub?.cancel();
+    _presenceSub?.cancel();
     super.dispose();
   }
 
@@ -96,6 +111,25 @@ class _DebugShellState extends State<DebugShell> {
 
   void _todoWire(String what) => _snack(
       '$what 尚未接線 — 隨 v2 wire（PRESENCE/SOS/field_id）在後續 Phase 0b commit 接上');
+
+  Future<void> _publishPresence() async {
+    setState(() => _busy = true);
+    try {
+      final outcome = await _presence.publishPresence();
+      if (!mounted) return;
+      if (outcome.anyAccepted) {
+        _snack('PRESENCE 已送出（${outcome.attempted} peer）');
+      } else if (outcome.queued) {
+        _snack('PRESENCE 已排入佇列（無在線 peer，深度 ${outcome.pendingDepth}）');
+      } else {
+        _snack('PRESENCE 已嘗試送出（${outcome.attempted} peer，無人接受）');
+      }
+    } catch (e) {
+      _snack('PRESENCE 送出失敗: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -176,12 +210,12 @@ class _DebugShellState extends State<DebugShell> {
           children: [
             const Text('送出事件', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            const Text('PRESENCE / SOS 走 v2 wire；本 commit 刻意不碰 wire,故尚未接線。',
+            const Text('PRESENCE 走 v2 wire（已接線）；SOS 在 A4 接上。',
                 style: TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 8),
             Wrap(spacing: 8, children: [
               OutlinedButton.icon(
-                onPressed: () => _todoWire('PRESENCE'),
+                onPressed: _busy ? null : _publishPresence,
                 icon: const Icon(Icons.my_location, size: 18),
                 label: const Text('發 PRESENCE'),
               ),
@@ -198,23 +232,68 @@ class _DebugShellState extends State<DebugShell> {
   }
 
   Widget _positionCard() {
-    return const Card(
+    return Card(
       child: Padding(
-        padding: EdgeInsets.all(14),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('最後可信位置', style: TextStyle(fontWeight: FontWeight.bold)),
-            SizedBox(height: 4),
-            Text(
-              'mapless 定位（§3.6）：anchor 節點 / 距離方位 / 可信度 / 誤差半徑。\n'
-              'LocationEvidence + PositionEstimate 隨 v2 wire 接上,本 commit 為占位。',
+            const Text('最近 PRESENCE 足跡',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            const Text(
+              'mapless 定位（§3.6）：收到的 PRESENCE evidence（anon / 來源 / 時間 / 經緯）。',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
+            const SizedBox(height: 8),
+            if (_presences.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Text('（尚無 PRESENCE）', style: TextStyle(color: Colors.grey)),
+              )
+            else
+              ..._presences.map(_presenceRow),
           ],
         ),
       ),
     );
+  }
+
+  Widget _presenceRow(PresenceUpdate p) {
+    final when = p.observedAt.toIso8601String().substring(11, 19);
+    final where = (p.lat != null && p.lng != null)
+        ? '${p.lat!.toStringAsFixed(5)}, ${p.lng!.toStringAsFixed(5)}'
+        : '（無座標）';
+    final src = _sourceLabel(p.source);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(children: [
+        SizedBox(
+          width: 70,
+          child: Text(p.anon8.isEmpty ? '—' : p.anon8,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: Text('$src · $where', style: const TextStyle(fontSize: 12))),
+        Text(when, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+      ]),
+    );
+  }
+
+  // LocationSource.* → label。UI 不 import app/proto，故以本地數值對照。
+  static String _sourceLabel(int source) {
+    switch (source) {
+      case 1:
+        return 'GPS';
+      case 2:
+        return 'NODE';
+      case 3:
+        return 'RSSI';
+      case 4:
+        return 'PDR';
+      default:
+        return '—';
+    }
   }
 
   Widget _eventsCard() {

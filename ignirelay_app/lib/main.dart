@@ -37,6 +37,9 @@ import 'package:ignirelay_app/app/services/protocol_hello_service.dart';
 import 'package:ignirelay_app/app/services/v2_inbound_projector.dart';
 import 'package:ignirelay_app/app/controllers/event_publisher.dart';
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
+import 'package:ignirelay_app/app/controllers/presence_controller.dart';
+import 'package:ignirelay_app/app/services/anon_identity.dart';
+import 'package:ignirelay_app/app/services/location_evidence_builder.dart';
 import 'package:ignirelay_app/app/controllers/ble_scan_controller.dart';
 import 'package:ignirelay_app/app/controllers/device_info_controller.dart';
 import 'package:ignirelay_app/app/controllers/handoff_controller.dart';
@@ -415,6 +418,18 @@ class _IgniRelayAppState extends State<IgniRelayApp> {
             store: context.read<EventStore>(),
           )..start(),
           dispose: (_, stream) => stream.dispose(),
+        ),
+        // #4-4 (A2) — PRESENCE publish orchestrator. Assembles anon_user_id +
+        // GPS evidence in the app layer so the UI never touches app/proto.
+        Provider<PresenceController>(
+          create: (context) => PresenceController(
+            facade: context.read<EventPublisherV2Facade>(),
+            anonIdentity: AnonIdentityService(),
+            locationBuilder: LocationEvidenceBuilder(
+              currentLocation: () =>
+                  context.read<LocationService>().currentLocation,
+            ),
+          ),
         ),
         Provider<MeshTransport>.value(
           value: widget.transport,

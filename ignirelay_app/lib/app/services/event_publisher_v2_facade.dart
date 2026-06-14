@@ -140,11 +140,28 @@ import 'dart:collection';
 import 'package:flutter/foundation.dart';
 
 import 'package:ignirelay_app/app/controllers/message_publisher_v2.dart';
+import 'package:ignirelay_app/app/crypto/field_auth_v2.dart';
 import 'package:ignirelay_app/app/proto/event_envelope_v2.dart';
 import 'package:ignirelay_app/app/services/ble_v2_bridge.dart';
 import 'package:ignirelay_app/app/services/peer_capability_registry.dart';
 import 'package:ignirelay_app/app/crdt/hlc.dart';
 import 'package:ignirelay_app/app/db/database_helper.dart';
+
+/// TEST-ONLY transitional field-join secret (32 bytes, hex) for #4-4 (A2).
+///
+/// PRESENCE must ride a non-zero `field_id`, but the real field-join flow does
+/// not exist until A5. As an A2-only bridge, the facade derives a fixed
+/// field_id / field_mac_key from this constant so PRESENCE envelopes are
+/// field-scoped end-to-end (the dispatcher field-scope check stays OFF in
+/// production for now). Tests import this to build a matching
+/// `FieldKeyStore.fromSecrets` for the receive side.
+///
+/// **A5 removes this entirely** (`grep -rn "kDebugFieldJoinSecretHex" lib/`
+/// must be 0 after A5). It is NOT a real field secret — do not use it for any
+/// production field membership.
+@visibleForTesting
+const String kDebugFieldJoinSecretHex =
+    'a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2';
 
 /// Per-peer outcome aggregated into the broadcast summary.
 class PeerSendOutcome {
@@ -230,6 +247,14 @@ class _PendingPublish {
   final DateTime enqueuedAt;
   final Set<String> deliveredTo = <String>{};
 
+  /// Field-membership context this entry publishes under (#4-4). `null` when
+  /// the entry carries no field (control / legacy default → zero field_id).
+  /// NOTE: deliberately NOT persisted to `Outbox_V2` in A2 (that schema
+  /// column lands in A5); a hydrated entry therefore re-drains with no field
+  /// context (zero field_id). Acceptable for the short-lived A2 debug seam.
+  final Uint8List? fieldId;
+  final Uint8List? fieldMacKey;
+
   /// SQLite `Outbox_V2.id` for entries that are mirrored to disk. `null`
   /// when running without a [DatabaseHelper] (tests / in-memory mode) or
   /// when persistence write failed (entry still lives in memory).
@@ -244,6 +269,8 @@ class _PendingPublish {
     required this.expiresAtHlc,
     required this.maxHops,
     required this.enqueuedAt,
+    this.fieldId,
+    this.fieldMacKey,
     this.outboxRowId,
   });
 }
@@ -431,6 +458,63 @@ class EventPublisherV2Facade {
     );
   }
 
+  /// Publish a PRESENCE footprint (#4-4). [anonUserId] is the 16-byte
+  /// rotatable anon id (NOT the author key — see `AnonIdentityService`);
+  /// [location] is the current best GPS evidence (null → no-location PRESENCE,
+  /// still sent); [batteryHint] is 0..100 (0 == absent).
+  ///
+  /// Priority is NORMAL (spec §6 — footprints never claim a higher slot),
+  /// TTL is 4 hours and max_hops is 4 (spec §11.2 PRESENCE). The envelope
+  /// rides the A2 debug field context so it is field-scoped end-to-end.
+  Future<BroadcastOutcome> publishPresence({
+    required Uint8List anonUserId,
+    LocationEvidence? location,
+    int? batteryHint,
+  }) async {
+    final data = PresenceData(
+      anonUserId: anonUserId,
+      location: location ?? const LocationEvidence(),
+      batteryHint: batteryHint ?? 0,
+    );
+    final field = await _debugFieldContext();
+    return _broadcast(
+      eventType: EventTypeV2.presence,
+      priority: PriorityV2.normal,
+      payload: data.encode(),
+      ttlOffset: const Duration(hours: 4), // §11.2 PRESENCE default
+      maxHops: EventTypeV2.maxHopsDefault(EventTypeV2.presence) ?? 4,
+      fieldId: field.fieldId,
+      fieldMacKey: field.fieldMacKey,
+    );
+  }
+
+  // ── A2 debug field seam (removed in A5) ────────────────────────────────
+  //
+  // Derives a fixed (field_id, field_mac_key) from [kDebugFieldJoinSecretHex]
+  // so PRESENCE rides a non-zero field_id before the real join flow (A5)
+  // exists. Cached after first derivation. A5 deletes this whole block.
+
+  _DebugFieldContext? _debugField;
+
+  Future<_DebugFieldContext> _debugFieldContext() async {
+    final cached = _debugField;
+    if (cached != null) return cached;
+    final secret = _hexToBytes(kDebugFieldJoinSecretHex);
+    final fieldId = await FieldAuthV2.deriveFieldId(secret);
+    final macKey = await FieldAuthV2.deriveFieldMacKey(secret);
+    final ctx = _DebugFieldContext(fieldId: fieldId, fieldMacKey: macKey);
+    _debugField = ctx;
+    return ctx;
+  }
+
+  static Uint8List _hexToBytes(String hex) {
+    final out = Uint8List(hex.length ~/ 2);
+    for (var i = 0; i < out.length; i++) {
+      out[i] = int.parse(hex.substring(i * 2, i * 2 + 2), radix: 16);
+    }
+    return out;
+  }
+
   // ── Core broadcast loop ───────────────────────────────────────────────
 
   Future<BroadcastOutcome> _broadcast({
@@ -439,6 +523,8 @@ class EventPublisherV2Facade {
     required Uint8List payload,
     required Duration ttlOffset,
     required int maxHops,
+    Uint8List? fieldId,
+    Uint8List? fieldMacKey,
   }) async {
     final hlc = HLC.now();
     final createdAtHlc =
@@ -467,6 +553,8 @@ class EventPublisherV2Facade {
         expiresAtHlc: expiresAtHlc,
         maxHops: maxHops,
         enqueuedAt: _now(),
+        fieldId: fieldId,
+        fieldMacKey: fieldMacKey,
       ));
       return BroadcastOutcome.bridgeNotReady(_pending.length);
     }
@@ -485,6 +573,8 @@ class EventPublisherV2Facade {
         expiresAtHlc: expiresAtHlc,
         maxHops: maxHops,
         enqueuedAt: _now(),
+        fieldId: fieldId,
+        fieldMacKey: fieldMacKey,
       ));
       return BroadcastOutcome.queued(_pending.length);
     }
@@ -499,6 +589,8 @@ class EventPublisherV2Facade {
       createdAtHlc: createdAtHlc,
       expiresAtHlc: expiresAtHlc,
       maxHops: maxHops,
+      fieldId: fieldId,
+      fieldMacKey: fieldMacKey,
     );
   }
 
@@ -512,6 +604,8 @@ class EventPublisherV2Facade {
     required HlcTimestampV2 createdAtHlc,
     required HlcTimestampV2 expiresAtHlc,
     required int maxHops,
+    Uint8List? fieldId,
+    Uint8List? fieldMacKey,
     Set<String>? skip,
   }) async {
     final outcomes = <PeerSendOutcome>[];
@@ -527,6 +621,8 @@ class EventPublisherV2Facade {
         createdAtHlc: createdAtHlc,
         expiresAtHlc: expiresAtHlc,
         maxHops: maxHops,
+        fieldId: fieldId,
+        fieldMacKey: fieldMacKey,
       );
       if (tx.sent) anyAccepted = true;
       outcomes.add(PeerSendOutcome(
@@ -725,6 +821,8 @@ class EventPublisherV2Facade {
           createdAtHlc: entry.createdAtHlc,
           expiresAtHlc: entry.expiresAtHlc,
           maxHops: entry.maxHops,
+          fieldId: entry.fieldId,
+          fieldMacKey: entry.fieldMacKey,
         );
         for (final o in outcome.outcomes) {
           if (o.sent) entry.deliveredTo.add(o.peerId);
@@ -747,4 +845,11 @@ class EventPublisherV2Facade {
       _draining = false;
     }
   }
+}
+
+/// A2-only derived field context (field_id + field_mac_key). Removed in A5.
+class _DebugFieldContext {
+  final Uint8List fieldId;
+  final Uint8List fieldMacKey;
+  const _DebugFieldContext({required this.fieldId, required this.fieldMacKey});
 }

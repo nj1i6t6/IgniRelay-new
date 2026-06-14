@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:ignirelay_app/app/mesh/event_types.dart';
 import 'package:ignirelay_app/app/mesh/mesh_event_handler.dart';
@@ -41,6 +42,44 @@ class HazardEvent {
       required this.description});
 }
 
+/// PRESENCE 足跡更新（投影自 v3 wire 的 `EventTypeV2.presence`）。
+///
+/// 內容是純 Dart 型別（由 `V2InboundProjector` 寫入 read-model 的 JSON snapshot
+/// 還原而來），不含 protobuf，供 debug shell「最近 presence」清單渲染。
+class PresenceUpdate {
+  final String eventId;
+
+  /// anon_user_id 前 4 bytes 的 hex 顯示把手（非完整 id、不可反推）。
+  final String anon8;
+
+  /// `LocationSource.*` 數值（0 = unknown / 無位置）。
+  final int source;
+
+  /// 經緯度（無 GPS 時為 null）。
+  final double? lat;
+  final double? lng;
+
+  /// 水平誤差（公尺，null = 未知）。
+  final int? accuracyM;
+
+  /// 電量提示 0..100（null = 未提供）。
+  final int? batteryHint;
+
+  /// 觀測時間。
+  final DateTime observedAt;
+
+  PresenceUpdate({
+    required this.eventId,
+    required this.anon8,
+    required this.source,
+    required this.observedAt,
+    this.lat,
+    this.lng,
+    this.accuracyM,
+    this.batteryHint,
+  });
+}
+
 /// 通用「事件日誌變動」通知。
 ///
 /// 給只關心「某個事件剛剛抵達/落地，請我重整自己這份 view」的 UI 使用。內容
@@ -81,11 +120,16 @@ class EventStream {
       StreamController<SosAlert>.broadcast();
   final StreamController<HazardEvent> _hazardController =
       StreamController<HazardEvent>.broadcast();
+  final StreamController<PresenceUpdate> _presenceController =
+      StreamController<PresenceUpdate>.broadcast();
   final StreamController<EventLogChanged> _anyEventController =
       StreamController<EventLogChanged>.broadcast();
 
   Stream<SosAlert> get sosAlerts => _sosController.stream;
   Stream<HazardEvent> get hazardEvents => _hazardController.stream;
+
+  /// PRESENCE 足跡更新 typed stream（投影自 v3 `EventTypeV2.presence`）。
+  Stream<PresenceUpdate> get presenceUpdates => _presenceController.stream;
 
   /// 「事件日誌有新東西」的通用通知 stream。UI 若只需要「something 變了，
   /// 請重新跑 query」的訊號，就訂閱這個 stream，不要再用 [rawEvents]。
@@ -151,6 +195,14 @@ class EventStream {
             ));
           }
           break;
+        case LocalReadModelType.presence:
+          // PRESENCE read-model row：payload 是純 JSON snapshot（非 protobuf），
+          // 由 V2InboundProjector 寫入。這裡還原成 typed PresenceUpdate。
+          final update = payload == null
+              ? null
+              : _presenceFromSnapshot(eventId, payload, timestamp);
+          if (update != null) _presenceController.add(update);
+          break;
         default:
           break;
       }
@@ -160,10 +212,37 @@ class EventStream {
     }
   }
 
+  /// 把 PRESENCE read-model 的 JSON snapshot 還原成 [PresenceUpdate]。
+  /// 解析失敗回 null（debug 面，壞資料不致命）。
+  PresenceUpdate? _presenceFromSnapshot(
+      String eventId, Uint8List payload, DateTime fallbackTs) {
+    try {
+      final decoded = jsonDecode(utf8.decode(payload));
+      if (decoded is! Map) return null;
+      final j = Map<String, dynamic>.from(decoded);
+      final observedMs = j['observed_ms'] as int?;
+      return PresenceUpdate(
+        eventId: eventId,
+        anon8: (j['anon8'] as String?) ?? '',
+        source: (j['src'] as num?)?.toInt() ?? 0,
+        lat: (j['lat'] as num?)?.toDouble(),
+        lng: (j['lng'] as num?)?.toDouble(),
+        accuracyM: (j['acc'] as num?)?.toInt(),
+        batteryHint: (j['battery'] as num?)?.toInt(),
+        observedAt: observedMs != null
+            ? DateTime.fromMillisecondsSinceEpoch(observedMs)
+            : fallbackTs,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> dispose() async {
     await _subscription?.cancel();
     await _sosController.close();
     await _hazardController.close();
+    await _presenceController.close();
     await _anyEventController.close();
   }
 }

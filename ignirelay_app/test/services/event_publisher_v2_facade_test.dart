@@ -5,6 +5,7 @@ import 'package:cryptography/cryptography.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ignirelay_app/app/controllers/envelope_dispatcher_v2.dart';
 import 'package:ignirelay_app/app/controllers/message_publisher_v2.dart';
+import 'package:ignirelay_app/app/crypto/field_auth_v2.dart';
 import 'package:ignirelay_app/app/db/database_helper.dart';
 import 'package:ignirelay_app/app/proto/event_envelope_v2.dart';
 import 'package:ignirelay_app/app/services/author_rate_limiter.dart';
@@ -347,6 +348,70 @@ void main() {
         reason: 'TRAPPED should floor at SOS_RED');
   });
 
+  test('publishPresence rides PRESENCE wire spec + decodable payload + field',
+      () async {
+    final registry = PeerCapabilityRegistry(
+      helloTimeout: const Duration(seconds: 5),
+    );
+    final bridge = await _makeRecordingBridge(registry);
+    final facade = EventPublisherV2Facade(
+      registry: registry,
+      bridge: bridge,
+    );
+    addTearDown(() async {
+      await facade.dispose();
+      await registry.dispose();
+    });
+    _markPeerActive(registry, 'PR:01');
+
+    final anon = Uint8List.fromList(List<int>.generate(16, (i) => i + 1));
+    final location = LocationEvidence.fromDegrees(
+      source: LocationSource.gps,
+      frame: LocationFrame.subject,
+      latDegrees: 25.0339805,
+      lngDegrees: 121.5654177,
+      observedAt: const HlcTimestampV2(msSinceEpoch: 1234, counter: 0),
+    );
+
+    final outcome = await facade.publishPresence(
+      anonUserId: anon,
+      location: location,
+      batteryHint: 73,
+    );
+    expect(outcome.anyAccepted, isTrue);
+    expect(bridge.invocations.length, 1);
+
+    final call = bridge.invocations.single;
+    // §6 matrix: PRESENCE → NORMAL; §11.2: TTL 4h, max_hops 4.
+    expect(call.eventType, EventTypeV2.presence);
+    expect(call.priority, PriorityV2.normal);
+    expect(call.maxHops, 4);
+    expect(
+      call.expiresAtHlc.msSinceEpoch - call.createdAtHlc.msSinceEpoch,
+      const Duration(hours: 4).inMilliseconds,
+    );
+
+    // Payload round-trips back to the same PresenceData (anon + location).
+    final decoded = PresenceData.decode(call.payload);
+    expect(decoded.anonUserId, orderedEquals(anon));
+    expect(decoded.batteryHint, 73);
+    expect(decoded.location.source, LocationSource.gps);
+    expect(decoded.location.latE7, 250339805); // round-to-nearest trap value
+    expect(decoded.location.lngE7, 1215654177);
+
+    // Field context: non-zero field_id derived from the A2 debug secret +
+    // a 32-byte mac key (so the envelope is field-scoped, not zero-field).
+    expect(call.fieldId, isNotNull);
+    expect(call.fieldId!.length, FieldAuthV2.fieldIdBytes);
+    expect(FieldAuthV2.isZeroFieldId(call.fieldId!), isFalse);
+    expect(call.fieldMacKey, isNotNull);
+    expect(call.fieldMacKey!.length, 32);
+
+    final expectedSecret = _hexToBytes(kDebugFieldJoinSecretHex);
+    final expectedFieldId = await FieldAuthV2.deriveFieldId(expectedSecret);
+    expect(call.fieldId!, orderedEquals(expectedFieldId));
+  });
+
   test('publishSosStatus routes through status publish and keeps SOS_RED floor',
       () async {
     final registry = PeerCapabilityRegistry(
@@ -389,6 +454,8 @@ class _SendInvocation {
   final HlcTimestampV2 createdAtHlc;
   final HlcTimestampV2 expiresAtHlc;
   final int maxHops;
+  final Uint8List? fieldId;
+  final Uint8List? fieldMacKey;
 
   _SendInvocation({
     required this.peerId,
@@ -399,6 +466,8 @@ class _SendInvocation {
     required this.createdAtHlc,
     required this.expiresAtHlc,
     required this.maxHops,
+    required this.fieldId,
+    required this.fieldMacKey,
   });
 }
 
@@ -428,6 +497,8 @@ class _RecordingBleV2Bridge extends BleV2Bridge {
     required HlcTimestampV2 expiresAtHlc,
     required int maxHops,
     Uint8List? envelopeId,
+    Uint8List? fieldId,
+    Uint8List? fieldMacKey,
     bool isExperimental = false,
   }) async {
     invocations.add(_SendInvocation(
@@ -440,6 +511,9 @@ class _RecordingBleV2Bridge extends BleV2Bridge {
       createdAtHlc: createdAtHlc,
       expiresAtHlc: expiresAtHlc,
       maxHops: maxHops,
+      fieldId: fieldId == null ? null : Uint8List.fromList(fieldId),
+      fieldMacKey:
+          fieldMacKey == null ? null : Uint8List.fromList(fieldMacKey),
     ));
     if (scriptedOutcomes.isNotEmpty) {
       return scriptedOutcomes.removeFirst();
@@ -512,6 +586,14 @@ Future<_RecordingBleV2Bridge> _makeRecordingBridge(
 
 Uint8List _filledEnvelopeId(int byte) =>
     Uint8List.fromList(List<int>.filled(16, byte));
+
+Uint8List _hexToBytes(String hex) {
+  final out = Uint8List(hex.length ~/ 2);
+  for (var i = 0; i < out.length; i++) {
+    out[i] = int.parse(hex.substring(i * 2, i * 2 + 2), radix: 16);
+  }
+  return out;
+}
 
 Future<List<Map<String, Object?>>> _queryOutboxRows(DatabaseHelper db) async {
   final database = await db.database;

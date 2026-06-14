@@ -112,6 +112,9 @@ class V2InboundProjector {
         case EventTypeV2.statusUpdate:
           await _projectStatus(accepted, eventId);
           break;
+        case EventTypeV2.presence:
+          await _projectPresence(accepted, eventId);
+          break;
         default:
           // Not a UI-surfaced type (supply / match / official / control);
           // nothing to project into the v1 read-model.
@@ -219,6 +222,48 @@ class V2InboundProjector {
       payload: req.writeToBuffer(),
       accepted: a,
     );
+  }
+
+  Future<void> _projectPresence(DispatchAccepted a, String eventId) async {
+    final p = PresenceData.decode(a.envelope.payload);
+    final loc = p.location;
+    final hasLoc = loc.source != LocationSource.unknown ||
+        loc.latE7 != 0 ||
+        loc.lngE7 != 0;
+    final observedMs = loc.observedAt.msSinceEpoch != 0
+        ? loc.observedAt.msSinceEpoch
+        : a.envelope.createdAtHlc.msSinceEpoch;
+    // Plain-JSON snapshot for UI rendering. PRESENCE has no v1 enum, so the
+    // row is tagged LocalReadModelType.presence (local read-model only, never
+    // on wire). `anon8` is the first 4 bytes of anon_user_id as hex (a short,
+    // non-reversible display handle — NOT the full id).
+    final snapshot = <String, dynamic>{
+      'anon8': _hexPrefix(p.anonUserId, 4),
+      'src': loc.source,
+      'observed_ms': observedMs,
+      if (hasLoc) 'lat': loc.latDegrees,
+      if (hasLoc) 'lng': loc.lngDegrees,
+      if (loc.accuracyM != 0) 'acc': loc.accuracyM,
+      if (p.batteryHint != 0) 'battery': p.batteryHint,
+    };
+    await _ingest(
+      eventId: eventId,
+      v1EventType: LocalReadModelType.presence,
+      urgency: 0,
+      payload: utf8.encode(jsonEncode(snapshot)),
+      accepted: a,
+      lat: hasLoc ? loc.latDegrees : null,
+      lng: hasLoc ? loc.lngDegrees : null,
+    );
+  }
+
+  static String _hexPrefix(Uint8List bytes, int n) {
+    final take = bytes.length < n ? bytes.length : n;
+    final sb = StringBuffer();
+    for (var i = 0; i < take; i++) {
+      sb.write(bytes[i].toRadixString(16).padLeft(2, '0'));
+    }
+    return sb.toString();
   }
 
   static int _safetyStateToUrgency(int safetyState) {

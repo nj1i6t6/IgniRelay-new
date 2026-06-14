@@ -282,3 +282,51 @@
 - review #3（live GPS accuracy 無來源，LocationService 僅存 LatLng）→ **已知，
   builder 支援 accuracyM 但 production 路徑無來源；補 LocationService 屬另刀範圍**
   （非 A3 blocker）。
+
+---
+
+## [2026-06-14] A3 DONE（4-5 HAZARD 換 typed payload）
+
+- repo/commit: IgniRelay @ `8c91657`（變更本體；本條目為後續 commit）
+- 執行者: 施工 AI（Claude，Owner 授權 session）
+- 開工前置: 讀 MASTER v1.3 §A3（v1.3 changelog：A–D 任務內容零變更，A3 與 v1.2 同）
+  + 本 STATUS 之 A2 DONE/ADDENDUM。僅做 A3，未碰 A4/A5/FieldSession，未改 MASTER。
+- 變更（皆在 `8c91657`）:
+  - `EventPublisherV2Facade.publishHazardMarker`：raw `payload` → 結構化參數
+    `(hazardType, severity, location?, description, isConfirmation, priority)`，內部
+    `HazardMarkerData.encode()`。description 超 `kDescriptionMaxLen`(280) → **同步拋
+    `ArgumentError`**（spec §9 HAZARD/ALERT ≤800B 之發佈端防護；publisher 既有
+    `PayloadBudgetV2` 仍為 wire 硬上限，defense-in-depth）。
+  - 新檔 `lib/app/services/hazard_type_codec.dart`：`HazardType` enum ↔ v1 read-model
+    字串（FIRE/FLOOD/…/ROADBLOCK/OTHER/UNKNOWN）單一來源，避免 sender/projector 漂移；
+    `fromV1String` 大小寫不敏感 + 別名，未知→`other`（不丟）。
+  - `event_publisher._dualWriteHazardMarker`：JSON shim → typed 呼叫（字串 `type` 經
+    codec → `HazardType`；lat/lng → `LocationEvidence(GPS/OBSERVER)`；移除 `dart:convert`）。
+  - `v2_inbound_projector._projectHazard`：`jsonDecode` shim → `HazardMarkerData.decode()`，
+    `HazardType` → v1 字串經 codec；投影 `Hazards_State` read-model 路徑不變。
+    **typed payload 無 radius 欄（reserved）→ read-model 用預設 200m；radius 僅留 v1 path。**
+  - 移除 `hazard_marker_v0_3_json_shim` 全部殘留（lib + test）。
+- 測試（新增/更新，皆綠）:
+  - `hazard_type_codec_test`（4）：enum↔字串 roundtrip、canonical 形、大小寫/別名、未知 fallback。
+  - `event_publisher_v2_facade_test`：`publishHazardMarker` typed payload roundtrip
+    （eventType=HAZARD/priority=ALERT/maxHops10、HazardMarkerData decode 對齊）+
+    超長 description `throwsArgumentError`（cap 邊界放行）。
+  - `event_publisher_dual_write_test`：spy 改收結構化參數，斷言 `HazardType.fire`/
+    severity/location（不再有 json shim 斷言）。
+  - `v2_inbound_projector_test`：hazard 測試改送 typed `HazardMarkerData` payload，
+    斷言 read-model `type='FLOOD'`/severity/lat + `hazardEvents` 流。
+  - `event_envelope_v2_test` 之 `HazardMarkerData` roundtrip 既有綠（未動 proto）。
+- DoD: D1 ✅（`grep -rn "json_shim" lib/ test/` → 0）/ D2 ✅ / D3 ✅ / D4 ✅
+- step 5（corpus 增補 typed hazard 樣本）: **依 §0.4 分工屬主理 AI（corpus·vectors
+  重生 + G7 同刀三端 parity），本刀不動 corpus。** wire envelope 格式未變、payload 對
+  corpus 不透明（`generate_wire_conformance_v1.dart` 零 hazard 參照；corpus 之
+  `event_type=50` 樣本 payload 為任意位元組，非 shim/typed），故 GATE-CONF-DART 不受
+  影響、D4 獨立滿足。建議主理 AI 後續以 generator 增補 typed HAZARD 樣本鎖跨端契約。
+- gates（G17 逐字執行，皆 exit 0）:
+  - `dart run tool/check_layers.dart --strict` → `[check_layers] ok — no boundary violations`
+  - `flutter analyze --no-fatal-infos --no-fatal-warnings` → `2 issues found`（2 既有
+    info：battery_optimization_guide），**0 errors**
+  - `flutter test --exclude-tags golden` → `00:13 +490 ~3: All tests passed!`（A2 後 +484 → +490）
+  - `flutter test test/conformance/wire_conformance_corpus_test.dart` → `+21 All tests passed!`
+- deviations: 無偏離 A3 範圍。step 5 corpus 增補移交主理 AI（理由如上）。
+- next: A4（4-6 SOS 自帶位置，OD-1）或 A6（殘留清理）；A4/A5 為主理 AI 任務。

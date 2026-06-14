@@ -22,8 +22,8 @@ import 'package:ignirelay_app/app/geo/village_geofence.dart';
 import 'package:ignirelay_app/platform/mesh_transport.dart';
 import 'package:ignirelay_app/app/mesh/transport_factory.dart';
 import 'package:ignirelay_app/platform/native_bridge.dart';
-import 'package:ignirelay_app/app/controllers/envelope_dispatcher_v2.dart';
 import 'package:ignirelay_app/app/controllers/message_publisher_v2.dart';
+import 'package:ignirelay_app/app/controllers/v2_pipeline_factory.dart';
 import 'package:ignirelay_app/app/proto/event_envelope_v2.dart';
 import 'package:ignirelay_app/app/services/adapter_health_monitor.dart';
 import 'package:ignirelay_app/app/services/author_rate_limiter.dart';
@@ -38,7 +38,9 @@ import 'package:ignirelay_app/app/services/v2_inbound_projector.dart';
 import 'package:ignirelay_app/app/controllers/event_publisher.dart';
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/controllers/presence_controller.dart';
+import 'package:ignirelay_app/app/controllers/active_field_controller.dart';
 import 'package:ignirelay_app/app/services/anon_identity.dart';
+import 'package:ignirelay_app/app/services/field_session_store.dart';
 import 'package:ignirelay_app/app/services/location_evidence_builder.dart';
 import 'package:ignirelay_app/app/controllers/ble_scan_controller.dart';
 import 'package:ignirelay_app/app/controllers/device_info_controller.dart';
@@ -143,6 +145,16 @@ final EventPublisherV2Facade _eventPublisherV2 = EventPublisherV2Facade(
   db: DatabaseHelper(),
 );
 
+/// v0.3 Phase 0b #4-7 (A5) — the active-field source. Constructed EAGERLY
+/// (empty) at module load so the Provider is non-null from the first frame
+/// (the debug field card reads + listens to it). Its persisted fields are
+/// loaded — and its shared FieldKeyStore populated — asynchronously inside
+/// [_startV2Bridge] via [ActiveFieldController.initialize], before the
+/// production dispatcher is built against that same key store.
+final ActiveFieldController _activeFieldController = ActiveFieldController(
+  store: FieldSessionStore(db: DatabaseHelper()),
+);
+
 /// Visible-for-test accessors so the 0d-gate test runner can drive the
 /// debug controller without reaching into module state. UI MUST NOT call
 /// these (the controllers are not Provider-wired; they are infrastructure).
@@ -163,16 +175,24 @@ Future<void> _startV2Bridge() async {
     final store = EnvelopeStoreV2(dbHelper);
     final trace = MeshTraceWriter(dbHelper);
     final rateLimiter = AuthorRateLimiter();
-    final dispatcher = EnvelopeDispatcherV2(
+
+    // A5 (4-7, 施工筆記 4) — load the persisted joined fields into the active
+    // -field controller BEFORE building the dispatcher: secure storage →
+    // re-derive (field_id, mac_key) → populate the shared FieldKeyStore. The
+    // dispatcher then enforces field-scope (§21.6) against that live store, and
+    // the publish facade signs every non-control envelope under the active
+    // field (no field joined → publish rejected with noField).
+    await _activeFieldController.initialize();
+    _eventPublisherV2.attachActiveField(_activeFieldController);
+
+    final dispatcher = createProductionDispatcherV2(
       store: store,
       trace: trace,
       rateLimiter: rateLimiter,
-      // v0.3 Stage 0c wave 3E — opt into spec-strict drop reasons. Tests
-      // default to OFF for legacy synthetic-HLC compatibility; production
-      // wires both ON. See EnvelopeDispatcherV2 docstrings for migration
-      // notes and the QA agent follow-up plan to flip defaults globally.
-      enableClockBasedExpiry: true,
-      enableMaxHopsOvercommit: true,
+      // A5 DoD D1 — field-scope check ON + the live, shared FieldKeyStore. The
+      // three production flags (clock expiry, max-hops, field-scope) are pinned
+      // inside the factory so they can't be silently flipped off (施工筆記 5).
+      fieldKeys: _activeFieldController.keyStore,
     );
     final publisher = MessagePublisherV2(
       keyPair: keyPair,
@@ -430,6 +450,14 @@ class _IgniRelayAppState extends State<IgniRelayApp> {
                   context.read<LocationService>().currentLocation,
             ),
           ),
+        ),
+        // #4-7 (A5) — active-field source. Long-lived module-level instance
+        // (loaded in [_startV2Bridge]); ListenableProvider (not
+        // ChangeNotifierProvider) so provider removal does NOT dispose the
+        // shared singleton — same rationale as EmergencyModeController above.
+        // The debug field card watches it; the publish facade reads it.
+        ListenableProvider<ActiveFieldController>.value(
+          value: _activeFieldController,
         ),
         Provider<MeshTransport>.value(
           value: widget.transport,

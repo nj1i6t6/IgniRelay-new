@@ -140,6 +140,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:ignirelay_app/app/controllers/active_field_controller.dart';
 import 'package:ignirelay_app/app/controllers/message_publisher_v2.dart';
 import 'package:ignirelay_app/app/crypto/field_auth_v2.dart';
 import 'package:ignirelay_app/app/proto/event_envelope_v2.dart';
@@ -147,22 +148,6 @@ import 'package:ignirelay_app/app/services/ble_v2_bridge.dart';
 import 'package:ignirelay_app/app/services/peer_capability_registry.dart';
 import 'package:ignirelay_app/app/crdt/hlc.dart';
 import 'package:ignirelay_app/app/db/database_helper.dart';
-
-/// TEST-ONLY transitional field-join secret (32 bytes, hex) for #4-4 (A2).
-///
-/// PRESENCE must ride a non-zero `field_id`, but the real field-join flow does
-/// not exist until A5. As an A2-only bridge, the facade derives a fixed
-/// field_id / field_mac_key from this constant so PRESENCE envelopes are
-/// field-scoped end-to-end (the dispatcher field-scope check stays OFF in
-/// production for now). Tests import this to build a matching
-/// `FieldKeyStore.fromSecrets` for the receive side.
-///
-/// **A5 removes this entirely** (`grep -rn "kDebugFieldJoinSecretHex" lib/`
-/// must be 0 after A5). It is NOT a real field secret — do not use it for any
-/// production field membership.
-@visibleForTesting
-const String kDebugFieldJoinSecretHex =
-    'a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2';
 
 /// Per-peer outcome aggregated into the broadcast summary.
 class PeerSendOutcome {
@@ -201,18 +186,33 @@ class BroadcastOutcome {
   /// for trace inspection. Always 0 unless `queued`.
   final int pendingDepth;
 
+  /// True when the publish was REJECTED because no field is joined / active
+  /// (A5 §21.6 — non-control envelopes must ride a joined field). The publish
+  /// was NOT queued and NOT sent; the UI should prompt the user to join a
+  /// field. Control frames (HELLO) are exempt and never set this.
+  final bool noField;
+
   const BroadcastOutcome({
     required this.anyAccepted,
     required this.attempted,
     required this.outcomes,
     this.queued = false,
     this.pendingDepth = 0,
+    this.noField = false,
   });
 
   factory BroadcastOutcome.noActivePeers() => const BroadcastOutcome(
         anyAccepted: false,
         attempted: 0,
         outcomes: [],
+      );
+
+  /// No joined / active field — non-control publish rejected (A5). Not queued.
+  factory BroadcastOutcome.noField() => const BroadcastOutcome(
+        anyAccepted: false,
+        attempted: 0,
+        outcomes: [],
+        noField: true,
       );
 
   factory BroadcastOutcome.queued(int depth) => BroadcastOutcome(
@@ -248,11 +248,15 @@ class _PendingPublish {
   final DateTime enqueuedAt;
   final Set<String> deliveredTo = <String>{};
 
-  /// Field-membership context this entry publishes under (#4-4). `null` when
-  /// the entry carries no field (control / legacy default → zero field_id).
-  /// NOTE: deliberately NOT persisted to `Outbox_V2` in A2 (that schema
-  /// column lands in A5); a hydrated entry therefore re-drains with no field
-  /// context (zero field_id). Acceptable for the short-lived A2 debug seam.
+  /// Field-membership context this entry publishes under. `null` when the
+  /// entry carries no field (control / no-controller default → zero field_id).
+  ///
+  /// `fieldId` (public) IS persisted to `Outbox_V2.field_id` (A5) so a queued
+  /// envelope re-drains under the field it was ENQUEUED in, even across an
+  /// active-field switch or a process restart (施工筆記 3). `fieldMacKey` is
+  /// secret-derived and is NEVER persisted; at drain it is re-resolved from the
+  /// `ActiveFieldController` by `fieldId` (and the entry is dropped if that
+  /// field has since been left).
   final Uint8List? fieldId;
   final Uint8List? fieldMacKey;
 
@@ -289,6 +293,14 @@ class EventPublisherV2Facade {
 
   final PeerCapabilityRegistry _registry;
   BleV2Bridge? _bridge;
+
+  /// The active-field source (A5). Supplies the (field_id, mac_key) every
+  /// non-control publish rides under, and re-resolves a queued entry's mac key
+  /// by its persisted field_id at drain time. `null` in unit tests / pre-A5
+  /// wiring → publishes carry the zero field_id (legacy behaviour); production
+  /// always attaches one via [attachActiveField].
+  ActiveFieldController? _activeField;
+
   StreamSubscription<PeerCapabilityState>? _registrySub;
   final ListQueue<_PendingPublish> _pending = ListQueue<_PendingPublish>();
   final DateTime Function() _now;
@@ -356,6 +368,13 @@ class EventPublisherV2Facade {
   /// the queue and will resume drain once `attachBridge` is called again.
   void detachBridge() {
     _bridge = null;
+  }
+
+  /// Attach the active-field source (A5). Wired once from `_startV2Bridge`
+  /// after the persisted fields have loaded. Until attached, the facade
+  /// publishes with the zero field_id (the pre-A5 / unit-test default).
+  void attachActiveField(ActiveFieldController controller) {
+    _activeField = controller;
   }
 
   Future<void> dispose() async {
@@ -505,55 +524,45 @@ class EventPublisherV2Facade {
   /// still sent); [batteryHint] is 0..100 (0 == absent).
   ///
   /// Priority is NORMAL (spec §6 — footprints never claim a higher slot),
-  /// TTL is 4 hours and max_hops is 4 (spec §11.2 PRESENCE). The envelope
-  /// rides the A2 debug field context so it is field-scoped end-to-end.
+  /// TTL is 4 hours and max_hops is 4 (spec §11.2 PRESENCE). Like every
+  /// non-control publish it rides the active field (A5); with no field joined
+  /// it returns [BroadcastOutcome.noField].
   Future<BroadcastOutcome> publishPresence({
     required Uint8List anonUserId,
     LocationEvidence? location,
     int? batteryHint,
-  }) async {
+  }) {
     final data = PresenceData(
       anonUserId: anonUserId,
       location: location ?? const LocationEvidence(),
       batteryHint: batteryHint ?? 0,
     );
-    final field = await _debugFieldContext();
     return _broadcast(
       eventType: EventTypeV2.presence,
       priority: PriorityV2.normal,
       payload: data.encode(),
       ttlOffset: const Duration(hours: 4), // §11.2 PRESENCE default
       maxHops: EventTypeV2.maxHopsDefault(EventTypeV2.presence) ?? 4,
-      fieldId: field.fieldId,
-      fieldMacKey: field.fieldMacKey,
     );
   }
 
-  // ── A2 debug field seam (removed in A5) ────────────────────────────────
+  // ── Active-field resolution (A5) ───────────────────────────────────────
   //
-  // Derives a fixed (field_id, field_mac_key) from [kDebugFieldJoinSecretHex]
-  // so PRESENCE rides a non-zero field_id before the real join flow (A5)
-  // exists. Cached after first derivation. A5 deletes this whole block.
+  // Every non-control publish rides the single active field's (field_id,
+  // mac_key). With no controller attached (unit tests / pre-A5 wiring) the
+  // publish falls back to the zero field_id. With a controller attached but no
+  // field joined, a non-control publish is REJECTED (noField) — the dispatcher
+  // field-scope check is ON in production, so a zero-field envelope would be
+  // dropped by every peer anyway. Control frames (HELLO) never flow through
+  // this facade, but the event-type guard keeps the rule explicit.
 
-  _DebugFieldContext? _debugField;
-
-  Future<_DebugFieldContext> _debugFieldContext() async {
-    final cached = _debugField;
-    if (cached != null) return cached;
-    final secret = _hexToBytes(kDebugFieldJoinSecretHex);
-    final fieldId = await FieldAuthV2.deriveFieldId(secret);
-    final macKey = await FieldAuthV2.deriveFieldMacKey(secret);
-    final ctx = _DebugFieldContext(fieldId: fieldId, fieldMacKey: macKey);
-    _debugField = ctx;
-    return ctx;
-  }
-
-  static Uint8List _hexToBytes(String hex) {
-    final out = Uint8List(hex.length ~/ 2);
-    for (var i = 0; i < out.length; i++) {
-      out[i] = int.parse(hex.substring(i * 2, i * 2 + 2), radix: 16);
-    }
-    return out;
+  _FieldResolution _resolvePublishField(int eventType) {
+    final controller = _activeField;
+    if (controller == null) return _FieldResolution.zero;
+    if (FieldAuthV2.isControlEventType(eventType)) return _FieldResolution.zero;
+    final active = controller.active;
+    if (active == null) return _FieldResolution.noField;
+    return _FieldResolution.field(active.fieldId, active.macKey);
   }
 
   // ── Core broadcast loop ───────────────────────────────────────────────
@@ -564,9 +573,16 @@ class EventPublisherV2Facade {
     required Uint8List payload,
     required Duration ttlOffset,
     required int maxHops,
-    Uint8List? fieldId,
-    Uint8List? fieldMacKey,
   }) async {
+    final field = _resolvePublishField(eventType);
+    if (field.rejected) {
+      // No joined / active field — reject before allocating an envelope_id or
+      // touching the queue (A5 §21.6). UI prompts the user to join a field.
+      return BroadcastOutcome.noField();
+    }
+    final fieldId = field.fieldId;
+    final fieldMacKey = field.macKey;
+
     final hlc = HLC.now();
     final createdAtHlc =
         HlcTimestampV2(msSinceEpoch: hlc.timestamp, counter: hlc.counter);
@@ -727,6 +743,10 @@ class EventPublisherV2Facade {
               .delete('Outbox_V2', where: 'id = ?', whereArgs: [id]);
           continue;
         }
+        // A5 — re-hydrate the persisted field_id (public). The mac key is NOT
+        // persisted; drain re-resolves it from the ActiveFieldController by
+        // this field_id (dropping the entry if the field has been left).
+        final rawFieldId = row['field_id'];
         final entry = _PendingPublish(
           envelopeId: Uint8List.fromList(row['envelope_id'] as List<int>),
           eventType: row['event_type'] as int,
@@ -742,6 +762,8 @@ class EventPublisherV2Facade {
           ),
           maxHops: row['max_hops'] as int,
           enqueuedAt: enqueuedAt,
+          fieldId:
+              rawFieldId == null ? null : Uint8List.fromList(rawFieldId as List<int>),
           outboxRowId: row['id'] as int,
         );
         _pending.addLast(entry);
@@ -779,6 +801,10 @@ class EventPublisherV2Facade {
         'expires_at_hlc_ctr': entry.expiresAtHlc.counter,
         'max_hops': entry.maxHops,
         'enqueued_at_ms': entry.enqueuedAt.millisecondsSinceEpoch,
+        // A5 (施工筆記 3) — persist the PUBLIC field_id so a restart-driven
+        // re-drain re-binds to the field this entry was enqueued under. The
+        // secret-derived mac key is NOT persisted; it is re-resolved at drain.
+        'field_id': entry.fieldId,
       });
       entry.outboxRowId = id;
     } catch (e) {
@@ -845,6 +871,30 @@ class EventPublisherV2Facade {
       final remaining = <_PendingPublish>[];
       while (_pending.isNotEmpty) {
         final entry = _pending.removeFirst();
+
+        // A5 (施工筆記 3) — re-bind the entry to the field it was ENQUEUED
+        // under (entry.fieldId), re-resolving its mac key from the controller.
+        // This signs a queued envelope under its original field even if the
+        // active field changed, and drops it if that field has been LEFT since
+        // enqueue (a hydrated entry also arrives here with mac key == null).
+        var fieldMacKey = entry.fieldMacKey;
+        final entryFieldId = entry.fieldId;
+        final controller = _activeField;
+        if (controller != null &&
+            entryFieldId != null &&
+            !FieldAuthV2.isZeroFieldId(entryFieldId)) {
+          final resolved = controller.macKeyForFieldId(entryFieldId);
+          if (resolved == null) {
+            debugPrint(
+              '[EventPublisherV2Facade] dropping queued event_type='
+              '${entry.eventType}: field left since enqueue',
+            );
+            unawaited(_deleteOutboxRow(entry));
+            continue;
+          }
+          fieldMacKey = resolved;
+        }
+
         final targets = activePeers
             .where((p) => !entry.deliveredTo.contains(p))
             .toList(growable: false);
@@ -863,7 +913,7 @@ class EventPublisherV2Facade {
           expiresAtHlc: entry.expiresAtHlc,
           maxHops: entry.maxHops,
           fieldId: entry.fieldId,
-          fieldMacKey: entry.fieldMacKey,
+          fieldMacKey: fieldMacKey,
         );
         for (final o in outcome.outcomes) {
           if (o.sent) entry.deliveredTo.add(o.peerId);
@@ -888,9 +938,20 @@ class EventPublisherV2Facade {
   }
 }
 
-/// A2-only derived field context (field_id + field_mac_key). Removed in A5.
-class _DebugFieldContext {
-  final Uint8List fieldId;
-  final Uint8List fieldMacKey;
-  const _DebugFieldContext({required this.fieldId, required this.fieldMacKey});
+/// Result of resolving which field a publish rides under (A5).
+///   • [rejected] — a controller is attached but no field is joined/active;
+///     the non-control publish is dropped with [BroadcastOutcome.noField].
+///   • both ids `null`, not rejected — zero field_id (no controller / control
+///     frame): the pre-A5 / unit-test fallback.
+///   • both ids set — the active field's (field_id, mac_key).
+class _FieldResolution {
+  final bool rejected;
+  final Uint8List? fieldId;
+  final Uint8List? macKey;
+  const _FieldResolution._(this.rejected, this.fieldId, this.macKey);
+
+  static const _FieldResolution noField = _FieldResolution._(true, null, null);
+  static const _FieldResolution zero = _FieldResolution._(false, null, null);
+  factory _FieldResolution.field(Uint8List id, Uint8List key) =>
+      _FieldResolution._(false, id, key);
 }

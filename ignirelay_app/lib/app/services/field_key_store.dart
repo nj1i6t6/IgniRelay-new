@@ -6,11 +6,13 @@
 // `field_id`, with the derived `field_mac_key` precomputed so the dispatcher's
 // per-envelope membership check (`FieldAuthV2.verifyFieldMac`) is synchronous.
 //
-// The join/rotation flow that supplies `field_join_secret`s is out of scope for
-// 4-3 (a later phase). Production wires an empty store for now and keeps the
-// dispatcher's field-scope check OFF until that flow exists (an empty store with
-// the check ON would drop every non-control envelope). Tests build a populated
-// store via [fromSecrets] and flip the check ON to exercise §21.6.
+// The join/rotation flow that supplies `field_join_secret`s lands in A5
+// (FieldSessionStore + ActiveFieldController). Production now wires a store
+// populated from the persisted joined fields and flips the dispatcher's
+// field-scope check ON (spec §21.6). The store is MUTABLE so a runtime join /
+// leave (A5 debug card, A7 QR) updates the SAME instance the dispatcher holds
+// by reference — the receive side starts/stops accepting that field's
+// envelopes immediately, without rebuilding the dispatcher.
 
 import 'dart:typed_data';
 
@@ -45,6 +47,20 @@ class FieldKeyStore {
   Uint8List? macKeyFor(Uint8List fieldId) => _macKeyByFieldIdHex[_hex(fieldId)];
 
   int get joinedFieldCount => _macKeyByFieldIdHex.length;
+
+  /// Add a joined field from its ALREADY-DERIVED `field_id` + `field_mac_key`
+  /// (A5 runtime join). The caller — [ActiveFieldController] — derives both
+  /// once and shares them here so we don't re-run HKDF. Idempotent: re-adding
+  /// the same field overwrites with the identical mac key.
+  void addDerived(Uint8List fieldId, Uint8List macKey) {
+    _macKeyByFieldIdHex[_hex(fieldId)] = Uint8List.fromList(macKey);
+  }
+
+  /// Remove a joined field by its lowercase `field_id` hex (A5 leave-field).
+  /// No-op when the field was not joined.
+  void removeByHex(String fieldIdHex) {
+    _macKeyByFieldIdHex.remove(fieldIdHex.toLowerCase());
+  }
 
   static String _hex(List<int> bytes) {
     final sb = StringBuffer();

@@ -21,6 +21,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'package:ignirelay_app/app/controllers/active_field_controller.dart';
 import 'package:ignirelay_app/app/controllers/ble_scan_controller.dart';
 import 'package:ignirelay_app/app/controllers/device_info_controller.dart';
 import 'package:ignirelay_app/app/controllers/event_publisher.dart';
@@ -39,6 +40,7 @@ import 'package:ignirelay_app/app/services/anon_identity.dart';
 import 'package:ignirelay_app/app/services/event_decoder.dart';
 import 'package:ignirelay_app/app/services/event_publisher_v2_facade.dart';
 import 'package:ignirelay_app/app/services/event_store.dart';
+import 'package:ignirelay_app/app/services/field_session_store.dart';
 import 'package:ignirelay_app/app/services/location_evidence_builder.dart';
 import 'package:ignirelay_app/app/services/location_service.dart';
 import 'package:ignirelay_app/app/services/peer_capability_registry.dart';
@@ -123,6 +125,13 @@ Widget _wrapWithRootProviders(Widget child) {
           ),
         ),
       ),
+      // #4-7 (A5) — active-field source (constructed, not initialized, in this
+      // smoke wiring; reading it from context is the gate).
+      ListenableProvider<ActiveFieldController>(
+        create: (_) => ActiveFieldController(
+          store: FieldSessionStore(db: DatabaseHelper()),
+        ),
+      ),
       Provider<MeshTransport>.value(
         value: TransportFactory.create(),
       ),
@@ -164,6 +173,7 @@ void main() {
         reads[TierManager] = ctx.read<TierManager>();
         reads[EventStream] = ctx.read<EventStream>();
         reads[PresenceController] = ctx.read<PresenceController>();
+        reads[ActiveFieldController] = ctx.read<ActiveFieldController>();
         reads[MeshTransport] = ctx.read<MeshTransport>();
       }),
     ));

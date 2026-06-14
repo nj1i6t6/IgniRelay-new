@@ -36,6 +36,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:cryptography/cryptography.dart';
 import 'package:ignirelay_app/app/crypto/canonical_encoder_v2.dart';
 import 'package:ignirelay_app/app/crypto/field_auth_v2.dart';
@@ -170,6 +171,18 @@ class EnvelopeDispatcherV2 {
         _fieldKeys = fieldKeys,
         _enableFieldScopeCheck = enableFieldScopeCheck,
         _now = now ?? (() async => DateTime.now());
+
+  /// Visible-for-tests: the production-config guard (A5 施工筆記 5) asserts the
+  /// field-scope + field-mac membership check (§21.6) is ON so it can't be
+  /// silently flipped off in `createProductionDispatcherV2`.
+  @visibleForTesting
+  bool get isFieldScopeCheckEnabled => _enableFieldScopeCheck;
+
+  @visibleForTesting
+  bool get isClockBasedExpiryEnabled => _enableClockBasedExpiry;
+
+  @visibleForTesting
+  bool get isMaxHopsOvercommitEnabled => _enableMaxHopsOvercommit;
 
   Future<void> dispose() async {
     await _outcomes.close();

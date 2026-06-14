@@ -4,16 +4,19 @@ import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ignirelay_app/app/controllers/active_field_controller.dart';
 import 'package:ignirelay_app/app/controllers/envelope_dispatcher_v2.dart';
 import 'package:ignirelay_app/app/controllers/message_publisher_v2.dart';
 import 'package:ignirelay_app/app/crypto/field_auth_v2.dart';
 import 'package:ignirelay_app/app/db/database_helper.dart';
 import 'package:ignirelay_app/app/proto/event_envelope_v2.dart';
+import 'package:ignirelay_app/app/services/anon_identity.dart' show SecureKvStore;
 import 'package:ignirelay_app/app/services/author_rate_limiter.dart';
 import 'package:ignirelay_app/app/services/ble_v2_bridge.dart';
 import 'package:ignirelay_app/app/services/envelope_store_v2.dart';
 import 'package:ignirelay_app/app/services/event_publisher_v2_facade.dart';
 import 'package:ignirelay_app/app/services/field_key_store.dart';
+import 'package:ignirelay_app/app/services/field_session_store.dart';
 import 'package:ignirelay_app/app/services/mesh_trace_writer.dart';
 import 'package:ignirelay_app/app/services/peer_capability_registry.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -350,7 +353,7 @@ void main() {
         reason: 'TRAPPED should floor at SOS_RED');
   });
 
-  test('publishPresence rides PRESENCE wire spec + decodable payload + field',
+  test('publishPresence rides the ACTIVE field (real field_id + mac key)',
       () async {
     final registry = PeerCapabilityRegistry(
       helloTimeout: const Duration(seconds: 5),
@@ -360,9 +363,13 @@ void main() {
       registry: registry,
       bridge: bridge,
     );
+    final secret = Uint8List.fromList(List<int>.filled(32, 0xA5));
+    final fieldCtrl = await _makeFieldController(secret: secret);
+    facade.attachActiveField(fieldCtrl);
     addTearDown(() async {
       await facade.dispose();
       await registry.dispose();
+      fieldCtrl.dispose();
     });
     _markPeerActive(registry, 'PR:01');
 
@@ -401,22 +408,76 @@ void main() {
     expect(decoded.location.latE7, 250339805); // round-to-nearest trap value
     expect(decoded.location.lngE7, 1215654177);
 
-    // Field context: non-zero field_id derived from the A2 debug secret +
-    // a 32-byte mac key (so the envelope is field-scoped, not zero-field).
+    // Rides the ACTIVE field's real field_id (non-zero) + 32-byte mac key.
     expect(call.fieldId, isNotNull);
     expect(call.fieldId!.length, FieldAuthV2.fieldIdBytes);
     expect(FieldAuthV2.isZeroFieldId(call.fieldId!), isFalse);
     expect(call.fieldMacKey, isNotNull);
     expect(call.fieldMacKey!.length, 32);
 
-    final expectedSecret = _hexToBytes(kDebugFieldJoinSecretHex);
-    final expectedFieldId = await FieldAuthV2.deriveFieldId(expectedSecret);
+    final expectedFieldId = await FieldAuthV2.deriveFieldId(secret);
     expect(call.fieldId!, orderedEquals(expectedFieldId));
   });
 
+  test('non-control publish with no joined field returns noField (not queued)',
+      () async {
+    final registry = PeerCapabilityRegistry(
+      helloTimeout: const Duration(seconds: 5),
+    );
+    final bridge = await _makeRecordingBridge(registry);
+    final facade = EventPublisherV2Facade(
+      registry: registry,
+      bridge: bridge,
+    );
+    final fieldCtrl = await _makeFieldController(); // no field joined
+    facade.attachActiveField(fieldCtrl);
+    addTearDown(() async {
+      await facade.dispose();
+      await registry.dispose();
+      fieldCtrl.dispose();
+    });
+    _markPeerActive(registry, 'NF:01');
+
+    final outcome = await facade.publishPresence(anonUserId: Uint8List(16));
+    expect(outcome.noField, isTrue,
+        reason: 'no joined/active field → reject, not queue (A5 §21.6)');
+    expect(outcome.queued, isFalse);
+    expect(facade.pendingQueueDepth, 0);
+    expect(bridge.invocations, isEmpty);
+  });
+
+  test('queued envelope persists its active field_id to Outbox_V2 (#4-7)',
+      () async {
+    final db = DatabaseHelper();
+    final registry = PeerCapabilityRegistry(
+      helloTimeout: const Duration(seconds: 5),
+    );
+    final secret = Uint8List.fromList(List<int>.filled(32, 0x5A));
+    final facade = EventPublisherV2Facade(registry: registry, db: db);
+    final fieldCtrl = await _makeFieldController(secret: secret);
+    facade.attachActiveField(fieldCtrl);
+    addTearDown(() async {
+      await facade.dispose();
+      await registry.dispose();
+      fieldCtrl.dispose();
+    });
+
+    // No active peer → queued; the Outbox row must carry the active field_id so
+    // a restart-driven re-drain re-binds to the same field (施工筆記 3).
+    final queued = await facade.publishPresence(anonUserId: Uint8List(16));
+    expect(queued.queued, isTrue);
+
+    final rows = await _waitForOutboxRowCount(db, 1);
+    final expectedFieldId = await FieldAuthV2.deriveFieldId(secret);
+    expect(
+      Uint8List.fromList(rows.single['field_id'] as List<int>),
+      orderedEquals(expectedFieldId),
+    );
+  });
+
   test(
-      'A2 hardening — PRESENCE final wire envelope carries a real, '
-      'receiver-verifiable field_mac (derived from the debug secret)',
+      'wire field_mac is real + receiver-verifiable: member accepts, other '
+      'field rejects',
       () async {
     final registry = PeerCapabilityRegistry(
       helloTimeout: const Duration(seconds: 5),
@@ -459,8 +520,8 @@ void main() {
       notifyEventToPeer: (_, __) async => true,
     );
 
-    // The SAME field context the facade derives from the A2 debug secret.
-    final secret = _hexToBytes(kDebugFieldJoinSecretHex);
+    // A field context derived from a local secret (no debug-secret constant).
+    final secret = Uint8List.fromList(List<int>.filled(32, 0xA5));
     final fieldId = await FieldAuthV2.deriveFieldId(secret);
     final macKey = await FieldAuthV2.deriveFieldMacKey(secret);
 
@@ -835,12 +896,29 @@ Future<_RecordingBleV2Bridge> _makeRecordingBridge(
 Uint8List _filledEnvelopeId(int byte) =>
     Uint8List.fromList(List<int>.filled(16, byte));
 
-Uint8List _hexToBytes(String hex) {
-  final out = Uint8List(hex.length ~/ 2);
-  for (var i = 0; i < out.length; i++) {
-    out[i] = int.parse(hex.substring(i * 2, i * 2 + 2), radix: 16);
+/// Build an [ActiveFieldController] backed by an in-memory secure store + the
+/// shared in-memory DB. When [secret] is given, joins it as the active field.
+Future<ActiveFieldController> _makeFieldController({List<int>? secret}) async {
+  final controller = ActiveFieldController(
+    store: FieldSessionStore(
+      db: DatabaseHelper(),
+      secureStore: _InMemorySecureKv(),
+    ),
+  );
+  if (secret != null) {
+    await controller.joinBySecret(secret, displayName: 'test-field');
   }
-  return out;
+  return controller;
+}
+
+class _InMemorySecureKv implements SecureKvStore {
+  final Map<String, String> _m = <String, String>{};
+  @override
+  Future<String?> read(String key) async => _m[key];
+  @override
+  Future<void> write(String key, String value) async => _m[key] = value;
+  @override
+  Future<void> delete(String key) async => _m.remove(key);
 }
 
 Future<List<Map<String, Object?>>> _queryOutboxRows(DatabaseHelper db) async {

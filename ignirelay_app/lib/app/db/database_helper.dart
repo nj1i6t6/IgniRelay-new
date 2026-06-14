@@ -41,7 +41,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 12,
+      version: 13,
       onConfigure: (db) async {
         await db.rawQuery('PRAGMA journal_mode=WAL');
       },
@@ -264,6 +264,23 @@ class DatabaseHelper {
       await db.execute('DROP TABLE IF EXISTS Outbox_V2');
       await _createOutboxV2Table(db);
     }
+    if (oldVersion < 13) {
+      // v13 (Phase 0b #4-7 / A5) — field-scope production enablement.
+      //   • Field_Sessions: persisted joined-field metadata. The secret
+      //     (`field_join_secret`) is NOT stored here — it lives in
+      //     flutter_secure_storage (FieldSessionStore). Only the public
+      //     field_id_hex + display name + joined time + optional cloud_base_url
+      //     live in SQLite (A5 DoD: no plaintext secret in SQLite).
+      //   • Outbox_V2 gains a `field_id` column so a queued envelope re-drains
+      //     under the field it was ENQUEUED in, not the currently-active one
+      //     (A5 施工筆記 3 — switching active field must not re-sign old queued
+      //     events to the new field). Outbox_V2 is ephemeral by contract
+      //     (bounded queue + TTL/cap drop), so we drop + rebuild rather than
+      //     ALTER — same approach as the v11 / v12 blocks above.
+      await _createFieldSessionsTable(db);
+      await db.execute('DROP TABLE IF EXISTS Outbox_V2');
+      await _createOutboxV2Table(db);
+    }
   }
 
   /// True when a table named [name] exists in the database.
@@ -440,13 +457,34 @@ class DatabaseHelper {
         expires_at_hlc_ms   INTEGER NOT NULL,
         expires_at_hlc_ctr  INTEGER NOT NULL,
         max_hops            INTEGER NOT NULL,
-        enqueued_at_ms      INTEGER NOT NULL
+        enqueued_at_ms      INTEGER NOT NULL,
+        field_id            BLOB
       )
     ''');
     await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_outbox_v2_enqueued ON Outbox_V2 (enqueued_at_ms)');
     await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_outbox_v2_expires ON Outbox_V2 (expires_at_hlc_ms)');
+  }
+
+  /// v0.3 Phase 0b #4-7 (A5) — joined-field session metadata.
+  ///
+  /// The `field_join_secret` is intentionally ABSENT here: it lives in
+  /// flutter_secure_storage (see [FieldSessionStore]), and the HKDF-derived
+  /// mac key is never persisted at all (re-derived on load). This table holds
+  /// only NON-secret metadata so the debug / field UI can enumerate joined
+  /// fields cheaply. `field_id_hex` (= SHA-256(secret)[0..15], hex) is the
+  /// public scope label and PK. `cloud_base_url` (v1.2) is written by A7 (QR
+  /// segment 3, `https://` only) and unused before Stage E.
+  Future<void> _createFieldSessionsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS Field_Sessions (
+        field_id_hex   TEXT PRIMARY KEY,
+        display_name   TEXT NOT NULL,
+        joined_at_ms   INTEGER NOT NULL,
+        cloud_base_url TEXT
+      )
+    ''');
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -583,6 +621,8 @@ class DatabaseHelper {
     await _createEnvelopeV2Tables(db);
     // v0.3 Stage 0c wave 3F — same for Outbox_V2.
     await _createOutboxV2Table(db);
+    // v0.3 Phase 0b #4-7 (A5) — joined-field session metadata.
+    await _createFieldSessionsTable(db);
   }
 
   // --- DAO 方法 ---

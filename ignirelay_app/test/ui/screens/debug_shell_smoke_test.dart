@@ -11,6 +11,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'dart:typed_data';
+
+import 'package:ignirelay_app/app/controllers/active_field_controller.dart';
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/controllers/mesh_runtime_controller.dart';
 import 'package:ignirelay_app/app/controllers/presence_controller.dart';
@@ -20,6 +23,7 @@ import 'package:ignirelay_app/app/services/anon_identity.dart';
 import 'package:ignirelay_app/app/services/event_decoder.dart';
 import 'package:ignirelay_app/app/services/event_publisher_v2_facade.dart';
 import 'package:ignirelay_app/app/services/event_store.dart';
+import 'package:ignirelay_app/app/services/field_session_store.dart';
 import 'package:ignirelay_app/app/services/location_evidence_builder.dart';
 import 'package:ignirelay_app/app/services/peer_capability_registry.dart';
 import 'package:ignirelay_app/ui/shell/debug_shell.dart';
@@ -36,7 +40,11 @@ class _FakeKvStore implements SecureKvStore {
   Future<void> delete(String key) async => _m.remove(key);
 }
 
-Widget _wrap(Widget child, PresenceController presence) {
+Widget _wrap(
+  Widget child,
+  PresenceController presence,
+  ActiveFieldController field,
+) {
   return MultiProvider(
     providers: [
       Provider<MeshRuntimeController>(
@@ -55,6 +63,7 @@ Widget _wrap(Widget child, PresenceController presence) {
         dispose: (_, s) => s.dispose(),
       ),
       Provider<PresenceController>.value(value: presence),
+      ListenableProvider<ActiveFieldController>.value(value: field),
     ],
     child: MaterialApp(home: child),
   );
@@ -82,17 +91,39 @@ void main() {
     );
   }
 
-  testWidgets('DebugShell renders mesh control, send actions, event log',
+  Future<ActiveFieldController> makeField({bool joined = false}) async {
+    final c = ActiveFieldController(
+      store: FieldSessionStore(db: DatabaseHelper(), secureStore: _FakeKvStore()),
+    );
+    if (joined) {
+      await c.joinBySecret(
+        Uint8List.fromList(List<int>.filled(32, 0x7A)),
+        displayName: '測試場域',
+      );
+    }
+    return c;
+  }
+
+  testWidgets('DebugShell renders mesh control, field card, actions, log',
       (tester) async {
+    // Tall surface so all five lazily-built ListView cards lay out (the new
+    // field card otherwise pushes the events-log card below the fold).
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     final registry = PeerCapabilityRegistry();
     final facade = EventPublisherV2Facade(registry: registry);
+    final field = await makeField(); // no field joined
     addTearDown(() async {
       await facade.dispose();
       await registry.dispose();
+      field.dispose();
     });
 
     await tester.pumpWidget(
-      _wrap(const DebugShell(), makePresence(registry, facade)),
+      _wrap(const DebugShell(), makePresence(registry, facade), field),
     );
     await tester.pump();
 
@@ -103,6 +134,12 @@ void main() {
     // BLE mesh toggle button（未注入 transport → 顯示「啟動」）
     expect(find.byType(FilledButton), findsOneWidget);
     expect(find.text('啟動'), findsOneWidget);
+
+    // #4-7 field card renders; no field joined → prompt + join buttons.
+    expect(find.text('場域（field-scope）'), findsOneWidget);
+    expect(find.textContaining('尚未加入場域'), findsWidgets);
+    expect(find.text('以代碼加入'), findsOneWidget);
+    expect(find.text('產生新場域'), findsOneWidget);
 
     // PRESENCE (real) + SOS (still placeholder) buttons
     expect(find.text('發 PRESENCE'), findsOneWidget);
@@ -115,17 +152,20 @@ void main() {
     expect(find.text('事件 log（最新 50）'), findsOneWidget);
   });
 
-  testWidgets('PRESENCE button publishes (not the _todoWire placeholder)',
+  testWidgets('PRESENCE button publishes to the active field (queued, no peer)',
       (tester) async {
     final registry = PeerCapabilityRegistry();
     final facade = EventPublisherV2Facade(registry: registry);
+    final field = await makeField(joined: true);
+    facade.attachActiveField(field); // production wiring: facade rides active field
     addTearDown(() async {
       await facade.dispose();
       await registry.dispose();
+      field.dispose();
     });
 
     await tester.pumpWidget(
-      _wrap(const DebugShell(), makePresence(registry, facade)),
+      _wrap(const DebugShell(), makePresence(registry, facade), field),
     );
     await tester.pump();
 
@@ -133,9 +173,9 @@ void main() {
     await tester.pump(); // run the async publish + setState
     await tester.pump(const Duration(milliseconds: 50));
 
-    // It must NOT be the old placeholder snackbar.
+    // It must NOT be the old placeholder snackbar, nor the no-field prompt.
     expect(find.textContaining('尚未接線'), findsNothing);
-    // No active peer / bridge → the publish is queued; the shell says so.
+    // Active field + no peer → queued; the shell says so.
     expect(find.textContaining('PRESENCE'), findsWidgets);
     expect(find.textContaining('佇列'), findsOneWidget);
 

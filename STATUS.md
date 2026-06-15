@@ -566,3 +566,57 @@
   A6 已證綠）。
 - deviations: 無。
 - next: A7（場域加入 UX：QR / 代碼）。
+
+---
+
+## [2026-06-15] A7 DONE（場域加入 UX：QR / 代碼）
+
+- repo/commit: IgniRelay @ `bdb09a1`
+- 執行者: Claude（主理 AI）
+- 範圍: MASTER_EXECUTION_PLAN A7 步驟 1–4（UI 任務；開工前讀 DESIGN_LANGUAGE.md）。
+- 變更:
+  - **QR 編解碼器**（純 Dart；A7 DoD D1 可自動化核心）`lib/app/services/field_qr_codec.dart`：
+    IGNI1 五段式 join code（凍結格式）`IGNI1:<base64url(secret32B)>:<urlencode(name)>
+    [:<urlencode(https-cloud-url)>[:<urlencode(staff_token)>]]`。段0 前綴必驗；段1→恰 32B；
+    段3 僅收 `https://`（其餘 badCloudUrl 拒）；有段4 無/空段3→staffWithoutCloud 拒；
+    **未知第 5+ 段一律忽略不報錯（前向相容鐵則）**；三段舊碼相容。`tryDecode` 不 throw，
+    回傳 typed `FieldQrError`（D2 不 crash）。urlencode 確保段內無裸 `:`。
+  - **場域頁** `lib/ui/screens/field/field_screen.dart`（447 行，≤500 UI 規則）：作用場域
+    摘要 / 空狀態、多場域清單 + 切換作用場域、離開（二次確認 destructive）、建立新場域→
+    顯 QR、掃碼加入、輸入代碼（**A5 hex 對話框升級**——吃 IGNI1 代碼或 64-hex）。
+  - **QR 顯示 sheet** `field_qr_sheet.dart`（拆出以守行數規則）：dark-on-light 以 token
+    維持可掃；raw code（含 secret）僅 `kDebugMode` 顯示，永不入剪貼簿 / log。
+  - **掃碼頁** `field_scan_screen.dart`：mobile_scanner，掃到首個合法 IGNI1 即 pop(raw)；
+    非法 / 非本 app 的碼只提示續掃不 crash；相機不可用→errorBuilder 提示改用代碼。
+  - **debug shell** 場域卡片精簡為狀態 + 「場域管理」入口推 FieldScreen；移除被取代的
+    A5 內嵌 hex 對話框 / 產生鈕 / hex helpers（升級而非新增——符 plan step 3 語意）。
+  - **app 層**：`active_field_controller.dart` +`createField`（產生隨機 32B secret→join→
+    回傳 transient secret 供顯 QR）、+`exportSecretForQr`（自安全儲存重讀供重顯 QR）。
+  - **依賴（附錄 F G13 白名單）**：`qr_flutter ^4.1.0`（解析 4.1.0）/ `mobile_scanner ^5.1.1`
+    （解析 5.2.3，transitive `qr 3.0.2`）。AndroidManifest +CAMERA（uses-feature camera
+    required=false——無相機仍可用輸入代碼）；iOS Info.plist +NSCameraUsageDescription。
+- 測試（+21）:
+  - `test/services/field_qr_codec_test.dart`（15）：三/四/五段 roundtrip、空輸入 / 壞前綴 /
+    太少段 / 壞長度 / 非 base64url / seg3 非 https / 有 seg4 無 seg3 拒收、未知第 6 段仍解析、
+    名稱含 `:` 經 urlencode 存活、encode guards（非 32B / staff 無 cloud throw）。
+  - `test/ui/screens/field_screen_test.dart`（5）：空狀態、作用場域摘要 + 清單、代碼加入、
+    壞碼提示不 crash 不加入、QR sheet 顯示 QrImageView。
+  - `event_publisher_v2_facade_test.dart` +1：多場域切換→published field_id 跟著作用場域換。
+  - `debug_shell_smoke_test.dart`：場域卡片斷言改「場域管理」入口（FilledButton 計數改 specific）。
+- DoD: D1 ✅（QR 字串層 15 測試綠；**實機兩機掃碼 join 同場域歸 A11 USER-GATE 腳本**）/
+  D2 ✅（未知前綴 / 壞 payload 不 crash 且有使用者提示）/ D3 ✅（通用 gate 全綠）。
+- 禁止事項（逐項守）: secret 不入剪貼簿 / log（新碼 grep `Clipboard|debugPrint|print(` = 0）；
+  QR 僅帶明文場域名（無其他個資）；seg3 不收 `http://`（badCloudUrl 拒，有測試）。
+- gates（G17 逐字，皆 exit 0）:
+  - `dart run tool/check_layers.dart --strict` → `ok — no boundary violations`
+  - `flutter analyze` → `2 issues found`（2 既有 info），**0 errors / 0 新 issue**
+  - `flutter test` → `00:16 +531 ~3: All tests passed!`（A6-polish +510 → +531：A7 +21）
+  - `dart run tool/generate_wire_conformance_v1.dart --check` → 確定性 OK（未碰 corpus/wire）
+  - `cd android; ./gradlew :app:assembleDebugAndroidTest` → `BUILD SUCCESSFUL`
+    （mobile_scanner/CameraX 原生整合於 androidTest 變體乾淨組裝，minSdk 26 ≥ 21）
+  - DESIGN_LANGUAGE §6 App gate：新場域 screens `grep Colors. lib/ui/screens/field/` = 0。
+- 觀察（備查，非 A7 範圍）: `grep Colors. lib/ui/screens/` 於 `design_showcase_screen.dart`
+  仍有 4 處既有 `Colors.white`/`Colors.transparent`（debug-only 元件對照頁，kDebugMode 路由）。
+  §4.1 豁免名單僅列 debug_shell；此屬既有債，G5 禁順手清理，留待 Owner 決定是否另開清理刀。
+- deviations: 無偏離。`field_screen.dart` 初稿 531 行→拆 `field_qr_sheet.dart` 後 447 行符規則。
+- next: A8（SOS UX，白皮書 §13.4：長按 1.5s→safetyState→5s 倒數可取消→帶 A4 位置發送）。

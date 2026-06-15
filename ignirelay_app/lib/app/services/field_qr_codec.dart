@@ -107,10 +107,14 @@ class FieldQrCodec {
 
   /// Build the join code for [payload].
   ///
-  /// Throws [ArgumentError] when the payload is internally inconsistent — a
-  /// 32-byte secret is required, and a [FieldQrPayload.staffInviteToken] may
-  /// not be set without a [FieldQrPayload.cloudBaseUrl] (the parser rejects
-  /// such codes, so the builder must never emit one).
+  /// Throws [ArgumentError] when the payload is internally inconsistent, so the
+  /// builder can never emit a code the parser would reject:
+  ///   • the secret must be exactly 32 bytes;
+  ///   • a [FieldQrPayload.cloudBaseUrl], when present, must be an `https://`
+  ///     URL (plaintext `http://` is prohibited — A7 禁止事項; mirrors the
+  ///     [tryDecode] `badCloudUrl` rule);
+  ///   • a [FieldQrPayload.staffInviteToken] may not be set without a
+  ///     [FieldQrPayload.cloudBaseUrl] (seg4 needs seg3).
   static String encode(FieldQrPayload payload) {
     if (payload.secret.length != secretLengthBytes) {
       throw ArgumentError.value(
@@ -118,6 +122,10 @@ class FieldQrCodec {
     }
     final staff = payload.staffInviteToken;
     final cloud = payload.cloudBaseUrl;
+    if (cloud != null && cloud.isNotEmpty && !cloud.startsWith('https://')) {
+      throw ArgumentError.value(
+          cloud, 'cloudBaseUrl', 'must be an https:// URL');
+    }
     if (staff != null && (cloud == null || cloud.isEmpty)) {
       throw ArgumentError(
           'staffInviteToken requires a cloudBaseUrl (seg4 needs seg3)');

@@ -115,13 +115,13 @@ void main() {
     });
 
     test('seg3 cloud url is plaintext http:// (prohibited)', () {
-      // Build a valid 4-seg code then swap the cloud url for http.
-      final code = FieldQrCodec.encode(FieldQrPayload(
-        secret: secret32,
-        displayName: 'x',
-        cloudBaseUrl: 'http://insecure.example',
-      ));
-      final r = FieldQrCodec.tryDecode(code);
+      // Hand-build the http:// code directly — encode() now refuses to emit
+      // one (see encode-guard test below), so we craft the segment manually.
+      final b64 = FieldQrCodec.encode(
+              FieldQrPayload(secret: secret32, displayName: 'x'))
+          .split(':')[1];
+      final httpSeg = Uri.encodeComponent('http://insecure.example');
+      final r = FieldQrCodec.tryDecode('IGNI1:$b64:x:$httpSeg');
       expect(r.error, FieldQrError.badCloudUrl);
     });
 
@@ -176,6 +176,24 @@ void main() {
         () => FieldQrCodec.encode(FieldQrPayload(
             secret: secret32, displayName: 'x', staffInviteToken: 't')),
         throwsArgumentError,
+      );
+    });
+
+    test('rejects non-https cloud url (encoder mirrors decoder)', () {
+      expect(
+        () => FieldQrCodec.encode(FieldQrPayload(
+            secret: secret32,
+            displayName: 'x',
+            cloudBaseUrl: 'http://insecure.example')),
+        throwsArgumentError,
+      );
+      // https:// is accepted.
+      expect(
+        FieldQrCodec.encode(FieldQrPayload(
+            secret: secret32,
+            displayName: 'x',
+            cloudBaseUrl: 'https://relay.example.org')),
+        contains(':'),
       );
     });
   });

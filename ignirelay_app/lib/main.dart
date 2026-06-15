@@ -38,6 +38,7 @@ import 'package:ignirelay_app/app/services/v2_inbound_projector.dart';
 import 'package:ignirelay_app/app/controllers/event_publisher.dart';
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/controllers/presence_controller.dart';
+import 'package:ignirelay_app/app/controllers/sos_controller.dart';
 import 'package:ignirelay_app/app/controllers/active_field_controller.dart';
 import 'package:ignirelay_app/app/services/anon_identity.dart';
 import 'package:ignirelay_app/app/services/field_session_store.dart';
@@ -446,6 +447,19 @@ class _IgniRelayAppState extends State<IgniRelayApp> {
           create: (context) => PresenceController(
             facade: context.read<EventPublisherV2Facade>(),
             anonIdentity: AnonIdentityService(),
+            locationBuilder: LocationEvidenceBuilder(
+              currentLocation: () =>
+                  context.read<LocationService>().currentLocation,
+            ),
+          ),
+        ),
+        // A8 — SOS publish state machine (long-press → countdown → send-with-
+        // location → 我安全了). ChangeNotifierProvider so its countdown timers
+        // are disposed with the provider; it is screen-scoped state, not a
+        // shared module singleton.
+        ChangeNotifierProvider<SosController>(
+          create: (context) => SosController(
+            facade: context.read<EventPublisherV2Facade>(),
             locationBuilder: LocationEvidenceBuilder(
               currentLocation: () =>
                   context.read<LocationService>().currentLocation,

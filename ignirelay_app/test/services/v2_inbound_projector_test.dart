@@ -173,6 +173,49 @@ void main() {
     await h.dispatcher.dispose();
   });
 
+  test('SAFE status update projects an SOS resolution (A8 / 我安全了)',
+      () async {
+    final h = await makeHarness();
+    final eventStream = EventStream(
+      handler: MeshEventHandler(),
+      decoder: EventDecoder(),
+      store: EventStore(databaseHelper: DatabaseHelper()),
+    )..start();
+    final resolvedFuture = eventStream.sosResolutions.first;
+
+    final published = await h.publisher.send(
+      eventType: EventTypeV2.statusUpdate,
+      priority: PriorityV2.status,
+      payload: StatusUpdateData(safetyState: SafetyState.safe).encode(),
+      createdAtHlc: HlcTimestampV2(msSinceEpoch: 3000, counter: 0),
+      expiresAtHlc: HlcTimestampV2(msSinceEpoch: 4000, counter: 0),
+      maxHops: 6,
+      negotiatedMtu: 247,
+      fieldId: Uint8List(16),
+    );
+
+    final projectedId = h.projector.projectedEventIds.first;
+    final outcome = await h.dispatcher
+        .onReceiveEnvelopeBytes(published.wireBytes, peerId: 'AA:BB:CC');
+    expect(outcome, isA<DispatchAccepted>());
+
+    final eventId = await projectedId.timeout(const Duration(seconds: 2));
+    final db = await DatabaseHelper().database;
+    final logs = await db
+        .query('Event_Logs', where: 'event_id = ?', whereArgs: [eventId]);
+    expect(logs.length, 1);
+    expect(logs.first['event_type'], LocalReadModelType.sosResolved);
+
+    final resolved =
+        await resolvedFuture.timeout(const Duration(seconds: 2));
+    expect(resolved.authorKeyHex.isNotEmpty, isTrue,
+        reason: 'resolution is keyed by the author pubkey');
+
+    await eventStream.dispose();
+    await h.projector.dispose();
+    await h.dispatcher.dispose();
+  });
+
   test('#4-6 SOS with location projects lat/lng into the read-model', () async {
     final h = await makeHarness();
     final payload = StatusUpdateData(
@@ -435,10 +478,13 @@ void main() {
     );
   });
 
-  test('non-SOS status (SAFE) is not projected into the read-model', () async {
+  test('non-SOS, non-SAFE status (UNSAFE) is not projected into the read-model',
+      () async {
+    // A8: SAFE now projects an SOS-resolution row (see the test above). Other
+    // non-SOS states (UNSAFE) still have no v1 read-model surface yet.
     final h = await makeHarness();
-    final payload = StatusUpdateData(safetyState: SafetyState.safe).encode();
-    // SAFE implies PriorityV2.status; matrix accepts STATUS_UPDATE at status.
+    final payload = StatusUpdateData(safetyState: SafetyState.unsafe).encode();
+    // UNSAFE implies PriorityV2.status; matrix accepts STATUS_UPDATE at status.
     final published = await h.publisher.send(
       eventType: EventTypeV2.statusUpdate,
       priority: PriorityV2.status,

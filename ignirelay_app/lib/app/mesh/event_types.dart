@@ -77,4 +77,12 @@ class LocalReadModelType {
   /// this is the *read-model* tag for the row, NOT the wire type. The row's
   /// payload column holds a plain-JSON presence snapshot (NOT a protobuf).
   static const int presence = 9001;
+
+  /// Projected SOS resolution ("我安全了"). Wire source = `EventTypeV2.statusUpdate`
+  /// with `safetyState == SAFE` (A8 / OD-8). NOT a wire type — there is no
+  /// `SOS_CANCELLED` on the wire; LWW (spec §10.2) converges the author's latest
+  /// status and this row lets the read-model / UI mark that author's prior SOS
+  /// resolved. The row's `sender_pub_key` identifies the author; payload is a
+  /// small plain-JSON snapshot.
+  static const int sosResolved = 9002;
 }

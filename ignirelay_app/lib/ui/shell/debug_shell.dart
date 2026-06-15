@@ -9,6 +9,7 @@ import 'package:ignirelay_app/app/controllers/mesh_runtime_controller.dart';
 import 'package:ignirelay_app/app/controllers/presence_controller.dart';
 import 'package:ignirelay_app/app/services/event_store.dart';
 import 'package:ignirelay_app/ui/screens/field/field_screen.dart';
+import 'package:ignirelay_app/ui/screens/sos/sos_screen.dart';
 
 /// Phase 0b mapless debug shell.
 ///
@@ -110,9 +111,6 @@ class _DebugShellState extends State<DebugShell> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
   }
-
-  void _todoWire(String what) => _snack(
-      '$what 尚未接線 — 隨 v2 wire（PRESENCE/SOS/field_id）在後續 Phase 0b commit 接上');
 
   Future<void> _publishPresence() async {
     setState(() => _busy = true);
@@ -221,6 +219,12 @@ class _DebugShellState extends State<DebugShell> {
     );
   }
 
+  Future<void> _openSosScreen() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const SosScreen()),
+    );
+  }
+
   Widget _meshCard(bool active, TransportStats stats) {
     return Card(
       child: Padding(
@@ -269,7 +273,7 @@ class _DebugShellState extends State<DebugShell> {
           children: [
             const Text('送出事件', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            const Text('PRESENCE 走 v2 wire（已接線）；SOS 在 A4 接上。',
+            const Text('PRESENCE 走 v2 wire（已接線）；SOS UX 在 A8 接上。',
                 style: TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 8),
             Wrap(spacing: 8, children: [
@@ -279,7 +283,7 @@ class _DebugShellState extends State<DebugShell> {
                 label: const Text('發 PRESENCE'),
               ),
               OutlinedButton.icon(
-                onPressed: () => _todoWire('SOS'),
+                onPressed: _openSosScreen,
                 icon: const Icon(Icons.sos, size: 18),
                 label: const Text('發 SOS'),
               ),

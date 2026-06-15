@@ -192,9 +192,16 @@ class V2InboundProjector {
     // are intentionally invisible to the v1 read-model.
     final urgency = _safetyStateToUrgency(s.safetyState);
     if (urgency < 2) {
-      // Non-SOS status (SAFE / UNSAFE) has no v1 UI surface yet (v0.3 Now tab).
-      debugPrint(
-          '[V2Projector] skip non-SOS status safetyState=${s.safetyState}');
+      // A8 (OD-8): a SAFE STATUS_UPDATE is the "我安全了" resolution — project a
+      // local-read-model row so the UI marks this author's prior SOS resolved
+      // (LWW by author, spec §10.2; no SOS_CANCELLED wire type). Other non-SOS
+      // states (UNSAFE) still have no v1 surface yet (v0.3 Now tab).
+      if (s.safetyState == SafetyState.safe) {
+        await _projectSosResolved(a, eventId);
+      } else {
+        debugPrint(
+            '[V2Projector] skip non-SOS status safetyState=${s.safetyState}');
+      }
       return;
     }
     // Represent as a v1 SOS (requestBroadcast + urgency>=2), matching how the
@@ -221,6 +228,22 @@ class V2InboundProjector {
       accepted: a,
       lat: hasLoc ? loc.latDegrees : null,
       lng: hasLoc ? loc.lngDegrees : null,
+    );
+  }
+
+  /// Project a SAFE STATUS_UPDATE as an SOS resolution row (A8). The author is
+  /// carried by `sender_pub_key` (via [_ingest]); `EventStream` reads that to
+  /// emit a resolution keyed by author so the UI clears that author's SOS card.
+  Future<void> _projectSosResolved(DispatchAccepted a, String eventId) async {
+    final snapshot = <String, dynamic>{
+      'resolved_ms': a.envelope.createdAtHlc.msSinceEpoch,
+    };
+    await _ingest(
+      eventId: eventId,
+      v1EventType: LocalReadModelType.sosResolved,
+      urgency: 0,
+      payload: utf8.encode(jsonEncode(snapshot)),
+      accepted: a,
     );
   }
 

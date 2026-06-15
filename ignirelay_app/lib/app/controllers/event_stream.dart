@@ -24,6 +24,18 @@ class SosAlert {
       required this.timestamp});
 }
 
+/// SOS 解除（投影自 v3 STATUS_UPDATE `safetyState == SAFE`；A8 / OD-8）。
+///
+/// 以 author（`sender_pub_key` 的 hex）標記哪位求救者已回報「我安全了」，供
+/// UI 把該 author 的 SOS 告警卡標「已解除」。wire 無 `SOS_CANCELLED` 型別——
+/// 這是 LWW（spec §10.2）收斂後的 read-model 投影。
+class SosResolved {
+  /// 求救者公鑰 hex（對應 [SosAlert.senderPubKey] 的 hex）。空字串 = 未知 author。
+  final String authorKeyHex;
+  final DateTime timestamp;
+  SosResolved({required this.authorKeyHex, required this.timestamp});
+}
+
 class HazardEvent {
   final String eventId;
   final String type;
@@ -118,6 +130,8 @@ class EventStream {
 
   final StreamController<SosAlert> _sosController =
       StreamController<SosAlert>.broadcast();
+  final StreamController<SosResolved> _sosResolvedController =
+      StreamController<SosResolved>.broadcast();
   final StreamController<HazardEvent> _hazardController =
       StreamController<HazardEvent>.broadcast();
   final StreamController<PresenceUpdate> _presenceController =
@@ -126,6 +140,11 @@ class EventStream {
       StreamController<EventLogChanged>.broadcast();
 
   Stream<SosAlert> get sosAlerts => _sosController.stream;
+
+  /// SOS 解除 typed stream（投影自 STATUS_UPDATE safetyState=SAFE；A8）。UI 以
+  /// author 比對，把對應的 SOS 告警卡標「已解除」。
+  Stream<SosResolved> get sosResolutions => _sosResolvedController.stream;
+
   Stream<HazardEvent> get hazardEvents => _hazardController.stream;
 
   /// PRESENCE 足跡更新 typed stream（投影自 v3 `EventTypeV2.presence`）。
@@ -203,6 +222,15 @@ class EventStream {
               : _presenceFromSnapshot(eventId, payload, timestamp);
           if (update != null) _presenceController.add(update);
           break;
+        case LocalReadModelType.sosResolved:
+          // SOS 解除 read-model row（A8）：投影自 STATUS_UPDATE safetyState=SAFE，
+          // 以 sender_pub_key 標記哪位 author 已回報安全。
+          final pubKey = row['sender_pub_key'] as Uint8List?;
+          _sosResolvedController.add(SosResolved(
+            authorKeyHex: pubKey == null ? '' : _hex(pubKey),
+            timestamp: timestamp,
+          ));
+          break;
         default:
           break;
       }
@@ -238,9 +266,18 @@ class EventStream {
     }
   }
 
+  static String _hex(Uint8List bytes) {
+    final sb = StringBuffer();
+    for (final b in bytes) {
+      sb.write(b.toRadixString(16).padLeft(2, '0'));
+    }
+    return sb.toString();
+  }
+
   Future<void> dispose() async {
     await _subscription?.cancel();
     await _sosController.close();
+    await _sosResolvedController.close();
     await _hazardController.close();
     await _presenceController.close();
     await _anyEventController.close();

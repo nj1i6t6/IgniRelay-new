@@ -769,3 +769,47 @@ A9 拆三刀之二：`[A9-2]` CHECKPOINT。code commit `226e1d2`。**wire 早於
 - deviations: 無偏離。
 - next: A9-3（ADMIN_BROADCAST 接收：projector + typed stream + 置頂橫幅 expires_at 下架；
   發佈端僅 kDebugMode 後門）+ A9 收尾 gate（CONF-DART/KOTLIN）。
+
+## [2026-06-15] A9-3 DONE（ADMIN_BROADCAST 接收：置頂橫幅 expires_at 下架 + kDebugMode 發佈後門）
+
+A9 拆三刀之三（收尾）：`[A9-3]` ADMIN_BROADCAST 接收顯示。code commit `d4a37ee`。
+**wire 早於 Phase 0b #4-1 已就位（AdminBroadcastData / EventTypeV2.adminBroadcast=82 / 矩陣），
+本刀純收發接線、不碰 wire。**
+- `event_types.dart` +`LocalReadModelType.adminBroadcast=9004`（本地 read-model 標記，**非 wire**）。
+- `v2_inbound_projector` +`case adminBroadcast`→`_projectAdminBroadcast`：寫 9004 read-model
+  row（純 JSON snapshot：scope/message/expires_ms；**非 protobuf**）。多筆並存（§10.2 非 LWW）。
+- `event_stream` +`AdminBroadcast`〔含 `isExpired(now)` 純函式〕＋`adminBroadcasts` typed stream
+  ＋`case adminBroadcast`（JSON snapshot 還原）＋dispose close。
+- facade `publishAdminBroadcast({message, toAllNodes=true, ttl=6h})`＝**debug 後門發佈面**：
+  priority **ALERT**、**max_hops 12**、**TTL 6h**（spec §6 / §11.2），payload 帶 `expires_at`
+  供收方下架；UTF-8 byte 預算守護（§9，`AdminBroadcastData.kMessageMaxLen=480`）。`toAllNodes`
+  bool→`AdminScope`，**使 UI 不 import app/proto**。
+- UI：新 `lib/ui/shell/admin_broadcast_banner.dart`（自帶 provider／注入 source+clock 測試 seam；
+  lib/ui/shell/ **不在 §6 Colors gate 掃描路徑**內）：置頂橫幅，依 `expires_at` prune（prune
+  timer 僅在有到期項時武裝、清空即取消 → 閒置無 pending timer）。**「發測試 ADMIN 廣播」按鈕僅
+  `kDebugMode`**（`DebugShell` 為 release home → 發佈入口必 kDebugMode 包夾＝**禁止事項
+  「ADMIN 發佈入口出現在 release UI」**）；facade 讀取惰性（僅按鈕 handler），收方路徑免 facade
+  provider。`debug_shell` ListView 置頂插入 `const AdminBroadcastBanner()`。
+- 測試（+6）:
+  - `event_publisher_v2_facade_test`：publishAdminBroadcast priority=ALERT / max_hops 12 /
+    TTL 6h / payload(scope=ALL/message/expires_at) roundtrip；over-budget message throwsArgumentError。
+  - `v2_inbound_projector_test`：ADMIN envelope → Event_Logs(event_type=adminBroadcast=9004)
+    ＋`adminBroadcasts` stream（message/scope/expiresAt）＋isExpired 邊界。
+  - `test/ui/shell/admin_broadcast_banner_test.dart`（3）：isExpired 單元；有效公告顯示；
+    過 expires_at 周期 prune 自動下架（注入 source + fake clock + pruneInterval）。
+- DoD：D2 ✅（CHECKPOINT+ADMIN projection+UI 測試綠）/ D3 ✅（通用 gate 全綠）。**A9 全數完成**
+  （A9-1 beacon / A9-2 CHECKPOINT / A9-3 ADMIN）。
+- 禁止事項（逐項守）：ADMIN 發佈入口 `kDebugMode` 包夾（release 無）；beacon 雙閘（A9-1）。
+- gates（A9 收尾，5 項全跑，皆 exit 0）:
+  - `dart run tool/check_layers.dart --strict` → `ok — no boundary violations`
+  - `flutter analyze lib test` → `2 issues found`（2 既有 baseline info），**0 errors / 0 新 issue**
+  - `flutter test` → `00:17 +557 ~3: All tests passed!`（A8 +541 → +557：A9 共 +16〔beacon 6 /
+    checkpoint 4 / admin 6〕）
+  - `dart run tool/generate_wire_conformance_v1.dart --check` → `--check OK (deterministic + up to date)`
+    （未碰 wire/corpus，rev 維持 `v0.3-phase0b-4-6-1`）
+  - `android> .\gradlew.bat :app:assembleDebugAndroidTest` → `BUILD SUCCESSFUL`（未碰 native/deps）
+  - DESIGN_LANGUAGE §6 App gate：`grep Colors. lib/ui/screens/` 僅既有 `design_showcase_screen.dart`
+    （A7 既有 debug-only debt，G5 禁順手清）；A9 新 UI 在 `lib/ui/shell/`，不在掃描範圍。
+- deviations: 無偏離。A9 全程未動 wire/corpus/native/deps。`fake_async`（A9-1 beacon fake clock）
+  為 flutter_test transitive，以 inline ignore 抑制 `depend_on_referenced_packages`，不動依賴清單（G13）。
+- next: A9 完成，待 GPT review。計畫下一棒見 master plan（A10+）。

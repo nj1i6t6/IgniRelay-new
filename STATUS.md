@@ -813,3 +813,46 @@ A9 拆三刀之三（收尾）：`[A9-3]` ADMIN_BROADCAST 接收顯示。code co
 - deviations: 無偏離。A9 全程未動 wire/corpus/native/deps。`fake_async`（A9-1 beacon fake clock）
   為 flutter_test transitive，以 inline ignore 抑制 `depend_on_referenced_packages`，不動依賴清單（G13）。
 - next: A9 完成，待 GPT review。計畫下一棒見 master plan（A10+）。
+
+## [2026-06-15] A10 DONE（mapless 位置呈現：PositionEstimate 本地融合 + 最後可信位置卡片）
+
+GPT review 放行 A9（含一小灰區：A9 shell 卡片用原生 Card/Colors——判定 skip A9-polish：
+那兩個元件在 `lib/ui/shell/`、刻意與 `debug_shell.dart` 的原生 Material 風格一致；設計系統
+token 範疇是 `lib/ui/screens/` 產品畫面，只改那兩個反而與所在 shell 不一致；debug shell 全面
+汰換時再一併套——GPT 同意非 blocker）。續做 A10。code commit `a7a2357`。
+- 新 `lib/app/services/position_estimator.dart`（**純函式、零 I/O、不上 wire**；REBUILD §3.6
+  分層鐵則：wire 只搬 LocationEvidence〔觀測〕，PositionEstimate〔融合〕純 UI 本地推導）：
+  - `PositionObservation`（plain Dart，UI 餵入）/ `PositionEstimate{lat?,lng?,anchorNodeId?,
+    distanceM?,bearingDeg?,confidence,uncertaintyM,ageSeconds}` / `enum PositionConfidence`。
+  - `confidenceForAge`：≤2min HIGH、≤10min MEDIUM、其後 LOW（§3.6 原則 4；常數註解出處）。
+  - `uncertaintyForAge`：base + 0.5 m/s × age 線性（base=觀測 accuracy 或 GPS-class 15m）。
+  - `estimate`：v1 融合＝freshest-fix wins；confidence/uncertainty 依年齡**即時算、絕不持久化**
+    （存事件 30 分鐘後即謊言，REBUILD §3.6）；負年齡 clamp 0；空集合→null。
+- 新 `lib/ui/screens/position/last_seen_screen.dart`（**產品畫面，守 DESIGN_LANGUAGE §4**：
+  一律 `context.igni` + Igni 元件〔IgniCard/IgniSubPageHeader/StatusChip/MonoText〕、零
+  `Colors.*`/hex）：每 anon8 一張卡「最後可信位置：<座標或錨點> · <n 分鐘前> · 可信度 H/M/L
+  〔StatusChip ok/warn/neutral〕 · 誤差 ~<m>m」。**文案鐵則：「最後可信位置/推估」，禁「目前
+  位置」**（§3.6 原則 5 / DESIGN §4.5）。週期 timer 重整年齡（注入 seam 可關）；訂閱
+  EventStream.presenceUpdates/checkpointCrossings（注入 seam 供測試）。debug shell PRESENCE
+  卡片頭加「最後可信位置」入口。
+- 測試（+11）:
+  - `test/services/position_estimator_test.dart`（9，純函式 DoD D1）：年齡→confidence **邊界
+    120s/600s 兩側全測**（119/120/121、599/600/601）、負年齡 clamp、uncertainty 線性、
+    freshest-fix 融合、anchor-only、future-dated clamp。
+  - `test/ui/screens/last_seen_screen_test.dart`（2，DoD D2）：空狀態提示；PRESENCE fix 渲染卡片
+    ＋可信度 chip＋座標；**斷言無「目前位置」字樣**。
+- DoD：D1 ✅（estimator 純函式邊界全綠）/ D2 ✅（UI smoke 綠）/ D3 ✅（通用 gate 綠）。
+- 禁止事項（逐項守）：confidence/uncertainty 未寫進任何 wire payload / DB 事件列（estimator
+  零持久化、純推導）；文案無「目前位置」（widget 測試斷言）。
+- gates（5 項，皆 exit 0）:
+  - `dart run tool/check_layers.dart --strict` → `ok — no boundary violations`
+  - `flutter analyze lib test` → `2 issues found`（2 既有 baseline info），**0 errors / 0 新 issue**
+  - `flutter test` → `00:17 +568 ~3: All tests passed!`（A9-3 +557 → +568：A10 +11）
+  - `dart run tool/generate_wire_conformance_v1.dart --check` → `--check OK`（未碰 wire/corpus，
+    rev 維持 `v0.3-phase0b-4-6-1`）
+  - GATE-KOTLIN-BUILD：A10 純 Dart UI，未碰 native/deps，自 A9-3 收尾 `:app:assembleDebugAndroidTest`
+    BUILD SUCCESSFUL 後無變動。
+  - DESIGN §6 App gate：`grep -rn "Colors\." lib/ui/screens/position/` = 0（新畫面全 token 化）；
+    `lib/ui/screens/` 其餘僅既有 `design_showcase_screen.dart`（A7 debug-only debt，G5 禁順手清）。
+- deviations: 無偏離。A9-polish 經判斷 skip（理由見上，GPT 同意非 blocker）。
+- next: A10b（雷達相對位置視圖，前置 A10）——本刀未做（A10 範圍外）；待 Owner / GPT 指示。

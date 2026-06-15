@@ -620,3 +620,25 @@
   §4.1 豁免名單僅列 debug_shell；此屬既有債，G5 禁順手清理，留待 Owner 決定是否另開清理刀。
 - deviations: 無偏離。`field_screen.dart` 初稿 531 行→拆 `field_qr_sheet.dart` 後 447 行符規則。
 - next: A8（SOS UX，白皮書 §13.4：長按 1.5s→safetyState→5s 倒數可取消→帶 A4 位置發送）。
+
+---
+
+## [2026-06-15] A7-polish DONE（encode 對稱拒收非 https cloudBaseUrl）
+
+- repo/commit: IgniRelay @ `04f7905`
+- 執行者: Claude（主理 AI）
+- 緣由: GPT review A7 尾巴——`FieldQrCodec.encode()` 先前可吐含 `http://` cloudBaseUrl
+  的碼，`tryDecode()` 卻以 `badCloudUrl` 拒收（encoder/decoder 不對稱；UI 目前無 cloud
+  輸入故不會立即炸，但建構端應同步禁止）。
+- 變更:
+  - `field_qr_codec.dart` `encode()`：`cloudBaseUrl` 非空且非 `https://` → `ArgumentError`
+    （鏡像 decode 的 `badCloudUrl`；A7 禁止事項「seg3 不收 http://」於建構端同樣成立）。
+    encode doc 同步列出三條 guard（32B / https / staff 需 cloud）。
+  - 測試：encode guards +「非 https cloud url throwsArgumentError、https 接受」；既有
+    decode 端 http:// 拒收測試改為手工拼碼（encode 已不再吐 http:// 碼）。
+- 純 Dart：未改 UI、未碰 A8 / corpus / wire / Kotlin。
+- gates（exit 0）: `flutter test test/services/field_qr_codec_test.dart` → `+16 All passed`；
+  `dart run tool/check_layers.dart --strict` → ok；`flutter analyze`（codec+test）→ No issues。
+  GATE-KOTLIN-BUILD / GATE-CONF-DART 未重跑（純 Dart 邏輯，未動 wire/corpus/Kotlin；A7 已證綠）。
+- deviations: 無。
+- next: A8（SOS UX，白皮書 §13.4）。

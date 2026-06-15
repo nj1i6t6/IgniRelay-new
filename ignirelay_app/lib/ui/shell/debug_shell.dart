@@ -9,6 +9,7 @@ import 'package:ignirelay_app/app/controllers/mesh_runtime_controller.dart';
 import 'package:ignirelay_app/app/controllers/presence_beacon_controller.dart';
 import 'package:ignirelay_app/app/controllers/presence_controller.dart';
 import 'package:ignirelay_app/app/services/event_store.dart';
+import 'package:ignirelay_app/ui/shell/admin_broadcast_banner.dart';
 import 'package:ignirelay_app/ui/shell/checkpoint_card.dart';
 import 'package:ignirelay_app/ui/screens/field/field_screen.dart';
 import 'package:ignirelay_app/ui/screens/sos/sos_screen.dart';
@@ -154,6 +155,9 @@ class _DebugShellState extends State<DebugShell> {
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
+          // A9 (3) — ADMIN_BROADCAST 置頂橫幅（依 expires_at 自動下架；發佈端
+          // 僅 kDebugMode 後門）。無有效公告時收合。
+          const AdminBroadcastBanner(),
           _meshCard(active, stats),
           const SizedBox(height: 12),
           _fieldCard(context.watch<ActiveFieldController>()),

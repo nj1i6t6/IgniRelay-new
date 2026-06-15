@@ -123,6 +123,38 @@ class CheckpointCrossing {
   });
 }
 
+/// ADMIN_BROADCAST 管理廣播指令（投影自 v3 wire 的 `EventTypeV2.adminBroadcast`）。
+///
+/// 內容是純 Dart 型別（由 `V2InboundProjector` 寫入 read-model 的 JSON snapshot
+/// 還原而來），不含 protobuf。多筆指令並存（spec §10.2 非 LWW）；UI 依 [expiresAt]
+/// 自動下架（[isExpired]）。
+class AdminBroadcast {
+  final String eventId;
+
+  /// `AdminScope.*` 數值（1=本場域、2=全部、0=未指定）。UI 不 import app/proto，
+  /// 故以本地數值對照。
+  final int scope;
+
+  final String message;
+
+  /// 到期時間（null = 無到期）。UI 過此時間即下架。
+  final DateTime? expiresAt;
+
+  /// 收到（投影）時間。
+  final DateTime receivedAt;
+
+  AdminBroadcast({
+    required this.eventId,
+    required this.scope,
+    required this.message,
+    required this.receivedAt,
+    this.expiresAt,
+  });
+
+  /// 是否已過 [expiresAt]（無到期則永不過期）。純函式，便於測試。
+  bool isExpired(DateTime now) => expiresAt != null && now.isAfter(expiresAt!);
+}
+
 /// 通用「事件日誌變動」通知。
 ///
 /// 給只關心「某個事件剛剛抵達/落地，請我重整自己這份 view」的 UI 使用。內容
@@ -169,6 +201,8 @@ class EventStream {
       StreamController<PresenceUpdate>.broadcast();
   final StreamController<CheckpointCrossing> _checkpointController =
       StreamController<CheckpointCrossing>.broadcast();
+  final StreamController<AdminBroadcast> _adminController =
+      StreamController<AdminBroadcast>.broadcast();
   final StreamController<EventLogChanged> _anyEventController =
       StreamController<EventLogChanged>.broadcast();
 
@@ -186,6 +220,10 @@ class EventStream {
   /// CHECKPOINT 點名通過 typed stream（投影自 v3 `EventTypeV2.checkpoint`；A9）。
   Stream<CheckpointCrossing> get checkpointCrossings =>
       _checkpointController.stream;
+
+  /// ADMIN_BROADCAST 管理廣播 typed stream（投影自 v3 `EventTypeV2.adminBroadcast`；
+  /// A9）。UI 置頂橫幅依 `expiresAt` 自動下架。
+  Stream<AdminBroadcast> get adminBroadcasts => _adminController.stream;
 
   /// 「事件日誌有新東西」的通用通知 stream。UI 若只需要「something 變了，
   /// 請重新跑 query」的訊號，就訂閱這個 stream，不要再用 [rawEvents]。
@@ -276,6 +314,14 @@ class EventStream {
               : _checkpointFromSnapshot(eventId, payload, timestamp);
           if (crossing != null) _checkpointController.add(crossing);
           break;
+        case LocalReadModelType.adminBroadcast:
+          // ADMIN_BROADCAST read-model row（A9）：payload 是純 JSON snapshot，由
+          // V2InboundProjector 寫入。還原成 typed AdminBroadcast（UI 依 expiresAt 下架）。
+          final admin = payload == null
+              ? null
+              : _adminFromSnapshot(eventId, payload, timestamp);
+          if (admin != null) _adminController.add(admin);
+          break;
         default:
           break;
       }
@@ -335,6 +381,29 @@ class EventStream {
     }
   }
 
+  /// 把 ADMIN_BROADCAST read-model 的 JSON snapshot 還原成 [AdminBroadcast]。
+  /// 解析失敗回 null（debug 面，壞資料不致命）。
+  AdminBroadcast? _adminFromSnapshot(
+      String eventId, Uint8List payload, DateTime receivedTs) {
+    try {
+      final decoded = jsonDecode(utf8.decode(payload));
+      if (decoded is! Map) return null;
+      final j = Map<String, dynamic>.from(decoded);
+      final expiresMs = j['expires_ms'] as int?;
+      return AdminBroadcast(
+        eventId: eventId,
+        scope: (j['scope'] as num?)?.toInt() ?? 0,
+        message: (j['message'] as String?) ?? '',
+        expiresAt: expiresMs != null
+            ? DateTime.fromMillisecondsSinceEpoch(expiresMs)
+            : null,
+        receivedAt: receivedTs,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   static String _hex(Uint8List bytes) {
     final sb = StringBuffer();
     for (final b in bytes) {
@@ -350,6 +419,7 @@ class EventStream {
     await _hazardController.close();
     await _presenceController.close();
     await _checkpointController.close();
+    await _adminController.close();
     await _anyEventController.close();
   }
 }

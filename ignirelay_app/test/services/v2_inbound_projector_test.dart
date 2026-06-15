@@ -445,6 +445,57 @@ void main() {
     await h.dispatcher.dispose();
   });
 
+  test('ADMIN_BROADCAST envelope projects to Event_Logs + adminBroadcasts stream',
+      () async {
+    final h = await makeHarness();
+    final eventStream = EventStream(
+      handler: MeshEventHandler(),
+      decoder: EventDecoder(),
+      store: EventStore(databaseHelper: DatabaseHelper()),
+    )..start();
+    final adminFuture = eventStream.adminBroadcasts.first;
+
+    final payload = AdminBroadcastData(
+      scope: AdminScope.all,
+      message: '全網疏散：請往高處',
+      expiresAt: const HlcTimestampV2(msSinceEpoch: 9000, counter: 0),
+    ).encode();
+
+    final published = await h.publisher.send(
+      eventType: EventTypeV2.adminBroadcast,
+      priority: PriorityV2.alert,
+      payload: payload,
+      createdAtHlc: HlcTimestampV2(msSinceEpoch: 1000, counter: 0),
+      expiresAtHlc: HlcTimestampV2(msSinceEpoch: 9000, counter: 0),
+      maxHops: 12,
+      negotiatedMtu: 247,
+      fieldId: Uint8List(16),
+    );
+
+    final projectedId = h.projector.projectedEventIds.first;
+    final outcome = await h.dispatcher
+        .onReceiveEnvelopeBytes(published.wireBytes, peerId: 'AA:BB:CC');
+    expect(outcome, isA<DispatchAccepted>());
+
+    final eventId = await projectedId.timeout(const Duration(seconds: 2));
+    final db = await DatabaseHelper().database;
+    final logs = await db
+        .query('Event_Logs', where: 'event_id = ?', whereArgs: [eventId]);
+    expect(logs.length, 1);
+    expect(logs.first['event_type'], LocalReadModelType.adminBroadcast);
+
+    final admin = await adminFuture.timeout(const Duration(seconds: 2));
+    expect(admin.message, '全網疏散：請往高處');
+    expect(admin.scope, AdminScope.all);
+    expect(admin.expiresAt, isNotNull);
+    expect(admin.isExpired(DateTime.fromMillisecondsSinceEpoch(8000)), isFalse);
+    expect(admin.isExpired(DateTime.fromMillisecondsSinceEpoch(10000)), isTrue);
+
+    await eventStream.dispose();
+    await h.projector.dispose();
+    await h.dispatcher.dispose();
+  });
+
   test('re-projecting the same PRESENCE envelope yields exactly one row',
       () async {
     // Drive the projector directly with a controllable outcomes stream so we

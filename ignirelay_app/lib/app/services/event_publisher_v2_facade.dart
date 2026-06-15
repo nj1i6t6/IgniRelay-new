@@ -559,6 +559,50 @@ class EventPublisherV2Facade {
     );
   }
 
+  /// Publish an ADMIN_BROADCAST authority directive (#4-2 / A9). **Debug
+  /// back-door only** — in v0.3 the App has no production authoring surface for
+  /// authority messages (that authority lives in the Gateway / Web, Stage C/D).
+  /// The only
+  /// in-app caller is a `kDebugMode`-gated button (the UI publish entry MUST NOT
+  /// appear in a release build).
+  ///
+  /// [toAllNodes] selects scope (ALL vs this field); [ttl] caps the directive's
+  /// lifetime and is also written into the payload `expires_at` so receivers can
+  /// auto-dismiss the banner. Priority ALERT, max_hops 12 (spec §6 / §11.2).
+  /// Rejects an over-budget [message] up front (spec §9 — UTF-8 bytes).
+  Future<BroadcastOutcome> publishAdminBroadcast({
+    required String message,
+    bool toAllNodes = true,
+    Duration ttl = const Duration(hours: 6),
+  }) {
+    final messageBytes = utf8.encode(message).length;
+    if (messageBytes > AdminBroadcastData.kMessageMaxLen) {
+      throw ArgumentError.value(
+        messageBytes,
+        'message',
+        'UTF-8 byte length exceeds AdminBroadcastData.kMessageMaxLen '
+            '(${AdminBroadcastData.kMessageMaxLen})',
+      );
+    }
+    final hlc = HLC.now();
+    final expiresAt = HlcTimestampV2(
+      msSinceEpoch: hlc.timestamp + ttl.inMilliseconds,
+      counter: 0,
+    );
+    final data = AdminBroadcastData(
+      scope: toAllNodes ? AdminScope.all : AdminScope.field,
+      message: message,
+      expiresAt: expiresAt,
+    );
+    return _broadcast(
+      eventType: EventTypeV2.adminBroadcast,
+      priority: PriorityV2.alert,
+      payload: data.encode(),
+      ttlOffset: ttl, // §11.2 ADMIN_BROADCAST: 6h (or payload expires_at)
+      maxHops: EventTypeV2.maxHopsDefault(EventTypeV2.adminBroadcast) ?? 12,
+    );
+  }
+
   // ── Active-field resolution (A5) ───────────────────────────────────────
   //
   // Every non-control publish rides the single active field's (field_id,

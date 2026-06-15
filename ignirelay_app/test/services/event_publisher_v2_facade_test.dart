@@ -471,6 +471,61 @@ void main() {
     expect(decoded.location.lngE7, 1215600000);
   });
 
+  test('publishAdminBroadcast encodes a typed AdminBroadcastData payload (A9)',
+      () async {
+    final registry = PeerCapabilityRegistry(
+      helloTimeout: const Duration(seconds: 5),
+    );
+    final bridge = await _makeRecordingBridge(registry);
+    final facade = EventPublisherV2Facade(
+      registry: registry,
+      bridge: bridge,
+    );
+    addTearDown(() async {
+      await facade.dispose();
+      await registry.dispose();
+    });
+    _markPeerActive(registry, 'AD:01');
+
+    final outcome = await facade.publishAdminBroadcast(message: '請保持冷靜');
+    expect(outcome.anyAccepted, isTrue);
+    expect(bridge.invocations.length, 1);
+
+    final call = bridge.invocations.single;
+    // §6 matrix: ADMIN_BROADCAST → ALERT; §11.2: TTL 6h, max_hops 12.
+    expect(call.eventType, EventTypeV2.adminBroadcast);
+    expect(call.priority, PriorityV2.alert);
+    expect(call.maxHops, 12);
+    expect(
+      call.expiresAtHlc.msSinceEpoch - call.createdAtHlc.msSinceEpoch,
+      const Duration(hours: 6).inMilliseconds,
+    );
+
+    final decoded = AdminBroadcastData.decode(call.payload);
+    expect(decoded.scope, AdminScope.all); // toAllNodes default
+    expect(decoded.message, '請保持冷靜');
+    // The payload carries an expires_at so receivers can auto-dismiss the banner.
+    expect(decoded.expiresAt.msSinceEpoch, greaterThan(0));
+  });
+
+  test('publishAdminBroadcast rejects an over-budget message (ArgumentError)',
+      () async {
+    final registry = PeerCapabilityRegistry(
+      helloTimeout: const Duration(seconds: 5),
+    );
+    final facade = EventPublisherV2Facade(registry: registry);
+    addTearDown(() async {
+      await facade.dispose();
+      await registry.dispose();
+    });
+
+    final tooLong = 'x' * (AdminBroadcastData.kMessageMaxLen + 1);
+    expect(
+      () => facade.publishAdminBroadcast(message: tooLong),
+      throwsArgumentError,
+    );
+  });
+
   test('multi-field switch → published field_id follows the active field (A7)',
       () async {
     final registry = PeerCapabilityRegistry(

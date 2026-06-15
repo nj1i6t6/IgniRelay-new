@@ -119,6 +119,9 @@ class V2InboundProjector {
         case EventTypeV2.checkpoint:
           await _projectCheckpoint(accepted, eventId);
           break;
+        case EventTypeV2.adminBroadcast:
+          await _projectAdminBroadcast(accepted, eventId);
+          break;
         default:
           // Not a UI-surfaced type (supply / match / official / control);
           // nothing to project into the v1 read-model.
@@ -311,6 +314,28 @@ class V2InboundProjector {
       accepted: a,
       lat: hasLoc ? loc.latDegrees : null,
       lng: hasLoc ? loc.lngDegrees : null,
+    );
+  }
+
+  Future<void> _projectAdminBroadcast(
+      DispatchAccepted a, String eventId) async {
+    final ab = AdminBroadcastData.decode(a.envelope.payload);
+    final expiresMs = ab.expiresAt.msSinceEpoch; // 0 == no expiry
+    // Plain-JSON snapshot. ADMIN_BROADCAST has no v1 enum, so the row is tagged
+    // LocalReadModelType.adminBroadcast (local read-model only, never on wire).
+    // Distinct directives coexist (spec §10.2 — not LWW); the UI auto-dismisses
+    // each by `expires_ms`.
+    final snapshot = <String, dynamic>{
+      'scope': ab.scope,
+      'message': ab.message,
+      if (expiresMs != 0) 'expires_ms': expiresMs,
+    };
+    await _ingest(
+      eventId: eventId,
+      v1EventType: LocalReadModelType.adminBroadcast,
+      urgency: 0,
+      payload: utf8.encode(jsonEncode(snapshot)),
+      accepted: a,
     );
   }
 

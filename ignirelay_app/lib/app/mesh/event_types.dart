@@ -92,4 +92,11 @@ class LocalReadModelType {
   /// keyed by envelope_id (never collapsed). The row's payload holds a plain-JSON
   /// crossing snapshot (checkpoint_id / anon / location), NOT a protobuf.
   static const int checkpoint = 9003;
+
+  /// Projected ADMIN_BROADCAST directive (A9). Wire source =
+  /// `EventTypeV2.adminBroadcast` (82); the *read-model* tag, NOT the wire type.
+  /// Distinct directives coexist (spec §10.2 — not LWW); the UI auto-dismisses
+  /// each by its payload `expires_at`. The row payload holds a plain-JSON snapshot
+  /// (scope / message / expires_ms), NOT a protobuf.
+  static const int adminBroadcast = 9004;
 }

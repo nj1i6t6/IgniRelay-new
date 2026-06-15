@@ -12,6 +12,7 @@ import 'package:ignirelay_app/app/services/event_store.dart';
 import 'package:ignirelay_app/ui/shell/admin_broadcast_banner.dart';
 import 'package:ignirelay_app/ui/shell/checkpoint_card.dart';
 import 'package:ignirelay_app/ui/screens/field/field_screen.dart';
+import 'package:ignirelay_app/ui/screens/position/last_seen_screen.dart';
 import 'package:ignirelay_app/ui/screens/sos/sos_screen.dart';
 
 /// Phase 0b mapless debug shell.
@@ -233,6 +234,12 @@ class _DebugShellState extends State<DebugShell> {
     );
   }
 
+  Future<void> _openLastSeen() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const LastSeenScreen()),
+    );
+  }
+
   Widget _meshCard(bool active, TransportStats stats) {
     return Card(
       child: Padding(
@@ -330,8 +337,17 @@ class _DebugShellState extends State<DebugShell> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('最近 PRESENCE 足跡',
-                style: TextStyle(fontWeight: FontWeight.bold)),
+            Row(children: [
+              const Text('最近 PRESENCE 足跡',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              const Spacer(),
+              // A10 — 開啟「最後可信位置」推估卡片頁（mapless）。
+              FilledButton.tonalIcon(
+                onPressed: _openLastSeen,
+                icon: const Icon(Icons.location_searching, size: 18),
+                label: const Text('最後可信位置'),
+              ),
+            ]),
             const SizedBox(height: 4),
             const Text(
               'mapless 定位（§3.6）：收到的 PRESENCE evidence（anon / 來源 / 時間 / 經緯）。',

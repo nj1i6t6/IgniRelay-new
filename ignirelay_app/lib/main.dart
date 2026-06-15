@@ -38,6 +38,7 @@ import 'package:ignirelay_app/app/services/v2_inbound_projector.dart';
 import 'package:ignirelay_app/app/controllers/event_publisher.dart';
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/controllers/presence_controller.dart';
+import 'package:ignirelay_app/app/controllers/presence_beacon_controller.dart';
 import 'package:ignirelay_app/app/controllers/sos_controller.dart';
 import 'package:ignirelay_app/app/controllers/active_field_controller.dart';
 import 'package:ignirelay_app/app/services/anon_identity.dart';
@@ -473,6 +474,30 @@ class _IgniRelayAppState extends State<IgniRelayApp> {
         // The debug field card watches it; the publish facade reads it.
         ListenableProvider<ActiveFieldController>.value(
           value: _activeFieldController,
+        ),
+        // A9 (1) — automatic PRESENCE beacon. Publishes a footprint every 120s
+        // (300s when battery < 20%) ONLY while the mesh is running AND a field
+        // is joined (the two gates). Reuses the A2 PresenceController publish
+        // path; battery comes from DeviceInfoController (guarded — returns null
+        // on a headless / no-plugin platform, which keeps the normal cadence).
+        // ChangeNotifierProvider so its loop timer is cancelled on teardown.
+        ChangeNotifierProvider<PresenceBeaconController>(
+          create: (context) => PresenceBeaconController(
+            publish: ({int? batteryHint}) => context
+                .read<PresenceController>()
+                .publishPresence(batteryHint: batteryHint),
+            isMeshRunning: () =>
+                context.read<MeshRuntimeController>().transportActive,
+            hasJoinedField: () =>
+                context.read<ActiveFieldController>().active != null,
+            readBattery: () async {
+              try {
+                return await context.read<DeviceInfoController>().batteryLevel();
+              } catch (_) {
+                return null;
+              }
+            },
+          ),
         ),
         Provider<MeshTransport>.value(
           value: widget.transport,

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:ignirelay_app/app/controllers/active_field_controller.dart';
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/controllers/mesh_runtime_controller.dart';
+import 'package:ignirelay_app/app/controllers/presence_beacon_controller.dart';
 import 'package:ignirelay_app/app/controllers/presence_controller.dart';
 import 'package:ignirelay_app/app/services/event_store.dart';
 import 'package:ignirelay_app/ui/screens/field/field_screen.dart';
@@ -265,6 +266,7 @@ class _DebugShellState extends State<DebugShell> {
       Text('$label: $v', style: const TextStyle(fontSize: 13));
 
   Widget _actionsCard() {
+    final beacon = context.watch<PresenceBeaconController>();
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -288,10 +290,30 @@ class _DebugShellState extends State<DebugShell> {
                 label: const Text('發 SOS'),
               ),
             ]),
+            const Divider(height: 20),
+            // A9 (1) — automatic PRESENCE beacon toggle. Only beacons while the
+            // mesh is running AND a field is joined; cadence 120s / 300s(<20%).
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              value: beacon.enabled,
+              onChanged: (v) => beacon.setEnabled(v),
+              title: const Text('自動 PRESENCE 信標',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              subtitle: Text(_beaconStatus(beacon),
+                  style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  String _beaconStatus(PresenceBeaconController b) {
+    if (!b.enabled) return '已關閉';
+    final secs = b.currentInterval.inSeconds;
+    final low = b.isLowBattery ? '（低電降頻）' : '';
+    return '每 $secs 秒 · 已發 ${b.beaconCount} 次$low';
   }
 
   Widget _positionCard() {

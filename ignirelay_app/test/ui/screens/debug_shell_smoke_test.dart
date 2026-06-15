@@ -16,6 +16,7 @@ import 'dart:typed_data';
 import 'package:ignirelay_app/app/controllers/active_field_controller.dart';
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/controllers/mesh_runtime_controller.dart';
+import 'package:ignirelay_app/app/controllers/presence_beacon_controller.dart';
 import 'package:ignirelay_app/app/controllers/presence_controller.dart';
 import 'package:ignirelay_app/app/db/database_helper.dart';
 import 'package:ignirelay_app/app/mesh/mesh_event_handler.dart';
@@ -44,6 +45,7 @@ Widget _wrap(
   Widget child,
   PresenceController presence,
   ActiveFieldController field,
+  PresenceBeaconController beacon,
 ) {
   return MultiProvider(
     providers: [
@@ -64,8 +66,22 @@ Widget _wrap(
       ),
       Provider<PresenceController>.value(value: presence),
       ListenableProvider<ActiveFieldController>.value(value: field),
+      ChangeNotifierProvider<PresenceBeaconController>.value(value: beacon),
     ],
     child: MaterialApp(home: child),
+  );
+}
+
+/// A beacon whose loop is disabled (enabled:false) so the widget test carries
+/// no pending fake timer; its gates are wired to the harness anyway.
+PresenceBeaconController _makeBeacon(
+    PresenceController presence, ActiveFieldController field) {
+  return PresenceBeaconController(
+    publish: ({int? batteryHint}) =>
+        presence.publishPresence(batteryHint: batteryHint),
+    isMeshRunning: () => false,
+    hasJoinedField: () => field.active != null,
+    enabled: false,
   );
 }
 
@@ -116,14 +132,17 @@ void main() {
     final registry = PeerCapabilityRegistry();
     final facade = EventPublisherV2Facade(registry: registry);
     final field = await makeField(); // no field joined
+    final presence = makePresence(registry, facade);
+    final beacon = _makeBeacon(presence, field);
     addTearDown(() async {
+      beacon.dispose();
       await facade.dispose();
       await registry.dispose();
       field.dispose();
     });
 
     await tester.pumpWidget(
-      _wrap(const DebugShell(), makePresence(registry, facade), field),
+      _wrap(const DebugShell(), presence, field, beacon),
     );
     await tester.pump();
 
@@ -145,6 +164,10 @@ void main() {
     expect(find.text('發 PRESENCE'), findsOneWidget);
     expect(find.text('發 SOS'), findsOneWidget);
 
+    // A9 (1) — automatic PRESENCE beacon toggle renders.
+    expect(find.text('自動 PRESENCE 信標'), findsOneWidget);
+    expect(find.byType(SwitchListTile), findsOneWidget);
+
     // presence section
     expect(find.text('最近 PRESENCE 足跡'), findsOneWidget);
 
@@ -158,14 +181,17 @@ void main() {
     final facade = EventPublisherV2Facade(registry: registry);
     final field = await makeField(joined: true);
     facade.attachActiveField(field); // production wiring: facade rides active field
+    final presence = makePresence(registry, facade);
+    final beacon = _makeBeacon(presence, field);
     addTearDown(() async {
+      beacon.dispose();
       await facade.dispose();
       await registry.dispose();
       field.dispose();
     });
 
     await tester.pumpWidget(
-      _wrap(const DebugShell(), makePresence(registry, facade), field),
+      _wrap(const DebugShell(), presence, field, beacon),
     );
     await tester.pump();
 

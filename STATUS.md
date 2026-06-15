@@ -642,3 +642,58 @@
   GATE-KOTLIN-BUILD / GATE-CONF-DART 未重跑（純 Dart 邏輯，未動 wire/corpus/Kotlin；A7 已證綠）。
 - deviations: 無。
 - next: A8（SOS UX，白皮書 §13.4）。
+
+---
+
+## [2026-06-15] A8 DONE（SOS UX：長按→倒數→帶位置發送 + 我安全了解除）
+
+- repo/commit: IgniRelay @ `d7f2921`
+- 執行者: Claude（主理 AI）
+- 範圍: MASTER_EXECUTION_PLAN A8 步驟 1–5（白皮書 §13.4；UI 任務）。
+- 變更:
+  - **發送端狀態機** `lib/app/controllers/sos_controller.dart`（SosController/ChangeNotifier）：
+    `idle ─arm(severity)→ countdown(5s 可取消) ─elapsed→ sending → sent`；
+    `cancelCountdown` 於送出前中止（誤觸防護）。送出走
+    `publishStatusUpdate(safetyState, location)`，§5.3 floor 由 facade 套用
+    （TRAPPED→SOS_RED / INJURED→SOS_YELLOW）。UI 面 `enum SosSeverity`
+    （trapped/injured）映射 wire `SafetyState`——**使 UI 不 import app/proto**
+    （GATE-LAYERS 攔到首版 sos_screen 直接 import event_envelope_v2，已改 enum 修正）。
+    `markSafe()`=「我安全了」後送 `STATUS_UPDATE(SAFE)`（**OD-8：不新增 SOS_CANCELLED
+    wire 型別**；LWW spec §10.2 收斂）。
+  - **UI**（守 DESIGN_LANGUAGE §4：`context.igni`＋Igni 元件，screen 內 0 `Colors.*`）
+    `lib/ui/screens/sos/`：`sos_screen.dart`（368 行≤500；長按 1.5s 觸發→狀態選擇
+    受困 RED/受傷 YELLOW→5s 倒數〔取消鈕 ≥64dp〕→送出後狀態列吃 `BroadcastOutcome`
+    〔queued/sent/peers〕→「我安全了」；收方 `sosAlerts` 告警卡〔位置＋相對時間〕，
+    收同 author 的 SAFE 即標「已解除」）＋`sos_hold_button.dart`（按住 1.5s 才觸發、
+    進度環為 hold 功能性回饋、圓鈕 ≥96dp）。
+  - debug shell「發 SOS」改推 `SosScreen`（移除 `_todoWire` 占位）。
+  - **收方解除**：`event_types.dart` +`LocalReadModelType.sosResolved=9002`（本地
+    read-model 標記，**非 wire 型別**）；`v2_inbound_projector` 收 STATUS_UPDATE
+    safetyState=SAFE → 投影 `sosResolved` row（author=sender_pub_key），UNSAFE 仍不投影；
+    `event_stream` +`SosResolved`＋`sosResolutions` typed stream（以 author hex 標記）。
+  - `main.dart` +`ChangeNotifierProvider<SosController>`。
+- 測試（+10）:
+  - `test/controllers/sos_controller_test.dart`（5）：arm→countdown 不發、cancel 中止、
+    countdown→送出＋TRAPPED floor=SOS_RED、INJURED floor=SOS_YELLOW、markSafe 後送
+    SAFE(STATUS)＋清作用 SOS。**讀 Outbox_V2 的 priority+payload 斷言 §5.3 floor，免架
+    recording BLE bridge**（real facade＋joined field＋無 peer → 佇列持久化）。
+  - `test/ui/screens/sos_screen_test.dart`（3）：trigger＋空收方、長按→選擇→倒數→取消、
+    倒數→送出橫幅＋我安全了（送出態因真實 DB I/O 用 `tester.runAsync` 放行）。
+  - `v2_inbound_projector_test`：+SAFE→sosResolved＋sosResolutions；既有「SAFE 不投影」
+    測試改測 UNSAFE 仍不投影（A8 改 SAFE 為投影解除 row）。
+- DoD: D1 ✅（觸發/倒數/取消/送出四態測試綠）/ D2 ✅（解除流：markSafe SAFE＋收方
+  sosResolved read-model＋sosResolutions stream）/ D3 ✅（通用 gate 全綠）。
+- 禁止事項（逐項守）: 未跳過倒數（arm 一律進倒數、`_send` 僅倒數結束後觸發；無 direct-publish
+  路徑）；未新增 `SOS_CANCELLED` wire 型別（`sosResolved` 為本地 read-model）。
+- gates（G17 逐字，皆 exit 0）:
+  - `dart run tool/check_layers.dart --strict` → `ok — no boundary violations`
+  - `flutter analyze` → `2 issues found`（2 既有 info），**0 errors / 0 新 issue**
+  - `flutter test` → `00:18 +541 ~3: All tests passed!`（A7 +531 → +541：A8 +10）
+  - `dart run tool/generate_wire_conformance_v1.dart --check` → 確定性 OK（未碰 corpus/wire）
+  - `cd android; ./gradlew :app:assembleDebugAndroidTest` → `BUILD SUCCESSFUL in 22s`
+  - DESIGN_LANGUAGE §6 App gate：`grep Colors. lib/ui/screens/sos/` = 0。
+- 觀察（同 A7，非 A8 範圍）: `design_showcase_screen.dart` 4 處既有 `Colors.*`（debug-only
+  對照頁）仍在，G5 禁順手清。
+- deviations: 無偏離。首版 sos_screen import app/proto 取 `SafetyState` 被 GATE-LAYERS 攔，
+  已改為 controller 暴露 UI 安全 `SosSeverity` enum 修正。
+- next: A9（PRESENCE 週期信標 + CHECKPOINT + ADMIN_BROADCAST 顯示）。

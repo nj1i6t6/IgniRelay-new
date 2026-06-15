@@ -697,3 +697,36 @@
 - deviations: 無偏離。首版 sos_screen import app/proto 取 `SafetyState` 被 GATE-LAYERS 攔，
   已改為 controller 暴露 UI 安全 `SosSeverity` enum 修正。
 - next: A9（PRESENCE 週期信標 + CHECKPOINT + ADMIN_BROADCAST 顯示）。
+
+## [2026-06-15] A9-1 DONE（PRESENCE 週期信標：mesh+場域雙閘 120s/低電300s）
+
+A9 拆三刀之一（GPT review 建議）：`[A9-1]` PRESENCE beacon only。code commit `f7627de`。
+- 新 `lib/app/controllers/presence_beacon_controller.dart`（ChangeNotifier）：自動 PRESENCE
+  足跡信標，走 A2 `PresenceController.publishPresence` 同一發佈路徑（不另開 wire/路徑）。
+  - **週期常數化**：normal 120s；電量 <20%（`lowBatteryThreshold`）降頻 300s。每次 re-arm
+    前重讀電量 → cadence 逐輪自適應，**含首個間隔**（低電時第一拍即 300s）。
+  - **雙閘**：`isMeshRunning` ∧ `hasJoinedField` 才發；否則 tick 為 NO-OP（**禁止事項
+    「beacon 在未加入場域時發送」**：零場域 PRESENCE 會被 A5 §21.6 拒/peer 丟，故不嘗試）。
+    閘未過仍 re-arm，條件成立即恢復，毋須使用者手動切換。
+  - 一次性 `Timer` 每輪重排（**非 `Timer.periodic`**，故 cadence 可逐輪改）；clock/電量/
+    閘/publish 皆 callback 注入 → fake clock 全覆蓋。UI 開關預設 ON。
+- `main.dart`：`ChangeNotifierProvider<PresenceBeaconController>`；電量自既有
+  `DeviceInfoController.batteryLevel()`（守護 try/catch，headless/無 plugin 回 null →
+  維持 normal cadence）。**未新增依賴**（G13）。
+- `debug shell`：actions 卡片加「自動 PRESENCE 信標」`SwitchListTile` + 狀態列
+  （cadence / 已發次數 / 低電降頻標記）。
+- 測試（+6）：`test/controllers/presence_beacon_controller_test.dart`（fake_async）：
+  120s 週期累進、低電 300s 降頻（含首間隔）、無場域不發（閘）、mesh 停不發（閘）、
+  開關停/復、建構即關不武裝。smoke test 補 beacon provider + 開關渲染斷言。
+- DoD：D1 ✅（beacon controller fake-clock 測試綠）。D2/D3 屬 A9-2/A9-3。
+- 禁止事項（逐項守）：未加入場域時不 beacon（雙閘 + 專測）。
+- gates（本刀跑 3 項，皆 exit 0）:
+  - `dart run tool/check_layers.dart --strict` → `ok — no boundary violations`
+  - `flutter analyze lib test` → `2 issues found`（2 既有 baseline info），**0 errors / 0 新 issue**
+    （fake_async 為 plan 指定 fake clock，已在 flutter_test transitive 依賴樹；以 inline
+    `ignore: depend_on_referenced_packages` 抑制而**不動依賴清單**，G13）
+  - `flutter test` → `00:17 +547 ~3: All tests passed!`（A8 +541 → +547：A9-1 +6）
+  - GATE-CONF-DART / GATE-KOTLIN-BUILD：本刀未碰 wire/corpus/native/deps，與 A8 同態，
+    於 A9 收尾統一確認（見 A9-3）。
+- deviations: 無偏離。
+- next: A9-2（CHECKPOINT：手動按鈕 + checkpoint_id + publish/projector/read-model 列表）。

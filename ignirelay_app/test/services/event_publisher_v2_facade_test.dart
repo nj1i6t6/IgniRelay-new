@@ -424,6 +424,43 @@ void main() {
     expect(call.fieldId!, orderedEquals(expectedFieldId));
   });
 
+  test('multi-field switch → published field_id follows the active field (A7)',
+      () async {
+    final registry = PeerCapabilityRegistry(
+      helloTimeout: const Duration(seconds: 5),
+    );
+    final bridge = await _makeRecordingBridge(registry);
+    final facade = EventPublisherV2Facade(registry: registry, bridge: bridge);
+    final secretA = Uint8List.fromList(List<int>.filled(32, 0x11));
+    final secretB = Uint8List.fromList(List<int>.filled(32, 0x22));
+    final fieldCtrl = await _makeFieldController(secret: secretA); // A active
+    facade.attachActiveField(fieldCtrl);
+    addTearDown(() async {
+      await facade.dispose();
+      await registry.dispose();
+      fieldCtrl.dispose();
+    });
+    _markPeerActive(registry, 'SW:01');
+
+    final idA = await FieldAuthV2.deriveFieldId(secretA);
+    final idB = await FieldAuthV2.deriveFieldId(secretB);
+    expect(idA, isNot(orderedEquals(idB)));
+
+    // 1) active = A → the send rides A's field_id.
+    await facade.publishPresence(anonUserId: Uint8List(16));
+    expect(bridge.invocations.last.fieldId!, orderedEquals(idA));
+
+    // 2) join B → B becomes active → the next send rides B's field_id.
+    await fieldCtrl.joinBySecret(secretB, displayName: 'B');
+    await facade.publishPresence(anonUserId: Uint8List(16));
+    expect(bridge.invocations.last.fieldId!, orderedEquals(idB));
+
+    // 3) switch back to A (joinedFields is oldest-first ⇒ first = A).
+    fieldCtrl.setActive(fieldCtrl.joinedFields.first.fieldIdHex);
+    await facade.publishPresence(anonUserId: Uint8List(16));
+    expect(bridge.invocations.last.fieldId!, orderedEquals(idA));
+  });
+
   test('non-control publish with no joined field returns noField (not queued)',
       () async {
     final registry = PeerCapabilityRegistry(

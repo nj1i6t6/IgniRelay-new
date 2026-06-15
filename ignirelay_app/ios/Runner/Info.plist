@@ -10,6 +10,8 @@
 	<string>烽傳 IgniRelay 需要藍牙權限來建立離線 Mesh 網路，在無網路環境下傳遞急難救助資訊。</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>烽傳 IgniRelay 需要藍牙權限來與附近裝置交換急難救助資訊。</string>
+	<key>NSCameraUsageDescription</key>
+	<string>烽傳 IgniRelay 需要相機權限來掃描場域 QR Code 以加入場域；您也可改用輸入代碼加入。</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>

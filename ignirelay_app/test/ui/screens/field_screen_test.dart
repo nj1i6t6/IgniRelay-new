@@ -1,0 +1,144 @@
+// A7 — FieldScreen widget test: empty state, code-input join (the upgraded A5
+// hex dialog, now also accepting an IGNI1 QR string), active-field summary, and
+// QR display. The camera scan path (FieldScanScreen / mobile_scanner) needs a
+// real camera and is verified by the A11 USER-GATE, not here.
+
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+import 'package:ignirelay_app/app/controllers/active_field_controller.dart';
+import 'package:ignirelay_app/app/db/database_helper.dart';
+import 'package:ignirelay_app/app/services/anon_identity.dart';
+import 'package:ignirelay_app/app/services/field_qr_codec.dart';
+import 'package:ignirelay_app/app/services/field_session_store.dart';
+import 'package:ignirelay_app/ui/screens/field/field_screen.dart';
+
+class _FakeKvStore implements SecureKvStore {
+  final Map<String, String> _m = {};
+  @override
+  Future<String?> read(String key) async => _m[key];
+  @override
+  Future<void> write(String key, String value) async => _m[key] = value;
+  @override
+  Future<void> delete(String key) async => _m.remove(key);
+}
+
+Future<ActiveFieldController> _makeController() async => ActiveFieldController(
+      store: FieldSessionStore(
+        db: DatabaseHelper(),
+        secureStore: _FakeKvStore(),
+      ),
+    );
+
+Widget _wrap(ActiveFieldController field) => MultiProvider(
+      providers: [
+        ListenableProvider<ActiveFieldController>.value(value: field),
+      ],
+      child: const MaterialApp(home: FieldScreen()),
+    );
+
+void main() {
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfiNoIsolate;
+    DatabaseHelper.testDatabasePathOverride = inMemoryDatabasePath;
+  });
+
+  setUp(() async {
+    await DatabaseHelper().resetForTest();
+  });
+
+  testWidgets('empty state when no field joined', (tester) async {
+    final field = await _makeController();
+    addTearDown(field.dispose);
+    await tester.pumpWidget(_wrap(field));
+    await tester.pump();
+
+    expect(find.text('場域'), findsOneWidget);
+    expect(find.text('尚未加入任何場域'), findsOneWidget);
+    expect(find.text('掃碼加入'), findsOneWidget);
+    expect(find.text('輸入代碼'), findsOneWidget);
+    expect(find.text('建立新場域'), findsOneWidget);
+    // No joined-field section.
+    expect(find.textContaining('已加入的場域'), findsNothing);
+  });
+
+  testWidgets('active field summary + joined list render', (tester) async {
+    final field = await _makeController();
+    addTearDown(field.dispose);
+    await field.joinBySecret(
+      Uint8List.fromList(List<int>.filled(32, 0x5C)),
+      displayName: '中正紀念堂站',
+    );
+
+    await tester.pumpWidget(_wrap(field));
+    await tester.pump();
+
+    // Active card: name + 作用中 chip.
+    expect(find.text('中正紀念堂站'), findsWidgets);
+    expect(find.text('作用中'), findsOneWidget);
+    expect(find.text('已加入的場域（1）'), findsOneWidget);
+  });
+
+  testWidgets('code input joins from a valid IGNI1 code', (tester) async {
+    final field = await _makeController();
+    addTearDown(field.dispose);
+    await tester.pumpWidget(_wrap(field));
+    await tester.pump();
+
+    final code = FieldQrCodec.encode(FieldQrPayload(
+      secret: Uint8List.fromList(List<int>.generate(32, (i) => i)),
+      displayName: '南港展覽館',
+    ));
+
+    await tester.tap(find.text('輸入代碼'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), code);
+    await tester.tap(find.text('加入'));
+    await tester.pumpAndSettle();
+
+    expect(field.joinedFieldCount, 1);
+    expect(field.active?.displayName, '南港展覽館');
+    expect(find.text('南港展覽館'), findsWidgets);
+  });
+
+  testWidgets('bad code prompts and does not crash or join', (tester) async {
+    final field = await _makeController();
+    addTearDown(field.dispose);
+    await tester.pumpWidget(_wrap(field));
+    await tester.pump();
+
+    // Well-formed prefix but a corrupt secret segment → decode error prompt.
+    await tester.tap(find.text('輸入代碼'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'IGNI1:!!!notb64!!!:name');
+    await tester.tap(find.text('加入'));
+    await tester.pumpAndSettle();
+
+    expect(field.joinedFieldCount, 0);
+    expect(find.textContaining('密鑰格式錯誤'), findsOneWidget);
+  });
+
+  testWidgets('QR sheet shows a QrImageView for a joined field', (tester) async {
+    final field = await _makeController();
+    addTearDown(field.dispose);
+    await field.joinBySecret(
+      Uint8List.fromList(List<int>.filled(32, 0x33)),
+      displayName: 'QR 場域',
+    );
+    await tester.pumpWidget(_wrap(field));
+    await tester.pump();
+
+    await tester.tap(find.byIcon(Icons.qr_code_2));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(QrImageView), findsOneWidget);
+    expect(find.text('完成'), findsOneWidget);
+  });
+}

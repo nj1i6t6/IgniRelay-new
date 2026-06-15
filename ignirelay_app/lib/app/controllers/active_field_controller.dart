@@ -18,6 +18,8 @@
 // (FieldSessionStore); this controller derives the public `field_id` and the
 // `field_mac_key` from it on load / join and holds only those derived values.
 
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 
 import 'package:ignirelay_app/app/crypto/field_auth_v2.dart';
@@ -143,6 +145,32 @@ class ActiveFieldController extends ChangeNotifier {
     return field;
   }
 
+  /// Create a brand-new field: generate a fresh random 32-byte
+  /// `field_join_secret`, join it (persist + derive + make active), and return
+  /// both the joined field AND that secret so the caller can render its join
+  /// QR (A7 "建立場域→顯示 QR"). The secret is handed back exactly once for
+  /// display; it otherwise lives only in secure storage (see
+  /// [exportSecretForQr]) and must never be logged or copied to the clipboard.
+  Future<({ActiveField field, Uint8List secret})> createField({
+    required String displayName,
+    String? cloudBaseUrl,
+  }) async {
+    final secret = _randomSecret();
+    final field = await joinBySecret(
+      secret,
+      displayName: displayName,
+      cloudBaseUrl: cloudBaseUrl,
+    );
+    return (field: field, secret: secret);
+  }
+
+  /// Re-read a JOINED field's `field_join_secret` from secure storage so the UI
+  /// can re-display its join QR to another device. Returns `null` if the field
+  /// is not joined or its secret is missing. For QR rendering only — the secret
+  /// must not be logged or placed on the clipboard.
+  Future<Uint8List?> exportSecretForQr(String fieldIdHex) =>
+      _store.secretFor(fieldIdHex.toLowerCase());
+
   /// Switch the active sending field to a joined field. No-op (no notify) when
   /// [fieldIdHex] is not joined.
   void setActive(String fieldIdHex) {
@@ -174,6 +202,15 @@ class ActiveFieldController extends ChangeNotifier {
   /// was enqueued under (returns `null` if that field has since been left).
   Uint8List? macKeyForFieldId(Uint8List fieldId) =>
       _keyStore.macKeyFor(fieldId);
+
+  static Uint8List _randomSecret() {
+    final rng = Random.secure();
+    final out = Uint8List(32);
+    for (var i = 0; i < out.length; i++) {
+      out[i] = rng.nextInt(256);
+    }
+    return out;
+  }
 
   static Future<ActiveField> _deriveField(
     List<int> secret,

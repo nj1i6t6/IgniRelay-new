@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +8,7 @@ import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/controllers/mesh_runtime_controller.dart';
 import 'package:ignirelay_app/app/controllers/presence_controller.dart';
 import 'package:ignirelay_app/app/services/event_store.dart';
+import 'package:ignirelay_app/ui/screens/field/field_screen.dart';
 
 /// Phase 0b mapless debug shell.
 ///
@@ -32,7 +32,6 @@ class _DebugShellState extends State<DebugShell> {
   late final EventStream _events;
   late final EventStore _store;
   late final PresenceController _presence;
-  late final ActiveFieldController _field;
 
   StreamSubscription<EventLogChanged>? _logSub;
   StreamSubscription<TransportState>? _stateSub;
@@ -50,7 +49,6 @@ class _DebugShellState extends State<DebugShell> {
     _events = context.read<EventStream>();
     _store = context.read<EventStore>();
     _presence = context.read<PresenceController>();
-    _field = context.read<ActiveFieldController>();
     _state = _runtime.transportActive
         ? TransportState.running
         : TransportState.stopped;
@@ -172,8 +170,10 @@ class _DebugShellState extends State<DebugShell> {
 
   // ── 場域（field-scope）─────────────────────────────────────────────────
   //
-  // A5 debug-only join surface: enter a 64-hex field_join_secret, or generate
-  // a new random one to read into another phone. The real QR / code UX is A7.
+  // Compact status + a launcher into the full A7 field page (建立 / 顯示 QR /
+  // 掃碼加入 / 代碼加入 / 多場域切換 / 離開). The A5 inline hex dialog was
+  // superseded by `FieldScreen` (the code-input there accepts both an IGNI1 QR
+  // string and the legacy 64-hex secret).
 
   Widget _fieldCard(ActiveFieldController field) {
     final active = field.active;
@@ -190,6 +190,12 @@ class _DebugShellState extends State<DebugShell> {
               const SizedBox(width: 6),
               const Text('場域（field-scope）',
                   style: TextStyle(fontWeight: FontWeight.bold)),
+              const Spacer(),
+              FilledButton.tonalIcon(
+                onPressed: _busy ? null : _openFieldScreen,
+                icon: const Icon(Icons.tune, size: 18),
+                label: const Text('場域管理'),
+              ),
             ]),
             const SizedBox(height: 6),
             if (active != null) ...[
@@ -201,153 +207,18 @@ class _DebugShellState extends State<DebugShell> {
                       color: Colors.grey,
                       fontFamily: 'monospace')),
             ] else
-              const Text('尚未加入場域 — 送出事件前需先加入或產生一個場域。',
+              const Text('尚未加入場域 — 送出事件前需先加入或建立一個場域。',
                   style: TextStyle(fontSize: 12, color: Colors.orange)),
-            const SizedBox(height: 8),
-            Wrap(spacing: 8, children: [
-              OutlinedButton.icon(
-                onPressed: _busy ? null : _showJoinByCodeDialog,
-                icon: const Icon(Icons.vpn_key, size: 18),
-                label: const Text('以代碼加入'),
-              ),
-              OutlinedButton.icon(
-                onPressed: _busy ? null : _generateNewField,
-                icon: const Icon(Icons.add_circle_outline, size: 18),
-                label: const Text('產生新場域'),
-              ),
-            ]),
-            if (field.joinedFields.length > 1) ...[
-              const SizedBox(height: 8),
-              const Text('切換作用場域：',
-                  style: TextStyle(fontSize: 12, color: Colors.grey)),
-              Wrap(spacing: 6, children: [
-                for (final f in field.joinedFields)
-                  ChoiceChip(
-                    label: Text(f.shortId,
-                        style: const TextStyle(
-                            fontFamily: 'monospace', fontSize: 11)),
-                    selected: active?.fieldIdHex == f.fieldIdHex,
-                    onSelected:
-                        _busy ? null : (_) => _field.setActive(f.fieldIdHex),
-                  ),
-              ]),
-            ],
           ],
         ),
       ),
     );
   }
 
-  Future<void> _showJoinByCodeDialog() async {
-    final controller = TextEditingController();
-    final secret = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('以代碼加入場域'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              '輸入 64 個十六進位字元的 field_join_secret（32 bytes）。'
-              '此為 debug 入口；正式的 QR / 代碼流程在 A7。',
-              style: TextStyle(fontSize: 12),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              maxLength: 64,
-              decoration: const InputDecoration(
-                hintText: 'a1b2c3…（64 hex）',
-                border: OutlineInputBorder(),
-              ),
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: const Text('加入'),
-          ),
-        ],
-      ),
+  Future<void> _openFieldScreen() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const FieldScreen()),
     );
-    if (secret == null || secret.isEmpty) return;
-    final bytes = _decodeHex32(secret);
-    if (bytes == null) {
-      _snack('場域代碼格式錯誤：需為 64 個十六進位字元');
-      return;
-    }
-    await _joinSecret(bytes, name: '場域-${secret.substring(0, 4)}');
-  }
-
-  Future<void> _generateNewField() async {
-    final rng = Random.secure();
-    final bytes =
-        List<int>.generate(32, (_) => rng.nextInt(256), growable: false);
-    final hex = _encodeHex(bytes);
-    await _joinSecret(bytes, name: '新場域-${hex.substring(0, 4)}');
-    if (!mounted) return;
-    // Show the secret so another phone can join the same field via 以代碼加入.
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('已建立並加入新場域'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('把這串 field_join_secret 輸入另一台手機的「以代碼加入」即可同場域：',
-                style: TextStyle(fontSize: 12)),
-            const SizedBox(height: 10),
-            SelectableText(
-              hex,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(ctx).pop(), child: const Text('關閉')),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _joinSecret(List<int> secret, {required String name}) async {
-    setState(() => _busy = true);
-    try {
-      final field = await _field.joinBySecret(secret, displayName: name);
-      if (mounted) _snack('已加入場域 ${field.shortId}…');
-    } catch (e) {
-      if (mounted) _snack('加入場域失敗: $e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  // UI-local hex helpers — debug field code only; UI must not import app/proto.
-  static List<int>? _decodeHex32(String hex) {
-    final s = hex.trim().toLowerCase();
-    if (s.length != 64) return null;
-    final out = List<int>.filled(32, 0);
-    for (var i = 0; i < 32; i++) {
-      final byte = int.tryParse(s.substring(i * 2, i * 2 + 2), radix: 16);
-      if (byte == null) return null;
-      out[i] = byte;
-    }
-    return out;
-  }
-
-  static String _encodeHex(List<int> bytes) {
-    final sb = StringBuffer();
-    for (final b in bytes) {
-      sb.write(b.toRadixString(16).padLeft(2, '0'));
-    }
-    return sb.toString();
   }
 
   Widget _meshCard(bool active, TransportStats stats) {

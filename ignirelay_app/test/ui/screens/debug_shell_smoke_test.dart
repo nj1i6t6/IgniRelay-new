@@ -132,14 +132,14 @@ void main() {
     expect(find.text('IgniRelay · Phase 0b'), findsOneWidget);
 
     // BLE mesh toggle button（未注入 transport → 顯示「啟動」）
-    expect(find.byType(FilledButton), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '啟動'), findsOneWidget);
     expect(find.text('啟動'), findsOneWidget);
 
-    // #4-7 field card renders; no field joined → prompt + join buttons.
+    // #4-7 field card renders; no field joined → prompt + 場域管理 launcher
+    // (A7 moved join/create/QR/scan into FieldScreen).
     expect(find.text('場域（field-scope）'), findsOneWidget);
     expect(find.textContaining('尚未加入場域'), findsWidgets);
-    expect(find.text('以代碼加入'), findsOneWidget);
-    expect(find.text('產生新場域'), findsOneWidget);
+    expect(find.text('場域管理'), findsOneWidget);
 
     // PRESENCE (real) + SOS (still placeholder) buttons
     expect(find.text('發 PRESENCE'), findsOneWidget);

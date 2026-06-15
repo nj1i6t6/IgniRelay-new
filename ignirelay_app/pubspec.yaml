@@ -55,6 +55,13 @@ dependencies:
   # ── Permissions ───────────────────────────────────────────
   permission_handler: ^11.3.1
 
+  # ── Field-join UX (A7) ────────────────────────────────────
+  # 附錄 F 白名單：A7 場域加入 UX。qr_flutter=建立場域時顯示 QR；
+  # mobile_scanner=掃碼加入（需 CAMERA 權限，見 AndroidManifest / Info.plist）。
+  # QR 五段式格式與解析見 lib/app/services/field_qr_codec.dart。
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^5.1.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

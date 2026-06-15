@@ -34,8 +34,13 @@
     <!-- Phase 0b #3A: Health Connect 權限已移除（health 依賴下線、medical card
          產品降級;見 docs/REBUILD_PLAN.md §2）。 -->
 
+    <!-- ── Camera (A7：掃碼加入場域 / mobile_scanner) ───────────────── -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
     <!-- ── Hardware feature declarations ──────────────────────────────────── -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
+    <!-- 相機非必要：無相機仍可用「輸入代碼」加入場域，故 required=false -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
         android:label="烽傳"

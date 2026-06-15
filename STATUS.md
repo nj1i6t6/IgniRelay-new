@@ -730,3 +730,42 @@ A9 拆三刀之一（GPT review 建議）：`[A9-1]` PRESENCE beacon only。code
     於 A9 收尾統一確認（見 A9-3）。
 - deviations: 無偏離。
 - next: A9-2（CHECKPOINT：手動按鈕 + checkpoint_id + publish/projector/read-model 列表）。
+
+## [2026-06-15] A9-2 DONE（CHECKPOINT：手動點名通過 publish + 投影 + read-model 列表）
+
+A9 拆三刀之二：`[A9-2]` CHECKPOINT。code commit `226e1d2`。**wire 早於 Phase 0b #4-1
+已就位（CheckpointData / EventTypeV2.checkpoint=4 / 矩陣），本刀純收發接線、不碰 wire。**
+- facade `publishCheckpoint(anonUserId, checkpointId, location?)`：priority **STATUS**、
+  **TTL 12h**、**max_hops 6**（spec §6 matrix / §11.2 CHECKPOINT）。**非 LWW**（§10.2，
+  每次通過為獨立事件）。同非控制發佈走作用場域（A5），無場域→`noField`。
+- 新 `lib/app/controllers/checkpoint_controller.dart`（app 層，鏡像 PresenceController）：
+  組 anon_user_id ＋ GPS evidence 後呼叫 facade，**使 UI 不 import app/proto**。
+- `v2_inbound_projector` +`case checkpoint`→`_projectCheckpoint`：寫
+  `LocalReadModelType.checkpoint=9003` read-model row（純 JSON snapshot：checkpoint_id/
+  anon8/src/observed/經緯；**非 protobuf、非 wire**）。
+- `event_stream` +`CheckpointCrossing`＋`checkpointCrossings` typed stream＋`case checkpoint`
+  （JSON snapshot 還原）＋dispose close。
+- `main.dart` +`Provider<CheckpointController>`。
+- UI：新 `lib/ui/shell/checkpoint_card.dart`（自帶 provider 讀取＋訂閱 → 使 `debug_shell.dart`
+  維持 <500 行 facade 上限；lib/ui/shell/ 不在 §6 Colors gate 掃描路徑內）。**手動 CHECKPOINT
+  按鈕僅 `kDebugMode`**（真實流程綁 Field Node QR/接觸→Stage D）＋ checkpoint_id 輸入對話框
+  ＋收到的點名通過清單（非 LWW，逐筆保留、以 eventId 去重重送）。`debug_shell` ListView
+  插入 `const CheckpointCard()`。
+- 測試（+4）:
+  - `event_publisher_v2_facade_test`：publishCheckpoint priority=STATUS / TTL 12h /
+    max_hops 6 / payload roundtrip。
+  - `v2_inbound_projector_test`：CHECKPOINT envelope → Event_Logs(event_type=checkpoint=9003)
+    ＋`checkpointCrossings` stream（checkpoint_id / anon8 / 經緯）。
+  - `test/ui/shell/checkpoint_card_test.dart`（2）：空狀態＋手動按鈕→對話框→queued。
+  - smoke test 補 `CheckpointController` provider；surface 加高（2400→3200）容 6 卡。
+- DoD：D2（CHECKPOINT 半）✅（projection + UI 測試綠）。
+- 禁止事項（逐項守）：手動 CHECKPOINT 入口 `kDebugMode` 包夾（release 無；ADMIN 發佈入口
+  屬 A9-3）。
+- gates（本刀跑 3 項，皆 exit 0）:
+  - `dart run tool/check_layers.dart --strict` → `ok — no boundary violations`
+  - `flutter analyze lib test` → `2 issues found`（2 既有 baseline info），**0 errors / 0 新 issue**
+  - `flutter test` → `00:17 +551 ~3: All tests passed!`（A9-1 +547 → +551：A9-2 +4）
+  - GATE-CONF-DART / GATE-KOTLIN-BUILD：本刀未碰 wire/corpus/native/deps，於 A9-3 收尾統一確認。
+- deviations: 無偏離。
+- next: A9-3（ADMIN_BROADCAST 接收：projector + typed stream + 置頂橫幅 expires_at 下架；
+  發佈端僅 kDebugMode 後門）+ A9 收尾 gate（CONF-DART/KOTLIN）。

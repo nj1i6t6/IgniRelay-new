@@ -92,6 +92,37 @@ class PresenceUpdate {
   });
 }
 
+/// CHECKPOINT 點名通過（投影自 v3 wire 的 `EventTypeV2.checkpoint`）。
+///
+/// 內容是純 Dart 型別（由 `V2InboundProjector` 寫入 read-model 的 JSON snapshot
+/// 還原而來），不含 protobuf。CHECKPOINT 非 LWW（spec §10.2）——每次通過都是獨立
+/// 事件，故 UI 以 `eventId` 區分、不折疊。
+class CheckpointCrossing {
+  final String eventId;
+
+  /// 點名點 / Field Node 錨點 id。
+  final String checkpointId;
+
+  /// anon_user_id 前 4 bytes 的 hex 顯示把手（非完整 id、不可反推）。
+  final String anon8;
+
+  /// 經緯度（無座標時為 null）。
+  final double? lat;
+  final double? lng;
+
+  /// 通過時間。
+  final DateTime observedAt;
+
+  CheckpointCrossing({
+    required this.eventId,
+    required this.checkpointId,
+    required this.anon8,
+    required this.observedAt,
+    this.lat,
+    this.lng,
+  });
+}
+
 /// 通用「事件日誌變動」通知。
 ///
 /// 給只關心「某個事件剛剛抵達/落地，請我重整自己這份 view」的 UI 使用。內容
@@ -136,6 +167,8 @@ class EventStream {
       StreamController<HazardEvent>.broadcast();
   final StreamController<PresenceUpdate> _presenceController =
       StreamController<PresenceUpdate>.broadcast();
+  final StreamController<CheckpointCrossing> _checkpointController =
+      StreamController<CheckpointCrossing>.broadcast();
   final StreamController<EventLogChanged> _anyEventController =
       StreamController<EventLogChanged>.broadcast();
 
@@ -149,6 +182,10 @@ class EventStream {
 
   /// PRESENCE 足跡更新 typed stream（投影自 v3 `EventTypeV2.presence`）。
   Stream<PresenceUpdate> get presenceUpdates => _presenceController.stream;
+
+  /// CHECKPOINT 點名通過 typed stream（投影自 v3 `EventTypeV2.checkpoint`；A9）。
+  Stream<CheckpointCrossing> get checkpointCrossings =>
+      _checkpointController.stream;
 
   /// 「事件日誌有新東西」的通用通知 stream。UI 若只需要「something 變了，
   /// 請重新跑 query」的訊號，就訂閱這個 stream，不要再用 [rawEvents]。
@@ -231,6 +268,14 @@ class EventStream {
             timestamp: timestamp,
           ));
           break;
+        case LocalReadModelType.checkpoint:
+          // CHECKPOINT read-model row（A9）：payload 是純 JSON snapshot（非 protobuf），
+          // 由 V2InboundProjector 寫入。還原成 typed CheckpointCrossing。
+          final crossing = payload == null
+              ? null
+              : _checkpointFromSnapshot(eventId, payload, timestamp);
+          if (crossing != null) _checkpointController.add(crossing);
+          break;
         default:
           break;
       }
@@ -266,6 +311,30 @@ class EventStream {
     }
   }
 
+  /// 把 CHECKPOINT read-model 的 JSON snapshot 還原成 [CheckpointCrossing]。
+  /// 解析失敗回 null（debug 面，壞資料不致命）。
+  CheckpointCrossing? _checkpointFromSnapshot(
+      String eventId, Uint8List payload, DateTime fallbackTs) {
+    try {
+      final decoded = jsonDecode(utf8.decode(payload));
+      if (decoded is! Map) return null;
+      final j = Map<String, dynamic>.from(decoded);
+      final observedMs = j['observed_ms'] as int?;
+      return CheckpointCrossing(
+        eventId: eventId,
+        checkpointId: (j['checkpoint_id'] as String?) ?? '',
+        anon8: (j['anon8'] as String?) ?? '',
+        lat: (j['lat'] as num?)?.toDouble(),
+        lng: (j['lng'] as num?)?.toDouble(),
+        observedAt: observedMs != null
+            ? DateTime.fromMillisecondsSinceEpoch(observedMs)
+            : fallbackTs,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   static String _hex(Uint8List bytes) {
     final sb = StringBuffer();
     for (final b in bytes) {
@@ -280,6 +349,7 @@ class EventStream {
     await _sosResolvedController.close();
     await _hazardController.close();
     await _presenceController.close();
+    await _checkpointController.close();
     await _anyEventController.close();
   }
 }

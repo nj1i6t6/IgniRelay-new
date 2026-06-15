@@ -94,6 +94,7 @@
 //     - HAZARD_MARKER                       (this facade, publishHazardMarker)
 //     - STATUS_UPDATE (non-SOS)             (this facade, publishStatusUpdate)
 //     - PRESENCE                            (this facade, publishPresence)
+//     - CHECKPOINT                          (this facade, publishCheckpoint)
 //   (CHAT_MESSAGE retired in A6 / OD-6 — no publish path; wire number 30 is
 //    reserved, see EventTypeV2.chatMessage.)
 //   Dual-write entry points (legacy v0.2 + v2):
@@ -527,6 +528,34 @@ class EventPublisherV2Facade {
       payload: data.encode(),
       ttlOffset: const Duration(hours: 4), // §11.2 PRESENCE default
       maxHops: EventTypeV2.maxHopsDefault(EventTypeV2.presence) ?? 4,
+    );
+  }
+
+  /// Publish a CHECKPOINT roll-call crossing (#4-2 / A9). [anonUserId] is the
+  /// 16-byte rotatable anon id (NOT the author key); [checkpointId] is the
+  /// roll-call point / Field Node anchor id; [location] is optional (the anchor
+  /// usually implies position; null → no-location crossing, still sent).
+  ///
+  /// Priority STATUS, TTL 12h, max_hops 6 (spec §6 matrix / §11.2 CHECKPOINT).
+  /// Unlike PRESENCE this is NOT LWW (§10.2) — each crossing is a distinct event.
+  /// Like every non-control publish it rides the active field (A5); with no field
+  /// joined it returns [BroadcastOutcome.noField].
+  Future<BroadcastOutcome> publishCheckpoint({
+    required Uint8List anonUserId,
+    required String checkpointId,
+    LocationEvidence? location,
+  }) {
+    final data = CheckpointData(
+      anonUserId: anonUserId,
+      checkpointId: checkpointId,
+      location: location ?? const LocationEvidence(),
+    );
+    return _broadcast(
+      eventType: EventTypeV2.checkpoint,
+      priority: PriorityV2.status,
+      payload: data.encode(),
+      ttlOffset: const Duration(hours: 12), // §11.2 CHECKPOINT default
+      maxHops: EventTypeV2.maxHopsDefault(EventTypeV2.checkpoint) ?? 6,
     );
   }
 

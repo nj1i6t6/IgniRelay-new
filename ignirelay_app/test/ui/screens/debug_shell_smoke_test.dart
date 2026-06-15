@@ -15,6 +15,7 @@ import 'dart:typed_data';
 
 import 'package:ignirelay_app/app/controllers/active_field_controller.dart';
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
+import 'package:ignirelay_app/app/controllers/checkpoint_controller.dart';
 import 'package:ignirelay_app/app/controllers/mesh_runtime_controller.dart';
 import 'package:ignirelay_app/app/controllers/presence_beacon_controller.dart';
 import 'package:ignirelay_app/app/controllers/presence_controller.dart';
@@ -46,6 +47,7 @@ Widget _wrap(
   PresenceController presence,
   ActiveFieldController field,
   PresenceBeaconController beacon,
+  CheckpointController checkpoint,
 ) {
   return MultiProvider(
     providers: [
@@ -65,6 +67,7 @@ Widget _wrap(
         dispose: (_, s) => s.dispose(),
       ),
       Provider<PresenceController>.value(value: presence),
+      Provider<CheckpointController>.value(value: checkpoint),
       ListenableProvider<ActiveFieldController>.value(value: field),
       ChangeNotifierProvider<PresenceBeaconController>.value(value: beacon),
     ],
@@ -107,6 +110,14 @@ void main() {
     );
   }
 
+  CheckpointController makeCheckpoint(EventPublisherV2Facade facade) {
+    return CheckpointController(
+      facade: facade,
+      anonIdentity: AnonIdentityService(store: _FakeKvStore()),
+      locationBuilder: LocationEvidenceBuilder(currentLocation: () => null),
+    );
+  }
+
   Future<ActiveFieldController> makeField({bool joined = false}) async {
     final c = ActiveFieldController(
       store: FieldSessionStore(db: DatabaseHelper(), secureStore: _FakeKvStore()),
@@ -122,9 +133,9 @@ void main() {
 
   testWidgets('DebugShell renders mesh control, field card, actions, log',
       (tester) async {
-    // Tall surface so all five lazily-built ListView cards lay out (the new
-    // field card otherwise pushes the events-log card below the fold).
-    tester.view.physicalSize = const Size(1080, 2400);
+    // Tall surface so all the lazily-built ListView cards lay out (incl. the
+    // A9 checkpoint card) — otherwise the events-log card stays below the fold.
+    tester.view.physicalSize = const Size(1080, 3200);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -134,6 +145,7 @@ void main() {
     final field = await makeField(); // no field joined
     final presence = makePresence(registry, facade);
     final beacon = _makeBeacon(presence, field);
+    final checkpoint = makeCheckpoint(facade);
     addTearDown(() async {
       beacon.dispose();
       await facade.dispose();
@@ -142,7 +154,7 @@ void main() {
     });
 
     await tester.pumpWidget(
-      _wrap(const DebugShell(), presence, field, beacon),
+      _wrap(const DebugShell(), presence, field, beacon, checkpoint),
     );
     await tester.pump();
 
@@ -183,6 +195,7 @@ void main() {
     facade.attachActiveField(field); // production wiring: facade rides active field
     final presence = makePresence(registry, facade);
     final beacon = _makeBeacon(presence, field);
+    final checkpoint = makeCheckpoint(facade);
     addTearDown(() async {
       beacon.dispose();
       await facade.dispose();
@@ -191,7 +204,7 @@ void main() {
     });
 
     await tester.pumpWidget(
-      _wrap(const DebugShell(), presence, field, beacon),
+      _wrap(const DebugShell(), presence, field, beacon, checkpoint),
     );
     await tester.pump();
 

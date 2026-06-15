@@ -85,4 +85,11 @@ class LocalReadModelType {
   /// resolved. The row's `sender_pub_key` identifies the author; payload is a
   /// small plain-JSON snapshot.
   static const int sosResolved = 9002;
+
+  /// Projected CHECKPOINT crossing (A9). Wire source = `EventTypeV2.checkpoint`
+  /// (4); this is the *read-model* tag for the row, NOT the wire type. CHECKPOINT
+  /// is NOT LWW (spec §10.2) — each crossing is a distinct event, so rows are
+  /// keyed by envelope_id (never collapsed). The row's payload holds a plain-JSON
+  /// crossing snapshot (checkpoint_id / anon / location), NOT a protobuf.
+  static const int checkpoint = 9003;
 }

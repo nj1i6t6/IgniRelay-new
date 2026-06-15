@@ -388,6 +388,63 @@ void main() {
     await h.dispatcher.dispose();
   });
 
+  test('CHECKPOINT envelope projects to Event_Logs + checkpointCrossings stream',
+      () async {
+    final h = await makeHarness();
+    final eventStream = EventStream(
+      handler: MeshEventHandler(),
+      decoder: EventDecoder(),
+      store: EventStore(databaseHelper: DatabaseHelper()),
+    )..start();
+    final crossingFuture = eventStream.checkpointCrossings.first;
+
+    final anon = Uint8List.fromList(List<int>.generate(16, (i) => 0xC0 + i));
+    final payload = CheckpointData(
+      anonUserId: anon,
+      checkpointId: 'gate-7',
+      location: LocationEvidence.fromDegrees(
+        source: LocationSource.gps,
+        frame: LocationFrame.subject,
+        latDegrees: 25.0339805,
+        lngDegrees: 121.5654177,
+        observedAt: const HlcTimestampV2(msSinceEpoch: 5555, counter: 0),
+      ),
+    ).encode();
+
+    final published = await h.publisher.send(
+      eventType: EventTypeV2.checkpoint,
+      priority: PriorityV2.status,
+      payload: payload,
+      createdAtHlc: HlcTimestampV2(msSinceEpoch: 1000, counter: 0),
+      expiresAtHlc: HlcTimestampV2(msSinceEpoch: 2000, counter: 0),
+      maxHops: 6,
+      negotiatedMtu: 247,
+      fieldId: Uint8List(16),
+    );
+
+    final projectedId = h.projector.projectedEventIds.first;
+    final outcome = await h.dispatcher
+        .onReceiveEnvelopeBytes(published.wireBytes, peerId: 'AA:BB:CC');
+    expect(outcome, isA<DispatchAccepted>());
+
+    final eventId = await projectedId.timeout(const Duration(seconds: 2));
+    final db = await DatabaseHelper().database;
+    final logs = await db
+        .query('Event_Logs', where: 'event_id = ?', whereArgs: [eventId]);
+    expect(logs.length, 1);
+    expect(logs.first['event_type'], LocalReadModelType.checkpoint);
+
+    final crossing = await crossingFuture.timeout(const Duration(seconds: 2));
+    expect(crossing.checkpointId, 'gate-7');
+    expect(crossing.anon8, 'c0c1c2c3'); // first 4 bytes of anon_user_id
+    expect(crossing.lat, closeTo(25.0339805, 1e-7));
+    expect(crossing.lng, closeTo(121.5654177, 1e-7));
+
+    await eventStream.dispose();
+    await h.projector.dispose();
+    await h.dispatcher.dispose();
+  });
+
   test('re-projecting the same PRESENCE envelope yields exactly one row',
       () async {
     // Drive the projector directly with a controllable outcomes stream so we

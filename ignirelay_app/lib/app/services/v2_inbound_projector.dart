@@ -116,6 +116,9 @@ class V2InboundProjector {
         case EventTypeV2.presence:
           await _projectPresence(accepted, eventId);
           break;
+        case EventTypeV2.checkpoint:
+          await _projectCheckpoint(accepted, eventId);
+          break;
         default:
           // Not a UI-surfaced type (supply / match / official / control);
           // nothing to project into the v1 read-model.
@@ -272,6 +275,37 @@ class V2InboundProjector {
     await _ingest(
       eventId: eventId,
       v1EventType: LocalReadModelType.presence,
+      urgency: 0,
+      payload: utf8.encode(jsonEncode(snapshot)),
+      accepted: a,
+      lat: hasLoc ? loc.latDegrees : null,
+      lng: hasLoc ? loc.lngDegrees : null,
+    );
+  }
+
+  Future<void> _projectCheckpoint(DispatchAccepted a, String eventId) async {
+    final c = CheckpointData.decode(a.envelope.payload);
+    final loc = c.location;
+    final hasLoc = loc.source != LocationSource.unknown ||
+        loc.latE7 != 0 ||
+        loc.lngE7 != 0;
+    final observedMs = loc.observedAt.msSinceEpoch != 0
+        ? loc.observedAt.msSinceEpoch
+        : a.envelope.createdAtHlc.msSinceEpoch;
+    // Plain-JSON snapshot. CHECKPOINT has no v1 enum, so the row is tagged
+    // LocalReadModelType.checkpoint (local read-model only, never on wire) and is
+    // NOT collapsed (each crossing is a distinct event, spec §10.2 — not LWW).
+    final snapshot = <String, dynamic>{
+      'checkpoint_id': c.checkpointId,
+      'anon8': _hexPrefix(c.anonUserId, 4),
+      'src': loc.source,
+      'observed_ms': observedMs,
+      if (hasLoc) 'lat': loc.latDegrees,
+      if (hasLoc) 'lng': loc.lngDegrees,
+    };
+    await _ingest(
+      eventId: eventId,
+      v1EventType: LocalReadModelType.checkpoint,
       urgency: 0,
       payload: utf8.encode(jsonEncode(snapshot)),
       accepted: a,

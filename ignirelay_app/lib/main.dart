@@ -39,6 +39,7 @@ import 'package:ignirelay_app/app/controllers/event_publisher.dart';
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/controllers/presence_controller.dart';
 import 'package:ignirelay_app/app/controllers/presence_beacon_controller.dart';
+import 'package:ignirelay_app/app/controllers/checkpoint_controller.dart';
 import 'package:ignirelay_app/app/controllers/sos_controller.dart';
 import 'package:ignirelay_app/app/controllers/active_field_controller.dart';
 import 'package:ignirelay_app/app/services/anon_identity.dart';
@@ -446,6 +447,19 @@ class _IgniRelayAppState extends State<IgniRelayApp> {
         // GPS evidence in the app layer so the UI never touches app/proto.
         Provider<PresenceController>(
           create: (context) => PresenceController(
+            facade: context.read<EventPublisherV2Facade>(),
+            anonIdentity: AnonIdentityService(),
+            locationBuilder: LocationEvidenceBuilder(
+              currentLocation: () =>
+                  context.read<LocationService>().currentLocation,
+            ),
+          ),
+        ),
+        // A9 (2) — CHECKPOINT publish orchestrator. Same app-layer assembly as
+        // PresenceController (anon id + GPS evidence) so the UI never touches
+        // app/proto; the manual trigger is a debug-only button in the shell.
+        Provider<CheckpointController>(
+          create: (context) => CheckpointController(
             facade: context.read<EventPublisherV2Facade>(),
             anonIdentity: AnonIdentityService(),
             locationBuilder: LocationEvidenceBuilder(

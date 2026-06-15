@@ -424,6 +424,53 @@ void main() {
     expect(call.fieldId!, orderedEquals(expectedFieldId));
   });
 
+  test('publishCheckpoint encodes a typed CheckpointData payload (A9)',
+      () async {
+    final registry = PeerCapabilityRegistry(
+      helloTimeout: const Duration(seconds: 5),
+    );
+    final bridge = await _makeRecordingBridge(registry);
+    final facade = EventPublisherV2Facade(
+      registry: registry,
+      bridge: bridge,
+    );
+    addTearDown(() async {
+      await facade.dispose();
+      await registry.dispose();
+    });
+    _markPeerActive(registry, 'CP:01');
+
+    final anon = Uint8List.fromList(List<int>.generate(16, (i) => i + 1));
+    final outcome = await facade.publishCheckpoint(
+      anonUserId: anon,
+      checkpointId: 'gate-7',
+      location: LocationEvidence.fromDegrees(
+        source: LocationSource.gps,
+        frame: LocationFrame.subject,
+        latDegrees: 25.04,
+        lngDegrees: 121.56,
+      ),
+    );
+    expect(outcome.anyAccepted, isTrue);
+    expect(bridge.invocations.length, 1);
+
+    final call = bridge.invocations.single;
+    // §6 matrix: CHECKPOINT → STATUS; §11.2: TTL 12h, max_hops 6.
+    expect(call.eventType, EventTypeV2.checkpoint);
+    expect(call.priority, PriorityV2.status);
+    expect(call.maxHops, 6);
+    expect(
+      call.expiresAtHlc.msSinceEpoch - call.createdAtHlc.msSinceEpoch,
+      const Duration(hours: 12).inMilliseconds,
+    );
+
+    final decoded = CheckpointData.decode(call.payload);
+    expect(decoded.anonUserId, orderedEquals(anon));
+    expect(decoded.checkpointId, 'gate-7');
+    expect(decoded.location.latE7, 250400000);
+    expect(decoded.location.lngE7, 1215600000);
+  });
+
   test('multi-field switch → published field_id follows the active field (A7)',
       () async {
     final registry = PeerCapabilityRegistry(

@@ -9,6 +9,7 @@ import 'package:ignirelay_app/app/controllers/mesh_runtime_controller.dart';
 import 'package:ignirelay_app/app/controllers/presence_beacon_controller.dart';
 import 'package:ignirelay_app/app/controllers/presence_controller.dart';
 import 'package:ignirelay_app/app/services/event_store.dart';
+import 'package:ignirelay_app/ui/shell/checkpoint_card.dart';
 import 'package:ignirelay_app/ui/screens/field/field_screen.dart';
 import 'package:ignirelay_app/ui/screens/sos/sos_screen.dart';
 
@@ -160,6 +161,8 @@ class _DebugShellState extends State<DebugShell> {
           _actionsCard(),
           const SizedBox(height: 12),
           _positionCard(),
+          const SizedBox(height: 12),
+          const CheckpointCard(),
           const SizedBox(height: 12),
           _eventsCard(),
         ],

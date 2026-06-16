@@ -934,3 +934,31 @@ GPT review A10b 大方向放行，先補一個小尾巴再進 A11/A12。code com
 - deviations: 無。未碰 wire/DB/pubspec/specs（逐項守 GPT 補丁指令）。
 - next: A11 雙機實機驗證（**USER-GATE**——AGENT 僅產 `docs/ACCEPTANCE_A11_TWO_PHONE_SCRIPT.md`
   驗收腳本與證據表格，**不得自宣稱雙機通過**，Owner 實機回填）；或 A12 App↔Node 契約凍結。
+
+## [2026-06-16] A11-D1 DONE（雙機實機驗收 runbook 腳本；D2=USER-GATE pending Owner）
+
+A11 是 **USER-GATE**：AGENT 只能產驗收腳本，Owner 晚上兩台 Android 實機照腳本實測回填才算 D2 通過，
+**AGENT 不得代填、不得宣稱雙機通過**。本刀僅新增 `docs/ACCEPTANCE_A11_TWO_PHONE_SCRIPT.md`，
+**未碰 app code / wire / DB / pubspec / specs**。code commit `675ca16`。
+- 腳本性質：晚上 Owner 兩台手機 USB 偵錯接上電腦後「照著跑」的驗收 runbook（CLI/ADB 優先，
+  Android Studio 非必要），不是抽象規劃。
+- 覆蓋 MASTER_EXECUTION_PLAN A11 表 **1–9 全步驟**，每步：目的／操作（人工 vs ADB）／預期／證據指令／
+  Owner 回填欄／pass-fail；文末結果彙總表。
+- 兩層結構：
+  - 自動/半自動 **ADB 區**：`adb devices -l`、`$DEVICE_A/$DEVICE_B`、`flutter build apk --debug` / `install`、
+    `adb -s install -r`、`logcat -c`、`screencap -p`+`pull`、`logcat -v time flutter:V`、`am force-stop`+重啟、
+    `:app:connectedDebugAndroidTest`（step 8 GATE-KOTLIN-RUN）。
+  - **人工操作區**：QR 出示/掃碼、按「啟動」mesh、發 PRESENCE/SOS、我安全了、手機相距 20m、目視雷達方位。
+- 證據資料夾 `tmp/a11-evidence/YYYYMMDD-HHMM/`；PowerShell helper `Shot`/`LogStart`/`LogStop`。
+- 測前檢查（USB debug、RSA 授權、BLE、位置/Nearby/通知 權限、關省電、時間同步、GPS fix）＋排錯段
+  （adb 看不到/unauthorized、權限未授〔含 `pm grant`〕、BLE 不通、QR 掃不到、connectedTest ambiguous〔`:app:`
+  前綴 + `$env:ANDROID_SERIAL`〕、雷達需 GPS）。
+- 具體識別：applicationId `network.ignirelay.field`、activity `network.ignirelay.ignirelay_app.MainActivity`。
+- **誠實標註 step 5（HAZARD）BLOCKED**：目前 mapless debug shell **無 HAZARD 發送入口**——A3 只接了
+  **typed 接收側**（`hazardEvents` 流 + projector 投影），`publishHazardMarker` 僅在 facade 層、無任何畫面
+  呼叫，**發送 UI 隨舊地圖頁退役**。建議獨立小任務補一個 `kDebugMode`「發 HAZARD」測試鈕（不在 A11 範圍、
+  本腳本不動 app code）。其餘 1–4、6–9 皆可實測。
+- gates：本刀純文件（無 Dart/wire/DB/pubspec 變更），不觸發 code gate；A11-D1 DoD = 腳本存在且含表 1–9
+  全步驟 + 證據欄（達成）。
+- next: **A11-D2（USER-GATE）**——Owner 晚上雙機照腳本實測 + 截圖/logcat 回填（AI 可代跑 ADB 區）；A11-D2
+  全項 PASS（step 5 另案）後 Owner 才在 STATUS 記結果、再開 A12（App↔Node 契約凍結）。

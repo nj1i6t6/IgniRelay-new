@@ -14,18 +14,21 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'dart:typed_data';
 
 import 'package:ignirelay_app/app/controllers/active_field_controller.dart';
+import 'package:ignirelay_app/app/controllers/event_publisher.dart';
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/controllers/checkpoint_controller.dart';
 import 'package:ignirelay_app/app/controllers/mesh_runtime_controller.dart';
 import 'package:ignirelay_app/app/controllers/presence_beacon_controller.dart';
 import 'package:ignirelay_app/app/controllers/presence_controller.dart';
 import 'package:ignirelay_app/app/db/database_helper.dart';
+import 'package:ignirelay_app/app/mesh/event_manager.dart';
 import 'package:ignirelay_app/app/mesh/mesh_event_handler.dart';
 import 'package:ignirelay_app/app/services/anon_identity.dart';
 import 'package:ignirelay_app/app/services/event_decoder.dart';
 import 'package:ignirelay_app/app/services/event_publisher_v2_facade.dart';
 import 'package:ignirelay_app/app/services/event_store.dart';
 import 'package:ignirelay_app/app/services/field_session_store.dart';
+import 'package:ignirelay_app/app/services/local_position_source.dart';
 import 'package:ignirelay_app/app/services/location_evidence_builder.dart';
 import 'package:ignirelay_app/app/services/peer_capability_registry.dart';
 import 'package:ignirelay_app/ui/shell/debug_shell.dart';
@@ -48,6 +51,7 @@ Widget _wrap(
   ActiveFieldController field,
   PresenceBeaconController beacon,
   CheckpointController checkpoint,
+  EventPublisherV2Facade facade,
 ) {
   return MultiProvider(
     providers: [
@@ -68,6 +72,16 @@ Widget _wrap(
       ),
       Provider<PresenceController>.value(value: presence),
       Provider<CheckpointController>.value(value: checkpoint),
+      // A11-prep — the HazardCard (debug HAZARD send/receive) reads these two:
+      // EventPublisher (send seam) + LocalPositionSource (own coordinate, never
+      // a peer). Mirror the production provider set so the shell builds.
+      Provider<EventPublisher>(
+        create: (_) =>
+            EventPublisher(eventManager: EventManager(), v2Facade: facade),
+      ),
+      Provider<LocalPositionSource>(
+        create: (_) => LocalPositionSource(currentLocation: () => null),
+      ),
       ListenableProvider<ActiveFieldController>.value(value: field),
       ChangeNotifierProvider<PresenceBeaconController>.value(value: beacon),
     ],
@@ -154,7 +168,7 @@ void main() {
     });
 
     await tester.pumpWidget(
-      _wrap(const DebugShell(), presence, field, beacon, checkpoint),
+      _wrap(const DebugShell(), presence, field, beacon, checkpoint, facade),
     );
     await tester.pump();
 
@@ -204,7 +218,7 @@ void main() {
     });
 
     await tester.pumpWidget(
-      _wrap(const DebugShell(), presence, field, beacon, checkpoint),
+      _wrap(const DebugShell(), presence, field, beacon, checkpoint, facade),
     );
     await tester.pump();
 

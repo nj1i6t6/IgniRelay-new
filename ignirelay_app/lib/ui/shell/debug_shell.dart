@@ -11,6 +11,7 @@ import 'package:ignirelay_app/app/controllers/presence_controller.dart';
 import 'package:ignirelay_app/app/services/event_store.dart';
 import 'package:ignirelay_app/ui/shell/admin_broadcast_banner.dart';
 import 'package:ignirelay_app/ui/shell/checkpoint_card.dart';
+import 'package:ignirelay_app/ui/shell/hazard_card.dart';
 import 'package:ignirelay_app/ui/screens/field/field_screen.dart';
 import 'package:ignirelay_app/ui/screens/position/last_seen_screen.dart';
 import 'package:ignirelay_app/ui/screens/sos/sos_screen.dart';
@@ -168,6 +169,10 @@ class _DebugShellState extends State<DebugShell> {
           _positionCard(),
           const SizedBox(height: 12),
           const CheckpointCard(),
+          const SizedBox(height: 12),
+          // A11-prep — typed HAZARD send（kDebugMode 鈕）+ receive list（解開
+          // 兩機驗收 A11 step 5；A3 原只接收，發送 UI 隨舊地圖頁退役）。
+          const HazardCard(),
           const SizedBox(height: 12),
           _eventsCard(),
         ],

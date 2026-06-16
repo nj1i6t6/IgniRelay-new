@@ -211,15 +211,21 @@ function LogStop([string]$tag) {
   ```
 - **Owner 回填**：B 端標已解除？☐；☐PASS ☐FAIL；證據：`step4_B_resolved.png`
 
-### Step 5 — B 發 HAZARD（typed） ⚠ 已知阻塞
-- **目的**：A3 typed HAZARD 收發。
-- **⚠ 現況（誠實標註，AI 查核）**：目前 **mapless debug shell 無 HAZARD 發送入口**——A3 只接了
-  **typed 接收側**（`hazardEvents` 流 + `V2InboundProjector` 投影都在），但**發送 UI 隨舊地圖頁退役**，
-  `publishHazardMarker` 僅存在於 facade 層、無任何畫面呼叫它。
-- **結論**：本步驟 **D2 暫標 BLOCKED**。需先補一個 `kDebugMode` 的「發 HAZARD」測試鈕（建議獨立小任務
-  〔例如 `A-hazard-send`〕，**不在 A11 範圍、不在本腳本動 app code**）。補上後再回來跑本步。
-- **可先做的接收側 sanity（若有任何 HAZARD 來源）**：A 端「危害」列表出現該事件即證明接收/投影鏈路活著。
-- **Owner 回填**：☐ BLOCKED（無發送入口）／☐PASS（補鈕後）；備註：`__________`
+### Step 5 — B 發 HAZARD（typed）
+- **目的**：A3 typed HAZARD 收發 —— B 送出 typed `HazardMarkerData`，A 端 typed 接收側投影並顯示。
+- **前置**：兩機同場域、mesh running（step 1–2 已建立）。
+- **操作（人工）**：B：在 debug shell 的「**危害（HAZARD）**」卡片按「**手動 HAZARD**」→ 選類型
+  （如 FIRE）→「送出」。
+  > A11-prep 已補這顆 `kDebugMode` 發送鈕：接既有 `EventPublisher.publishHazard`，座標取本機 GPS、
+  > 無 GPS fix 則用樣本座標（仍送出 typed 事件），severity 固定 2。原 A3 只接收、發送 UI 隨舊地圖頁
+  > 退役，故先前標 BLOCKED；現已可實測。
+- **預期**：A 端「危害（HAZARD）」卡片**列表出現該事件**（type 與 B 選的一致，含 sev/座標）；logcat
+  無 HAZARD 解碼錯誤。
+- **證據**：
+  ```powershell
+  Shot $DEVICE_B "step5_B_sent"; Shot $DEVICE_A "step5_A_hazard"
+  ```
+- **Owner 回填**：A 危害列表出現該事件？☐；type 一致？☐；☐PASS ☐FAIL；證據：`step5_*`
 
 ### Step 6 — 殺掉 B 進程重啟 → 不重複 + Outbox 補送
 - **目的**：envelope_id dedup + Outbox_V2 持久化補送。
@@ -293,13 +299,14 @@ function LogStop([string]$tag) {
 | 2 | mesh + 互發 PRESENCE | 對方位置卡出現 anon8+時間 | ☐P ☐F | |
 | 3 | SOS(RED) 取消後真發 | B 告警 ≤10s | ☐P ☐F | |
 | 4 | 我安全了 | B 標解除 | ☐P ☐F | |
-| 5 | HAZARD(typed) | A 危害列表出現 | ☐**BLOCKED**(無發送 UI) ☐P | |
+| 5 | HAZARD(typed) | A 危害列表出現該事件 | ☐P ☐F | |
 | 6 | 殺 B 重啟 | 不重複 + Outbox 補送 | ☐P ☐F | |
 | 7 | 場域隔離 | A 收不到 + mismatch trace | ☐P ☐F | |
 | 8 | connectedDebugAndroidTest | 全綠 | ☐P ☐F | |
 | 9 | 雷達 ≥20m | 方位/量級對、SOS 紅點 | ☐P ☐F | |
 
-> **A11-D2 PASS 條件**：除 step 5（已知 BLOCKED，待補發送鈕的獨立小任務）外，其餘步驟全 PASS。
+> **A11-D2 PASS 條件**：表中 step 1–9 **全部 PASS**。A11-prep 已補上 HAZARD 發送鈕，step 5
+> 不再有 BLOCKED 例外；若任一步 FAIL 即非全項通過。
 > Owner 在 **App repo `STATUS.md`** 記 `A11-D2: <日期> <PASS/部分>`。Stage A Exit 另見 §5.13。
 
 ---
@@ -351,5 +358,5 @@ adb -s $DEVICE_A shell pm grant network.ignirelay.field android.permission.BLUET
 - 本檔（D1）由 AGENT 產出。**晚上的實測、截圖、logcat、結果判定（D2）必須由 Owner 親自於雙機完成**。
 - AI 可代跑 §2–§4 的 ADB/gradle 與證據蒐集指令，但 QR 掃碼、按鈕、SOS 長按、手機移動 20m 等**人工
   操作只能 Owner 做**；且 **AI 不得代填結果、不得宣稱通過**。
-- A11-D2 全項 PASS（step 5 除外，另案）前，**不得宣告 Stage A Exit**，亦**不應**進入 A12 之前未經
-  Owner 確認的收尾宣稱。
+- A11-D2 全項 PASS（step 1–9，含 A11-prep 補上的 step 5）前，**不得宣告 Stage A Exit**，亦**不應**
+  進入 A12 之前未經 Owner 確認的收尾宣稱。

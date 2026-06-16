@@ -908,3 +908,29 @@ code commit `e848f8a`。
   座標獨立紅點/卡片呈現（誠實不猜）。
 - next: A11 雙機實機驗證（USER-GATE，AGENT 產 `docs/ACCEPTANCE_A11_TWO_PHONE_SCRIPT.md` 腳本 / Owner
   實機回填；A11 腳本步驟 9 含 A10b 雷達）；或 A12 App↔Node 契約凍結。待 Owner / GPT 指示。
+
+## [2026-06-16] A10b-polish DONE（雷達節點三角形漏接 + 本機位置中途遺失自動退化）
+
+GPT review A10b 大方向放行，先補一個小尾巴再進 A11/A12。code commit `75c5360`。
+- **漏接修正**：`LastSeenScreen` 建 `RadarSubject` 原未傳 `isNode`，導致有座標的 CHECKPOINT /
+  錨點 estimate 被畫成一般圓點（規格 A10b 明寫「節點/錨點畫三角形」）。改：`isNode =
+  baseTone != sos && est.anchorNodeId != null`（可投影的錨點 estimate → 三角形；SOS 維持圓點、
+  不誤標 node）。
+- **防護**：原本只在「點雷達當下無 origin」設 `_radarUnavailable` flag；若**已在雷達模式才遺失
+  GPS**（origin 後來變 null），畫面雖退回列表卻無提示、toggle 還停在雷達。改：移除 flag，build
+  從 `origin`（雷達模式才取）即時推導——`origin == null` → 顯示「需要本機位置才能顯示相對方位」
+  + 列表 + toggle 同步回「列表」；`_selectRadar` 只記意圖；**origin 復原 → 自動回雷達**。
+- 測試（+2，總 +591）：CHECKPOINT 含 checkpointId+lat/lng + 本機 origin → 切雷達 → 斷言對應
+  `RadarMarker.isNode == true`；雷達模式中 origin 遺失（注入 seam 後變 null + 新事件觸發 rebuild）
+  → 斷言退回列表 + 提示文案、`RelativeRadar` 消失。
+- gates（皆 exit 0；本刀純 Dart UI，KOTLIN 仍實跑驗證）:
+  - `dart run tool/check_layers.dart --strict` → `ok`
+  - `flutter analyze` → `2 issues found`（2 既有 baseline），0 新
+  - `flutter test` → `00:21 +591 ~3: All tests passed!`（A10b +589 → +591）
+  - `dart run tool/generate_wire_conformance_v1.dart --check` → `--check OK`（未碰 wire/corpus）
+  - GATE-KOTLIN-BUILD：`:app:assembleDebugAndroidTest` → **BUILD SUCCESSFUL in 5s**（純 Dart
+    變更、native 無動，仍實跑確認）。
+  - DESIGN §6：`grep -rn "Colors\." lib/ui/screens/position/` = 0。
+- deviations: 無。未碰 wire/DB/pubspec/specs（逐項守 GPT 補丁指令）。
+- next: A11 雙機實機驗證（**USER-GATE**——AGENT 僅產 `docs/ACCEPTANCE_A11_TWO_PHONE_SCRIPT.md`
+  驗收腳本與證據表格，**不得自宣稱雙機通過**，Owner 實機回填）；或 A12 App↔Node 契約凍結。

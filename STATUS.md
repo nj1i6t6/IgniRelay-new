@@ -856,3 +856,55 @@ token 範疇是 `lib/ui/screens/` 產品畫面，只改那兩個反而與所在 
     `lib/ui/screens/` 其餘僅既有 `design_showcase_screen.dart`（A7 debug-only debt，G5 禁順手清）。
 - deviations: 無偏離。A9-polish 經判斷 skip（理由見上，GPT 同意非 blocker）。
 - next: A10b（雷達相對位置視圖，前置 A10）——本刀未做（A10 範圍外）；待 Owner / GPT 指示。
+
+## [2026-06-16] A10b DONE（雷達相對位置視圖：relative_position 局部等距投影 + CustomPaint 北朝上雷達 + 列表/雷達切換）
+
+GPT review 放行 A10（純函式無 I/O、screen 全 token 化無 Colors.*、文案無「目前位置」、信心邊界有測），
+按文件 §5 A10b 完成；GPT 明示 A10b 收尾務必**實跑** GATE-KOTLIN-BUILD、不得沿用 A9/A10 說法。
+code commit `e848f8a`。
+- 新 `lib/app/services/relative_position.dart`（**純函式、零 I/O、不上 wire**；同 A10 鐵則）：
+  - `RelativePosition{distanceM, bearingDeg(0=正北/順時針 0–360), confidence, uncertaintyM, ageSeconds}`。
+  - `RelativePositionProjector.relativeTo(origin, subject)`：局部等距投影——eastM = Δlng × 111320 ×
+    cos(lat₀)、northM = Δlat × 110574（**常數凍結、與 E1 map_calibration_v1 同一組**），
+    distance=hypot、bearing=atan2(east,north) 正規化 [0,360)；Δlng 跨 ±180° wrap；origin/subject
+    任一無 latLng → null（錨點-only 留列表；本機無位置走退化）。
+  - `relativeAll`：批次投影、丟不可定位者、保序。
+- 新 `lib/app/services/local_position_source.dart`（**本機自有 GPS、不偷拿 peer**——A10b 首要紅線）：
+  app 層包裝 legacy `LocationService` singleton → 純 Dart `PositionObservation?`/`PositionEstimate?`
+  （UI 經 DI 取得、永不直接碰 singleton；CLAUDE.md）。無 fix → null（雷達退化）。main.dart 注入
+  `Provider<LocalPositionSource>`（currentLocation ← LocationService）。
+- 改 `lib/ui/screens/position/last_seen_screen.dart`（487 行 < 500 facade 上限）：加 **列表⇄雷達
+  toggle（預設列表）**；新增 SOS 訂閱（sosAlerts 自帶 lat/lng → 紅點/卡片；pubkey 識別空間，
+  **刻意不偽造與 anon8 連結**）；雷達 origin ← LocalPositionSource（注入 seam 供測試）；**本機無位置
+  → 顯示「需要本機位置才能顯示相對方位」並自動退回列表**；雷達點按 → bottom sheet 開該人 A10 卡片。
+- 新 `lib/ui/screens/position/relative_radar.dart`（CustomPaint 雷達面，**全 token 化零 Colors.***）：
+  **北朝上固定（v1 不接指南針/磁力計）**；距離環自動選檔（100/250/500…50k/100k/200k 取涵蓋最遠成員
+  最小檔、環值標環上）；點色語意（SOS=sos / 正常=ok / LOW=stale 灰）；LOW 加虛線不確定圈（半徑＝
+  uncertaintyM 依比例尺）；節點/錨點三角形、他人圓點；超最外環者釘環緣標「>環值」。`RadarMarker`
+  public（widget 測試斷言 sos 點）。
+- 測試（+21）:
+  - `test/services/relative_position_test.dart`（純函式 DoD D1，數值斷言**相對誤差 ≤0.5%**）：
+    N/E/S/W 四象限、±180° antimeridian wrap、同點距離 0、bearing 環繞 359.x°（<360）、cos(lat₀)
+    高緯（60° ×0.5）；latLng 缺漏 guard、relativeAll 丟錨點保序、欄位透傳。
+  - `test/ui/screens/relative_radar_test.dart`（DoD D2）：n=0/1/8 渲染不 crash、**含 SOS → sos 色
+    RadarMarker 存在**、LOW → neutral 點、超環 pin「>」。
+  - `test/ui/screens/last_seen_screen_test.dart`（A10 2 + A10b 3）：列表⇄雷達切換（DoD D2）、
+    **本機無位置退化顯示提示文案（DoD D3）**、SOS 卡片 chip；既有空狀態/PRESENCE 卡片補 sosSource seam。
+- DoD：D1 ✅ / D2 ✅（雷達 smoke + 切換）/ D3 ✅（本機無位置退化 widget 測試）/ D4 ✅（通用 gate +
+  A7–A10b 設計 DoD 含 Colors grep）。
+- 禁止事項（逐項守）：未引入地圖 SDK/圖磚/GIS、**零新依賴**（G13，pubspec 未動）；distance/bearing/
+  confidence/uncertainty 未寫進任何 wire/DB（純推導）；未用指南針/磁力計；文案無「目前位置」（測試斷言）。
+- gates（5 項皆 exit 0；KOTLIN **本刀實跑**）:
+  - `dart run tool/check_layers.dart --strict` → `ok — no boundary violations`
+  - `flutter analyze` → `2 issues found`（2 既有 baseline info），**0 errors / 0 新 issue**
+  - `flutter test` → `00:18 +589 ~3: All tests passed!`（A10 +568 → +589：A10b +21）
+  - `dart run tool/generate_wire_conformance_v1.dart --check` → `--check OK`（未碰 wire/corpus，rev 維持
+    `v0.3-phase0b-4-6-1`）
+  - GATE-KOTLIN-BUILD：`cd android && .\gradlew.bat :app:assembleDebugAndroidTest` → **BUILD SUCCESSFUL
+    in 1m 6s**（A10b 收尾實跑，未沿用 A9/A10 說法）。
+  - DESIGN §6 App gate：`grep -rn "Colors\." lib/ui/screens/position/` = 0；`lib/ui/screens/` 其餘僅既有
+    `design_showcase_screen.dart`（A7 debug-only debt，G5 禁順手清）。
+- deviations: 無偏離。SOS 與 PRESENCE 屬不同識別空間（pubkey vs anon8），刻意不偽造連結——SOS 以自帶
+  座標獨立紅點/卡片呈現（誠實不猜）。
+- next: A11 雙機實機驗證（USER-GATE，AGENT 產 `docs/ACCEPTANCE_A11_TWO_PHONE_SCRIPT.md` 腳本 / Owner
+  實機回填；A11 腳本步驟 9 含 A10b 雷達）；或 A12 App↔Node 契約凍結。待 Owner / GPT 指示。

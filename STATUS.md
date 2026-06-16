@@ -962,3 +962,42 @@ A11 是 **USER-GATE**：AGENT 只能產驗收腳本，Owner 晚上兩台 Android
   全步驟 + 證據欄（達成）。
 - next: **A11-D2（USER-GATE）**——Owner 晚上雙機照腳本實測 + 截圖/logcat 回填（AI 可代跑 ADB 區）；A11-D2
   全項 PASS（step 5 另案）後 Owner 才在 STATUS 記結果、再開 A12（App↔Node 契約凍結）。
+
+## [2026-06-16] A11-prep DONE（debug shell HAZARD 發送鈕 → 解開 A11 step 5）
+
+GPT/Owner 判斷：A11-D1 腳本合格，但 step 5（B 發 typed HAZARD）因 mapless shell 無發送
+入口被標 BLOCKED、A11-D2 無法全項通過。本刀補一顆 kDebugMode HAZARD 發送鈕還原發送能力。
+code commit `8155e30`。
+
+- **新 `lib/ui/shell/hazard_card.dart`**：自洽卡片（鏡像 A9-2 CheckpointCard）。訂閱
+  `EventStream.hazardEvents` 顯示收到的 typed HAZARD（type/sev/座標）；kDebugMode 才出現
+  「手動 HAZARD」鈕 → 對話框選類型（FIRE/FLOOD/COLLAPSE/CHEMICAL/ROADBLOCK/OTHER）+ 描述 →
+  送出，接既有 `EventPublisher.publishHazard`。座標取本機 `LocalPositionSource`（**永不偷
+  peer**，與 A10b 雷達 origin 同規則），無 GPS fix 用樣本座標仍送出 typed 事件；severity
+  固定 2。注入 seam（hazardSource/onPublish/localEstimate）沿用 LastSeenScreen 模式，免
+  provider 即可測。
+- `debug_shell.dart`：CheckpointCard 後掛 `const HazardCard()`。
+- `debug_shell_smoke_test.dart`：`_wrap` 補 `EventPublisher` + `LocalPositionSource`
+  provider（HazardCard initState 需要；鏡像 production 注入）—— 否則 tall-surface smoke 會在
+  HazardCard.initState 拋 ProviderNotFound、events-log 卡片不渲染而 FAIL。
+- 測試 `test/ui/screens/hazard_card_test.dart`（+4）：空狀態 / 收到 typed HAZARD 顯示一列 /
+  kDebugMode 送出走 seam（預設 FIRE、sev 2、帶本機座標）/ 無 GPS 退樣本座標（25.0339,121.5645）。
+- `docs/ACCEPTANCE_A11_TWO_PHONE_SCRIPT.md`：step 5 由 ⚠BLOCKED 改可實測（操作=B 按手動
+  HAZARD 選類型送出、預期=A 危害卡列表出現該事件）；彙總表 row 5、A11-D2 PASS 條件、§8
+  USER-GATE 聲明皆移除「step 5 除外」例外 → 現 step 1–9 全項 PASS 才算 D2。
+
+- gates（全 exit 0，KOTLIN 本刀實跑）：
+  - `dart run tool/check_layers.dart --strict` → `ok — no boundary violations`
+  - `flutter analyze` → `2 issues found`（皆既有 baseline info；0 errors / 0 新 issue）
+  - `flutter test` → `00:21 +595 ~3: All tests passed!`（A10b-polish +591 → +595，HAZARD +4）
+  - `dart run tool/generate_wire_conformance_v1.dart --check` → `--check OK`（未動 wire/corpus，
+    rev 維持 `v0.3-phase0b-4-6-1`）
+  - GATE-KOTLIN-BUILD：`:app:assembleDebugAndroidTest` → **BUILD SUCCESSFUL in 14s**（純 Dart
+    UI、未碰 native；G17 本刀實跑、未沿用 A9/A10/A10b claim）
+  - DESIGN §6：HazardCard 在 `lib/ui/shell/`（非 `lib/ui/screens/`，§6 grep 範圍外，與
+    CheckpointCard/debug_shell 同；沿用 shell 既有 Colors.grey 風格）；`lib/ui/screens/position/`
+    Colors grep 維持 0。
+- 未動 wire/DB/proto/native/pubspec/specs。
+- next: **A11-D2（USER-GATE）**：Owner 晚上接雙機照 runbook 實測 step 1–9（含本刀補上的 step
+  5）+ 截圖/logcat 回填；AI 可代跑 ADB 區但不得代填/宣稱通過。A11-D2 全項 PASS 後 Owner 於
+  STATUS 記，再開 A12（App↔Node 契約凍結）。

@@ -1,6 +1,6 @@
-# A11 — 雙機實機驗收 Runbook v1.4（USER-GATE）
+# A11 — 雙機實機驗收 Runbook v1.5（USER-GATE）
 
-> **任務**：MASTER_EXECUTION_PLAN v1.4 §5 A11。
+> **任務**：MASTER_EXECUTION_PLAN v1.5 §5 A11。
 > **前置**：UI-F（正式 AppShell + motion-aware 定位節流）與 UI-G（先看功能/引導模式）已 DONE。
 > **D1**：本檔 = AGENT 產出的可執行驗收腳本。
 > **D2**：Owner 兩台 Android 實機照本檔實測、截圖/logcat、回填全項 PASS。
@@ -27,7 +27,8 @@
 - [ ] 室外或近窗可取得 GPS fix。
 - [ ] 本次驗收使用 debug build（需要 diagnostics / kDebugMode 驗收入口）。
 
-命名：手機 **A** = 建立場域 / owner；手機 **B** = 加入者，會依腳本測 participant/staff。
+命名：手機 **A** = 建立場域 / owner；手機 **B** = 加入者，Stage A 驗 participant。`staff` join 延後到
+Stage E cloud staff-token 或另開 QR 契約任務。
 
 ---
 
@@ -55,6 +56,8 @@ flutter build apk --debug
 $APK = "build\app\outputs\flutter-apk\app-debug.apk"
 adb -s $DEVICE_A install -r $APK
 adb -s $DEVICE_B install -r $APK
+adb -s $DEVICE_A shell pm list packages network.ignirelay.field
+adb -s $DEVICE_B shell pm list packages network.ignirelay.field
 ```
 
 清資料（fresh first-run 驗收才做；會清掉已加入場域）：
@@ -147,16 +150,17 @@ Shot $DEVICE_B "step1_B_entry"
 Shot $DEVICE_A "step2_preview"
 ```
 
-### Step 3 — 建立場域 + participant/staff 加入
+### Step 3 — 建立場域 + participant 加入
 
 操作：
 1. A 點 `建立場域`，成為 owner。
 2. A 出示 participant QR/密鑰，B 加入，確認 B 角色為 participant。
-3. B 離開或重置該 membership；A 出示 staff QR/密鑰，B 再加入，確認 B 角色為 staff。
+3. 確認沒有要求 A 出示第二組 staff field secret；staff path 若出現，必須標示 deferred/disabled。
 
 預期：
 - A/B 顯示同一 fieldId 前 8 碼。
-- B 兩次加入會顯示正確角色。
+- A 顯示 owner；B 顯示 participant。
+- `staff` 不可用第二組 `field_join_secret` 假裝完成，避免產生不同 `field_id`。
 - raw join secret 不出現在 logcat 或畫面不必要處。
 
 證據：
@@ -164,7 +168,6 @@ Shot $DEVICE_A "step2_preview"
 ```powershell
 Shot $DEVICE_A "step3_A_owner_field"
 Shot $DEVICE_B "step3_B_participant"
-Shot $DEVICE_B "step3_B_staff"
 ```
 
 ### Step 4 — 正式 AppShell / 五分頁 / 全域 SOS
@@ -215,7 +218,7 @@ LogStop "step5_A"; LogStop "step5_B"
 - 靜置時 policy reason 顯示 stationary / stationary-reuse，current interval 約 180s（低電量時 300s）。
 - 移動後 policy reason 變 moving，current interval 約 30s（低電量時 60s）。
 - 移動後 ≤30s 有新的 PRESENCE 或 GPS fix age 更新。
-- 未使用 step counter / Activity Recognition 權限。
+- 未使用 step counter / Activity Recognition 權限；下方 `ACTIVITY_RECOGNITION` 查核預期無輸出。
 
 證據：
 
@@ -224,10 +227,13 @@ LogStart $DEVICE_B "step6_motion"
 Shot $DEVICE_B "step6_B_stationary"
 Shot $DEVICE_B "step6_B_moving"
 Shot $DEVICE_A "step6_A_after_motion"
+adb -s $DEVICE_A shell dumpsys package network.ignirelay.field | Select-String "ACTIVITY_RECOGNITION"
+adb -s $DEVICE_B shell dumpsys package network.ignirelay.field | Select-String "ACTIVITY_RECOGNITION"
 LogStop "step6_motion"
 ```
 
-Owner 回填：靜置 interval=`____`；移動後更新秒數=`____`。
+Owner 回填：stationary interval=`____`；moving interval=`____`；policy reason=`____`；
+last GPS fix age=`____`；移動後更新秒數=`____`；ACTIVITY_RECOGNITION 查核輸出=`____`。
 
 ### Step 7 — SOS：取消一次後真發
 
@@ -354,10 +360,10 @@ Shot $DEVICE_B "step13_B_radar"
 |---|---|---|---|---|
 | 1 | first-run/no-field | 權限 + 三入口，不進 DebugShell | ☐P ☐F | |
 | 2 | 先看功能 | fixture preview、不送真事件 | ☐P ☐F | |
-| 3 | participant/staff join | 同 fieldId、角色正確 | ☐P ☐F | |
+| 3 | owner/participant join | 同 fieldId；A=owner、B=participant；staff deferred | ☐P ☐F | |
 | 4 | AppShell | 安全/位置/事件/協助/我的 + global SOS | ☐P ☐F | |
 | 5 | mesh/PRESENCE | 對方最後可信位置出現 | ☐P ☐F | |
-| 6 | motion-aware | 靜置省電、移動 ≤30s 更新 | ☐P ☐F | |
+| 6 | motion-aware | 靜置省電、移動 ≤30s 更新、無 ACTIVITY_RECOGNITION | ☐P ☐F | |
 | 7 | SOS | 取消一次；真發 ≤10s 到 B | ☐P ☐F | |
 | 8 | 我安全了 | B 端解除 SOS | ☐P ☐F | |
 | 9 | HAZARD | A 端危害事件出現 | ☐P ☐F | |

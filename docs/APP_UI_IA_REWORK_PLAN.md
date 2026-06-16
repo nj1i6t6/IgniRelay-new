@@ -1,8 +1,27 @@
 # IgniRelay App UI/IA Rework Plan
 
-> Version: v0.1, 2026-06-16. Owner-approved planning basis for MASTER_EXECUTION_PLAN v1.4.
+> Version: v0.2, 2026-06-16. Owner-approved planning basis for MASTER_EXECUTION_PLAN v1.5.
 > Scope: formal App shell, field-first UX, motion-aware location cadence, and guided preview.
 > This document does not change wire/GATT/crypto contracts.
+
+## 0. Review Decisions
+
+Claude review #1 was accepted where it found contract or execution-order risk, and rejected where it pulled future
+service concepts into the Stage A App shell.
+
+- **RD-1 role/QR model**: Stage A offline join uses one `field_join_secret` per field. The creator is `owner`; scanned
+  joins are `participant`. Do not create separate participant/staff field secrets: that would derive different
+  `field_id` values and split the field. `staff` QR/membership is deferred until the Stage E cloud staff-token flow or
+  a separate Owner-approved QR-contract task.
+- **RD-2 motion source**: Flutter has no built-in accelerometer/gyroscope API in this repo. UI-F must use a narrow
+  native Android `SensorManager` bridge or an injected platform source. Do not add `sensors_plus`, do not add
+  `ACTIVITY_RECOGNITION`, and do not use step counter/detector in Stage A.
+- **RD-3 UI-F split**: UI-F is not one giant commit. Implement it as UI-F0 through UI-F5 below; each subtask must keep
+  gates green and update `STATUS.md`.
+- **RD-4 visibility policy**: SOS is never hidden by role or peer-visibility policy. Full `peer_visibility=staff_only`
+  semantics remain a Stage E/service-policy responsibility.
+- **RD-5 future models**: `IncidentCase`, E-CARE, full manager screens, and Web/cloud admin workflows are not UI-F.
+  Stage A remains event-centric and field-local.
 
 ## 1. Product Direction
 
@@ -56,16 +75,31 @@ Permissions:
 
 Field role entry:
 
-- A field can expose at least two join secrets:
-  - participant/member secret -> role `participant`
-  - staff secret -> role `staff`
+- A Stage A offline field exposes one field join secret:
+  - creator -> role `owner`
+  - scanner/manual-key join -> role `participant`
 - Owner-created local field grants role `owner` to the creator.
 - QR is an encoded join string, not a new transport. It should stay versioned (`IGNI1...`) and must not log
   raw `field_join_secret`.
+- `staff` is a reserved role, but not a Stage A offline QR path. Current `IGNI1` staff token requires
+  `cloud_base_url`; without cloud, the app must not pretend that staff membership exists.
 
 ## 4. UI-F: Formal AppShell + Motion-Aware Location
 
 Purpose: finish the product shell except guided preview/tutorial mode.
+
+### 4.0 Subtask Split
+
+- **UI-F0 Preflight**: confirm no `staff` offline QR, choose native motion source, and add/adjust docs or STATUS if a
+  dependency is missing.
+- **UI-F1 AppShell entry**: first-run/no-field entry, five-tab `AppShell`, production home swap, `DebugShell` debug-only.
+- **UI-F2 Module placement**: move existing SOS, field, position/radar, events, broadcast, checkpoint, hazard, and
+  presence controls into their target tabs. HAZARD must have a formal product action, not only a debug card.
+- **UI-F3 Field membership model**: minimal `owner`/`participant` model, role display, owner-only create/share controls.
+  `staff` stays disabled/deferred with explicit copy if shown at all.
+- **UI-F4 CommunicationState**: aggregate cloud stub/off, BLE/mesh, peers/nodes, outbox count, last presence, and best
+  path copy.
+- **UI-F5 Motion-aware cadence**: native/injected motion source, hysteresis, diagnostics, and presence/GPS cadence tests.
 
 ### 4.1 Required Scope
 
@@ -91,9 +125,11 @@ Purpose: finish the product shell except guided preview/tutorial mode.
    - `PresenceBeaconController`
 5. Move `DebugShell` behind a debug/developer diagnostics route.
 6. Add minimal field membership / permission model if missing:
-   - `participant`, `staff`, `owner`
-   - role derived from join secret / QR role lane
+   - Stage A active roles: `participant`, `owner`
+   - reserved future role: `staff`
+   - role derived from local create vs joined field, not from a second field secret
    - role visible in "我的" and active field status
+   - owner sees field QR/create/share controls; participant does not
 7. Add `CommunicationState` aggregation:
    - cloud reachable (stub/off until Stage E)
    - BLE available / mesh running
@@ -108,7 +144,8 @@ Replace the fixed "120s always" presence/GPS policy with motion-aware cadence.
 
 Implementation constraints:
 
-- Use low-rate accelerometer/motion sampling via existing platform/native bridge or standard Android APIs.
+- Use low-rate accelerometer/motion sampling via a narrow native Android `SensorManager` bridge or injected platform
+  source.
 - Do not add a third-party sensor dependency unless Owner explicitly approves and G13 is updated.
 - Do not request `ACTIVITY_RECOGNITION`.
 - Do not use step counter / step detector in v1.
@@ -125,6 +162,11 @@ low_battery_moving_interval    = 60s
 low_battery_stationary_interval= 300s
 low_battery_threshold          = 20%
 motion_sample_rate             = low / UI-grade only
+motion_window                  = 8s
+moving_confirm_windows         = 2
+stationary_confirm_duration    = 45s
+moving_rms_threshold           = implementation constant, tested with fake source
+stationary_rms_threshold       = implementation constant lower than moving threshold
 ```
 
 Behavior:
@@ -148,6 +190,8 @@ Behavior:
   - last GPS fix age
   - last presence sent
   - GPS policy reason (`moving`, `stationary-reuse`, `manual-event`, `low-battery`)
+- Hysteresis is required: one noisy accelerometer sample must not flip stationary -> moving, and one quiet sample must
+  not flip moving -> stationary. Tests should use a fake motion source and fake clock.
 
 ### 4.3 UI-F DoD
 
@@ -155,15 +199,21 @@ Behavior:
 - D2 `AppShell` five tabs exist with labels exactly `安全 | 位置 | 事件 | 協助 | 我的`.
 - D3 global SOS is reachable from every tab and is not hidden inside `事件` or `協助`.
 - D4 existing functional modules render in their target tabs; debug diagnostics is debug-only.
-- D5 participant/staff/owner role is visible and drives at least one UI difference.
+- D5 `owner`/`participant` role is visible and drives concrete UI differences: owner can create/share field join QR;
+  participant cannot. `staff` is absent or visibly deferred, never faked with a second field secret.
 - D6 motion-aware policy is implemented with tests for moving, stationary, transition, and low-battery cadence.
 - D7 no new wire/proto/GATT/crypto changes.
-- D8 gates green:
+- D8 debug diagnostics is not the production home and is only reachable in debug/developer mode.
+- D9 HAZARD is reachable as a formal event action from the production event/safety surface.
+- D10 permission naming is unambiguous: OS permission health is not mixed with field role/capability policy.
+- D11 gates green:
   - `dart run tool/check_layers.dart --strict`
   - `flutter analyze --no-fatal-infos --no-fatal-warnings`
   - `flutter test --exclude-tags golden`
   - `flutter test test/conformance/wire_conformance_corpus_test.dart`
   - `cd android; .\gradlew.bat :app:assembleDebugAndroidTest`
+  - grep/assert no `ACTIVITY_RECOGNITION` in Android manifests
+  - grep/assert no `sensors_plus` dependency unless Owner explicitly approves a G13 update
 
 ## 5. UI-G: Guided Preview / "先看功能"
 
@@ -211,7 +261,8 @@ A11 two-phone acceptance must be updated after UI-F/UI-G:
 
 - It validates the formal `AppShell`, not `DebugShell`.
 - It includes first-run permissions and no-field entry.
-- It verifies participant and staff join paths.
+- It verifies owner create + participant join. `staff` join is deferred until Stage E/cloud staff-token support or a
+  separate QR-contract task.
 - It verifies the tab labels use `位置`, not `地圖`.
 - It verifies global SOS from at least two tabs.
 - It verifies motion-aware GPS/presence behavior using the diagnostic state exposed by UI-F.

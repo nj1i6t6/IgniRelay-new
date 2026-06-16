@@ -1,6 +1,6 @@
 # 烽傳 IgniRelay — 總施工計畫 MASTER EXECUTION PLAN
 
-> **版本 v1.4 · 2026-06-16 · Owner: simon（本文件中稱「Owner」）**
+> **版本 v1.5 · 2026-06-16 · Owner: simon（本文件中稱「Owner」）**
 > 範圍：從本日現況，一路到「手機 App + 實體 Field Node + Gateway + 管理者 Web 後台
 > + **雲端場域服務（Owner VPS，Stage E）**」整套產品跑通為止的完整施工路線。
 > **本文件是給施工 AI（以下稱 AGENT）逐字遵守的施工規格**，
@@ -729,9 +729,13 @@ D3 通用 gate 綠。
 
 ### UI-F — 正式 AppShell / UI-IA 重整 + motion-aware 定位節流（前置：A10b）
 
-**依據**：`docs/APP_UI_IA_REWORK_PLAN.md` §1–§4。此任務是 Stage A 產品殼校正：
+**依據**：`docs/APP_UI_IA_REWORK_PLAN.md` §0–§4。此任務是 Stage A 產品殼校正：
 保留 BLE/event/v3 envelope/SOS/PRESENCE/位置估計等底層，將 `DebugShell` 降級為開發者診斷，
 新增正式 `AppShell`。**不含「先看功能」引導模式（UI-G）**。
+
+**v1.5 拆刀規則**：UI-F 必須分成 UI-F0～UI-F5 小任務施工（preflight、AppShell entry、module
+placement、field membership、CommunicationState、motion cadence）。每一刀都要維持 gate 綠並更新
+`STATUS.md`；不得用一個 commit 混完整個 UI-F。
 
 **步驟**：
 1. **正式入口 / 首次啟動**：production home 不再進 `DebugShell`。無 active field 時顯示 field entry：
@@ -743,14 +747,18 @@ D3 通用 gate 綠。
 3. **模組搬遷**：將既有 `FieldScreen`、`SosScreen`/`SosController`、`LastSeenScreen`/`RelativeRadar`、
    `AdminBroadcastBanner`、`CheckpointCard`、`HazardCard`、`PresenceBeaconController` 移入對應分頁。
    `DebugShell` 僅可在 debug/developer diagnostics route 進入。
-4. **基本角色/權限**：補最小 `FieldMembership` / `PermissionResolver`（命名可依現有程式碼調整）。
-   同一場域至少支援 participant/member secret 與 staff secret；建立者為 owner。角色在「我的」與
-   active field status 顯示，並至少驅動一個 UI 差異。
+4. **基本角色/能力**：補最小 `FieldMembership` / `FieldCapabilityResolver`（命名可依現有程式碼調整）。
+   Stage A offline 模型只支援 creator=`owner`、joiner=`participant`；**不得用第二組
+   `field_join_secret` 假裝 staff**，因為它會導出不同 `field_id`。`staff` 保留為 Stage E cloud
+   staff-token 或另開 QR 契約任務。角色在「我的」與 active field status 顯示，且 owner 可建立/分享
+   場域 QR，participant 不可。
 5. **CommunicationState**：聚合 BLE/mesh running、nearby peers/nodes（若可得）、pending outbox、
    last presence sent、current best path。UI 不得只顯示 online/offline。
-6. **motion-aware 定位與 PRESENCE**：取代 A9 的固定 120s production cadence。用低頻加速度感知
-   moving/stationary；**不得使用 step counter / Activity Recognition**，不得要求
-   `ACTIVITY_RECOGNITION`；不得新增第三方 sensor 依賴（除非 Owner 另准並修 G13）。政策常數：
+6. **motion-aware 定位與 PRESENCE**：取代 A9 的固定 120s production cadence。用窄版 Android
+   `SensorManager` native bridge 或注入式 platform source 取得低頻 motion state；**不得使用 step
+   counter / Activity Recognition**，不得要求 `ACTIVITY_RECOGNITION`；不得新增第三方 sensor 依賴
+   （除非 Owner 另准並修 G13）。必須有 hysteresis，避免單一雜訊 sample 讓 moving/stationary 來回跳。
+   政策常數：
    moving 30s、moving fresh-fix age 30s、stationary 180s、stationary fresh-fix age 15min、
    low battery moving 60s、low battery stationary 300s、low battery threshold 20%。manual
    SOS/HAZARD/CHECKPOINT/SAFE 可嘗試一次 fresh GPS（timeout）再 fallback last known fix。
@@ -762,10 +770,15 @@ D3 通用 gate 綠。
 - D2 五分頁存在且 label 精確為 `安全 | 位置 | 事件 | 協助 | 我的`；無 `地圖` tab。
 - D3 global SOS 從每個 tab 可觸發，且不藏在單一 tab 深層。
 - D4 現有功能模組移入對應 tab；debug diagnostics 僅 debug 可見。
-- D5 participant/staff/owner 最小角色模型存在，角色顯示並影響至少一處 UI。
+- D5 owner/participant 最小角色模型存在，角色顯示並有明確 UI 差異：owner 可建立/分享場域 QR；
+  participant 不可。staff 不可用第二組 field secret 假裝完成。
 - D6 motion-aware cadence 單元/widget 測試覆蓋 moving、stationary、transition、low battery；
   測試證明 stationary 不熱跑高精度 GPS、moving 會縮短 presence/GPS refresh。
-- D7 通用 gate + GATE-CONF-DART + GATE-KOTLIN-BUILD 全綠；wire/proto/GATT/crypto 零變更。
+- D7 debug diagnostics 不是 production home，且只在 debug/developer mode 可進入。
+- D8 HAZARD 有正式事件入口，不只存在 debug card。
+- D9 grep/assert 證明 Android manifest 無 `ACTIVITY_RECOGNITION`，`pubspec.yaml` 無 `sensors_plus`
+  （除非 Owner 另准並修 G13）。
+- D10 通用 gate + GATE-CONF-DART + GATE-KOTLIN-BUILD 全綠；wire/proto/GATT/crypto 零變更。
 
 **禁止**：重寫 BLE/event/v3 envelope/SOS/PRESENCE 底層；把 `DebugShell` 當正式首頁；
 新增地圖 SDK/圖磚/GIS 套件；使用 `ACTIVITY_RECOGNITION`；把 motion-derived state 寫進 wire。
@@ -796,16 +809,16 @@ D3 通用 gate 綠。
 ### A11 — 雙機實機驗證（USER-GATE）
 
 AGENT 工作 = 產出/更新 `docs/ACCEPTANCE_A11_TWO_PHONE_SCRIPT.md`，內容必須含逐步操作腳本與
-證據表格；Owner 實機執行回填。**v1.4 起 A11 驗正式 `AppShell` 與 UI-F/UI-G 結果，
+證據表格；Owner 實機執行回填。**v1.5 起 A11 驗正式 `AppShell` 與 UI-F/UI-G 結果，
 不得再以 `DebugShell` 當主要驗收路徑。**腳本至少涵蓋：
 
 | # | 步驟 | 預期 | 證據欄 |
 |---|---|---|---|
 | 1 | fresh install/clear data 後首次啟動 | 權限引導出現；no-field entry 顯示「加入場域 / 建立場域 / 先看功能」 | 截圖+權限狀態 |
 | 2 | 檢查正式 AppShell | 加入/建立場域後出現五分頁 `安全/位置/事件/協助/我的`，無 `地圖` tab；global SOS 每 tab 可見 | 截圖×5 |
-| 3 | 手機 A 建立場域，分別出示 participant 與 staff QR/密鑰；手機 B 依腳本加入 | 同 fieldId 前 8 碼；B 顯示對應角色（participant 或 staff） | 截圖×3 |
+| 3 | 手機 A 建立場域並出示 participant QR/密鑰；手機 B 加入 | 同 fieldId 前 8 碼；A 顯示 owner，B 顯示 participant；staff join 標為 Stage E deferred | 截圖×2 |
 | 4 | A/B 啟動 mesh，互相發 PRESENCE；motion-aware diagnostics 開啟 | 對方位置卡/位置頁出現本機 anon8 + 時間；診斷顯示 current interval / last presence | 截圖+log |
-| 5 | motion-aware GPS/presence：靜置→移動 | 靜置使用 stationary cadence，不熱跑 GPS；移動後 ≤30s 更新 presence/GPS policy reason | 截圖+log+秒數 |
+| 5 | motion-aware GPS/presence：靜置→移動 | 靜置使用 stationary cadence，不熱跑 GPS；移動後 ≤30s 更新 presence/GPS policy reason；無 `ACTIVITY_RECOGNITION` 權限 | 截圖+log+秒數+權限查核 |
 | 6 | A 從非安全 tab 觸發 SOS(RED)（倒數中取消一次，再真發） | global SOS 可用；B 端 sosAlerts 告警卡 ≤10s | 截圖+秒數 |
 | 7 | A 發「我安全了」 | B 端該 SOS 標記解除 | 截圖 |
 | 8 | B 發 HAZARD（typed） | A 端事件/危害列表出現 | 截圖 |
@@ -1737,3 +1750,11 @@ crc16 = CRC-16/CCITT-FALSE(hdr‖body‖mac8)，poly 0x1021 init 0xFFFF
   stationary 180s、low battery 降頻），使用低頻 motion sensor，不用 step counter/Activity Recognition、
   不新增 sensor 依賴。⑤A11 雙機腳本改驗正式 AppShell、角色 QR、global SOS、motion-aware 診斷與
   `位置` 雷達；wire/GATT/crypto 契約零變更。作者：Codex（Owner 明示授權）。
+- v1.5（2026-06-16，Claude review #1 後的施工收斂）：
+  ①修正 v1.4 的角色/QR 語意：Stage A offline 同場域只用一條 `field_join_secret`，creator=`owner`、
+  joiner=`participant`；`staff` QR/會員資格延後到 Stage E cloud staff-token 或另開 QR 契約任務，
+  不得用第二條 field secret 造成不同 `field_id`。②UI-F 拆成 UI-F0～UI-F5 小任務，避免一刀混
+  AppShell、模組搬遷、角色模型、CommunicationState、motion cadence。③motion source 改明確要求窄版
+  Android `SensorManager`/注入式 source、hysteresis、無 `ACTIVITY_RECOGNITION`、無 `sensors_plus`。
+  ④A11 改驗 owner+participant，補 motion 權限查核；visibility policy 只釘「SOS 永不被角色/可見性隱藏」，
+  完整 `peer_visibility=staff_only` 留 Stage E。作者：Codex（Owner 要求審查後完善）。

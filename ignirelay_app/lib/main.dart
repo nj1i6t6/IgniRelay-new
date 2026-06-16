@@ -51,6 +51,7 @@ import 'package:ignirelay_app/app/controllers/handoff_controller.dart';
 import 'package:ignirelay_app/app/controllers/tier_manager.dart';
 import 'package:ignirelay_app/app/services/event_decoder.dart';
 import 'package:ignirelay_app/app/services/event_store.dart';
+import 'package:ignirelay_app/app/services/local_position_source.dart';
 import 'package:ignirelay_app/app/services/location_service.dart';
 import 'package:ignirelay_app/app/mesh/mesh_event_handler.dart';
 import 'package:ignirelay_app/app/controllers/mesh_runtime_controller.dart';
@@ -412,6 +413,15 @@ class _IgniRelayAppState extends State<IgniRelayApp> {
         ),
         Provider<LocationService>(
           create: (_) => LocationService(),
+        ),
+        // A10b — the device's OWN position (radar origin) as plain-Dart, wrapping
+        // the LocationService singleton in the app layer so the LastSeenScreen
+        // radar never touches it directly and never guesses "me" from a peer.
+        Provider<LocalPositionSource>(
+          create: (context) => LocalPositionSource(
+            currentLocation: () =>
+                context.read<LocationService>().currentLocation,
+          ),
         ),
         Provider<DeviceInfoController>(
           create: (_) => DeviceInfoController.instance,

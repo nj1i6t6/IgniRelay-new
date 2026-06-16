@@ -1001,3 +1001,24 @@ code commit `8155e30`。
 - next: **A11-D2（USER-GATE）**：Owner 晚上接雙機照 runbook 實測 step 1–9（含本刀補上的 step
   5）+ 截圖/logcat 回填；AI 可代跑 ADB 區但不得代填/宣稱通過。A11-D2 全項 PASS 後 Owner 於
   STATUS 記，再開 A12（App↔Node 契約凍結）。
+
+## [2026-06-16] PLAN-v1.4 DONE（App UI/IA 校正：UI-F/UI-G 插入 A11 前）
+
+Owner 明示授權修訂 MASTER_EXECUTION_PLAN（G11 例外）：打開 App 後確認現況仍像 debug shell / 舊 onboarding，
+產品體感不符合「場域安全工具」。本刀為 docs-only planning update，commit `d6dd61d`。
+
+- `docs/MASTER_EXECUTION_PLAN.md` bump v1.3 → v1.4：Stage A 在 A10b 後插入 **UI-F**
+  （正式 AppShell / UI-IA 重整 + motion-aware 定位節流）與 **UI-G**（先看功能/引導模式），再回 A11/A12。
+- 新增 `docs/APP_UI_IA_REWORK_PLAN.md`：定義五分頁 `安全 | 位置 | 事件 | 協助 | 我的`、global SOS、
+  no-field entry（加入場域 / 建立場域 / 先看功能）、participant/staff/owner 最小角色、DebugShell 降級、
+  CommunicationState、motion-aware GPS/PRESENCE policy。
+- motion-aware policy 定案：A9 固定 120s 僅為既有基線；UI-F production cadence 改 moving 30s、
+  stationary 180s、low battery moving 60s / stationary 300s；使用低頻 motion sensor，不用 step
+  counter / Activity Recognition，不新增 sensor 依賴，不要求 `ACTIVITY_RECOGNITION`。
+- `docs/ACCEPTANCE_A11_TWO_PHONE_SCRIPT.md` 重寫為 v1.4：前置改 UI-F/UI-G DONE；A11 改驗正式
+  AppShell、first-run/no-field、先看功能、participant/staff join、五分頁、global SOS、motion-aware
+  diagnostics、PRESENCE/SOS/SAFE/HAZARD、restart/dedup、field-scope、connectedDebugAndroidTest、
+  `位置` 雷達 ≥20m。
+- gates：docs-only；`git diff --check` 已跑，無 whitespace error。
+- deviations: MASTER 依 G11 需 Owner 明示授權；本次即 Owner 於對話中要求「寫 F/G、A11 也要改」。
+- next: UI-F 開工（正式 AppShell + motion-aware 定位），UI-F DONE 後 UI-G，再執行 A11-D2。

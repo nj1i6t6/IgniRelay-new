@@ -82,11 +82,10 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
   StreamSubscription<SosAlert>? _sosSub;
   Timer? _refresh;
 
+  /// The view the user picked. The radar only *shows* while a local origin
+  /// exists — if it is/becomes null the build derives the degrade state, so a
+  /// position lost mid-radar falls back to the list (and auto-recovers).
   _ViewMode _mode = _ViewMode.list;
-
-  /// Set when the user asked for the radar but there was no local position;
-  /// shows the degrade hint and keeps the list visible (A10b step 1).
-  bool _radarUnavailable = false;
 
   /// anon8 → recent observations (people; PRESENCE + CHECKPOINT).
   final Map<String, List<PositionObservation>> _byAnon = {};
@@ -216,27 +215,11 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
     return out;
   }
 
-  void _selectList() {
-    setState(() {
-      _mode = _ViewMode.list;
-      _radarUnavailable = false;
-    });
-  }
+  void _selectList() => setState(() => _mode = _ViewMode.list);
 
-  void _selectRadar() {
-    if (_origin() == null) {
-      // No own position → degrade to the list with a hint (A10b step 1).
-      setState(() {
-        _mode = _ViewMode.list;
-        _radarUnavailable = true;
-      });
-    } else {
-      setState(() {
-        _mode = _ViewMode.radar;
-        _radarUnavailable = false;
-      });
-    }
-  }
+  // Selecting the radar only records intent; build() decides whether it can
+  // actually show (needs a local origin) or must degrade to the list + hint.
+  void _selectRadar() => setState(() => _mode = _ViewMode.radar);
 
   /// Radar dot tap → open the subject's A10 card (§5 A10b step 2) in a sheet.
   void _showSubjectCard(String key) {
@@ -270,8 +253,12 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
     final now = _nowFn();
     final entries = _entries(now);
 
-    final origin = _mode == _ViewMode.radar ? _origin() : null;
-    final showRadar = _mode == _ViewMode.radar && origin != null;
+    final radarRequested = _mode == _ViewMode.radar;
+    final origin = radarRequested ? _origin() : null;
+    // Radar is active only with a local origin; a missing/lost origin while in
+    // radar mode degrades to the list with a hint (A10b step 1; covers the case
+    // where the origin goes null AFTER entering the radar).
+    final showHint = radarRequested && origin == null;
 
     return Scaffold(
       backgroundColor: p.bg0,
@@ -285,9 +272,9 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: IgniSpacing.lg),
-              child: _viewToggle(p),
+              child: _viewToggle(p, radarActive: origin != null),
             ),
-            if (_radarUnavailable)
+            if (showHint)
               Padding(
                 padding: const EdgeInsets.fromLTRB(
                     IgniSpacing.lg, IgniSpacing.md, IgniSpacing.lg, 0),
@@ -295,7 +282,7 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
               ),
             const SizedBox(height: IgniSpacing.md),
             Expanded(
-              child: showRadar
+              child: origin != null
                   ? RelativeRadar(
                       origin: origin,
                       subjects: [
@@ -305,6 +292,10 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
                             label: e.label,
                             estimate: e.est,
                             baseTone: e.baseTone,
+                            // Anchor-derived fixes (CHECKPOINT / Field Node) draw
+                            // as a triangle; SOS stays a circle (§5 A10b step 2).
+                            isNode: e.baseTone != StatusTone.sos &&
+                                e.est.anchorNodeId != null,
                           ),
                       ],
                       onTapSubject: _showSubjectCard,
@@ -317,12 +308,12 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
     );
   }
 
-  Widget _viewToggle(IgniPalette p) {
+  Widget _viewToggle(IgniPalette p, {required bool radarActive}) {
     return Row(
       children: [
-        _togglePill(p, '列表', _mode == _ViewMode.list, _selectList),
+        _togglePill(p, '列表', !radarActive, _selectList),
         const SizedBox(width: IgniSpacing.sm),
-        _togglePill(p, '雷達', _mode == _ViewMode.radar, _selectRadar),
+        _togglePill(p, '雷達', radarActive, _selectRadar),
       ],
     );
   }

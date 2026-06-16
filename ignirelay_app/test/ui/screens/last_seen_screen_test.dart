@@ -179,4 +179,92 @@ void main() {
     expect(find.widgetWithText(StatusChip, 'SOS'), findsOneWidget);
     expect(find.textContaining('目前位置'), findsNothing);
   });
+
+  testWidgets('a CHECKPOINT (anchor) subject draws as a node on the radar',
+      (tester) async {
+    final now = DateTime(2026, 6, 15, 12, 0, 0);
+    const origin = PositionEstimate(
+      lat: 25.0,
+      lng: 121.0,
+      confidence: PositionConfidence.high,
+      uncertaintyM: 15,
+      ageSeconds: 0,
+    );
+    await tester.pumpWidget(
+      screen(now: () => now, localEstimate: () => origin),
+    );
+    await tester.pump();
+
+    cp.add(CheckpointCrossing(
+      eventId: 'cp-1',
+      checkpointId: 'CP-7',
+      anon8: 'd0d1d2d3',
+      lat: 25.01,
+      lng: 121.0,
+      observedAt: now.subtract(const Duration(seconds: 10)),
+    ));
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.text('雷達'));
+    await tester.pump();
+
+    final nodes =
+        find.byWidgetPredicate((w) => w is RadarMarker && w.isNode);
+    expect(nodes, findsOneWidget);
+  });
+
+  testWidgets('origin lost while in radar mode → degrades to list + hint',
+      (tester) async {
+    final now = DateTime(2026, 6, 15, 12, 0, 0);
+    PositionEstimate? originVal = const PositionEstimate(
+      lat: 25.0,
+      lng: 121.0,
+      confidence: PositionConfidence.high,
+      uncertaintyM: 15,
+      ageSeconds: 0,
+    );
+    await tester.pumpWidget(MaterialApp(
+      home: LastSeenScreen(
+        presenceSource: pres.stream,
+        checkpointSource: cp.stream,
+        sosSource: sos.stream,
+        now: () => now,
+        localEstimate: () => originVal,
+        refreshInterval: Duration.zero,
+      ),
+    ));
+    await tester.pump();
+
+    pres.add(PresenceUpdate(
+      eventId: 'v2-1',
+      anon8: 'e0e1e2e3',
+      source: 1,
+      lat: 25.01,
+      lng: 121.0,
+      observedAt: now.subtract(const Duration(seconds: 10)),
+    ));
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.text('雷達'));
+    await tester.pump();
+    expect(find.byType(RelativeRadar), findsOneWidget); // radar active
+
+    // Lose the local fix; a fresh event forces a rebuild (no user toggle).
+    originVal = null;
+    pres.add(PresenceUpdate(
+      eventId: 'v2-2',
+      anon8: 'e0e1e2e3',
+      source: 1,
+      lat: 25.02,
+      lng: 121.0,
+      observedAt: now.subtract(const Duration(seconds: 5)),
+    ));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byType(RelativeRadar), findsNothing);
+    expect(find.textContaining('需要本機位置才能顯示相對方位'), findsOneWidget);
+  });
 }

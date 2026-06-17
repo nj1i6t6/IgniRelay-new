@@ -54,7 +54,15 @@ class HazardCard extends StatefulWidget {
     this.hazardSource,
     this.onPublish,
     this.localEstimate,
+    this.formalSend = false,
   });
+
+  /// When true, the manual send action is shown in **production** (not just
+  /// `kDebugMode`) with product copy — this is the formal HAZARD report entry
+  /// for the 事件 tab (UI-F2; participant+owner may send, per UI-F0 §4.0.1 F0-5).
+  /// `DebugShell` leaves this `false`, keeping the original kDebugMode-only debug
+  /// stand-in unchanged. No wire change either way (same `publishHazard`).
+  final bool formalSend;
 
   /// Typed received-HAZARD stream. Defaults to `EventStream.hazardEvents`.
   final Stream<HazardEvent>? hazardSource;
@@ -108,11 +116,12 @@ class _HazardCardState extends State<HazardCard> {
 
   Future<_HazardDraft?> _promptDraft() {
     String type = 'FIRE';
-    final descCtl = TextEditingController(text: '測試危害（debug）');
+    final descCtl =
+        TextEditingController(text: widget.formalSend ? '' : '測試危害（debug）');
     return showDialog<_HazardDraft>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('手動 HAZARD（debug）'),
+        title: Text(widget.formalSend ? '回報危害' : '手動 HAZARD（debug）'),
         content: StatefulBuilder(
           builder: (ctx, setLocal) => Column(
             mainAxisSize: MainAxisSize.min,
@@ -179,11 +188,15 @@ class _HazardCardState extends State<HazardCard> {
       );
       if (!mounted) return;
       final short = id.length <= 8 ? id : id.substring(0, 8);
-      final note = hasFix ? '' : '（無 GPS，用樣本座標）';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-            'HAZARD「${draft.type}」已送出（id $short）$note · 需已加入場域才會實際廣播'),
-      ));
+      final String msg;
+      if (widget.formalSend) {
+        final note = hasFix ? '' : '（無定位，使用預設座標）';
+        msg = '已回報危害「${draft.type}」$note · 需已加入場域才會廣播';
+      } else {
+        final note = hasFix ? '' : '（無 GPS，用樣本座標）';
+        msg = 'HAZARD「${draft.type}」已送出（id $short）$note · 需已加入場域才會實際廣播';
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -203,22 +216,25 @@ class _HazardCardState extends State<HazardCard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              const Text('危害（HAZARD）',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(widget.formalSend ? '危害回報' : '危害（HAZARD）',
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
               const Spacer(),
-              // 手動按鈕：debug-only 占位（真實流程綁 Field Node / 危害回報 UI）。
-              if (kDebugMode)
+              // formalSend → 正式回報入口（production，participant+owner）。
+              // 否則 kDebugMode-only debug 占位（DebugShell 沿用）。
+              if (widget.formalSend || kDebugMode)
                 FilledButton.tonalIcon(
                   onPressed: _busy ? null : _promptAndPublish,
                   icon: const Icon(Icons.warning_amber, size: 18),
-                  label: const Text('手動 HAZARD'),
+                  label: Text(widget.formalSend ? '回報危害' : '手動 HAZARD'),
                 ),
             ]),
             const SizedBox(height: 4),
-            const Text(
-              '收到的 typed HAZARD 事件（A3 接收側）。手動送出為 debug 占位'
-              '（座標取本機 GPS，無則用樣本）。',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+            Text(
+              widget.formalSend
+                  ? '附近的危害事件。回報時座標取自本機定位（無定位時用預設座標）。'
+                  : '收到的 typed HAZARD 事件（A3 接收側）。手動送出為 debug 占位'
+                      '（座標取本機 GPS，無則用樣本）。',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
             const SizedBox(height: 8),
             if (_hazards.isEmpty)

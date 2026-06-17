@@ -1,16 +1,18 @@
-// AppShell — 烽傳 IgniRelay 正式產品殼（UI-F1）。
+// AppShell — 烽傳 IgniRelay 正式產品殼（UI-F1 殼骨架 + UI-F2 模組搬遷）。
 //
 // 取代舊的 mapless `DebugShell` 成為 production home（main.dart `_StartupRouter`
-// 在 onboarding/權限完成後改回傳本殼）。UI-F1 只做「殼骨架」：
+// 在 onboarding/權限完成後改回傳本殼）：
 //
 //   • 無 active field → [NoFieldEntry]（加入場域 / 建立場域 / 先看功能）。
 //   • 有 active field → 五分頁 scaffold（安全 / 位置 / 事件 / 協助 / 我的）
 //     + 全域 SOS（每個分頁都可達）。
 //
+// UI-F2 將既有模組移入各分頁（`lib/ui/shell/tabs/`）：安全=SafetyTab、
+// 位置=LastSeenScreen、事件=EventsTab、協助=AssistTab、我的=MyTab。
+//
 // 刻意不做（留後續小任務，見 docs/APP_UI_IA_REWORK_PLAN.md §4.0）：
-//   • 模組搬遷（把既有 SOS/位置/事件/危害…實體內容移入各分頁）→ UI-F2。
-//   • owner/participant 角色模型 → UI-F3。
-//   • CommunicationState 聚合 → UI-F4。
+//   • owner/participant 角色模型 → UI-F3（「我的」顯示產品佔位）。
+//   • CommunicationState 聚合 → UI-F4（「安全」顯示產品佔位）。
 //   • motion-aware 定位節流 → UI-F5。
 //   • 「先看功能」引導模式 → UI-G（此處僅提示佔位）。
 //
@@ -19,13 +21,17 @@
 // [kDeveloperDiagnosticsRoute]（main.dart 中只在 kDebugMode/kProfileMode 註冊）
 // 進入，且該入口只在 kDebugMode 渲染——release/production home 不得直接落 DebugShell。
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:ignirelay_app/app/controllers/active_field_controller.dart';
 import 'package:ignirelay_app/ui/screens/field/field_screen.dart';
+import 'package:ignirelay_app/ui/screens/position/last_seen_screen.dart';
 import 'package:ignirelay_app/ui/screens/sos/sos_screen.dart';
+import 'package:ignirelay_app/ui/shell/tabs/assist_tab.dart';
+import 'package:ignirelay_app/ui/shell/tabs/events_tab.dart';
+import 'package:ignirelay_app/ui/shell/tabs/my_tab.dart';
+import 'package:ignirelay_app/ui/shell/tabs/safety_tab.dart';
 import 'package:ignirelay_app/ui/theme/igni_colors.dart';
 import 'package:ignirelay_app/ui/theme/igni_tokens.dart';
 import 'package:ignirelay_app/ui/theme/igni_typography.dart';
@@ -44,6 +50,10 @@ const List<String> kAppShellTabLabels = <String>[
   '協助',
   '我的',
 ];
+
+/// 全域 SOS 鈕的 key——讓 smoke test 能不靠文字（避免與分頁內容裡的「SOS」字面
+/// 衝突）就定位到「每個分頁都可達」的那顆求救鍵。
+const Key kGlobalSosButtonKey = Key('app_shell_global_sos');
 
 /// production home。依 active field 狀態切「no-field entry」或「五分頁殼」。
 class AppShell extends StatelessWidget {
@@ -150,7 +160,7 @@ class NoFieldEntry extends StatelessWidget {
   }
 }
 
-/// 五分頁 scaffold + 全域 SOS。分頁內容在 UI-F1 為佔位 surface（模組搬遷留 UI-F2）。
+/// 五分頁 scaffold + 全域 SOS。分頁內容由 `lib/ui/shell/tabs/` 的模組提供（UI-F2）。
 class _AppShellTabs extends StatefulWidget {
   const _AppShellTabs();
 
@@ -171,14 +181,14 @@ class _AppShellTabsState extends State<_AppShellTabs> {
     Icons.person_outline, // 我的
   ];
 
-  // 分頁 body 佔位標題——刻意與 tab label 不同字面值，避免 smoke test 的
-  // find.text(label) 命中兩次。
-  static const List<String> _tabSurfaceTitles = <String>[
-    '我的安全與通訊狀態',
-    '最後可信位置 / 雷達',
-    '事件列表',
-    '離線協助',
-    '我的場域與身分',
+  // 與 [kAppShellTabLabels] 平行對位的分頁內容（UI-F2 模組搬遷）。順序＝
+  // 安全 / 位置 / 事件 / 協助 / 我的。位置直接嵌入既有 LastSeenScreen（A10/A10b）。
+  static const List<Widget> _tabBodies = <Widget>[
+    SafetyTab(),
+    LastSeenScreen(),
+    EventsTab(),
+    AssistTab(),
+    MyTab(),
   ];
 
   @override
@@ -191,13 +201,7 @@ class _AppShellTabsState extends State<_AppShellTabs> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            IndexedStack(
-              index: _index,
-              children: [
-                for (int i = 0; i < kAppShellTabLabels.length; i++)
-                  _tabSurface(context, p, i),
-              ],
-            ),
+            IndexedStack(index: _index, children: _tabBodies),
             // 全域 SOS：錨在 body 右下、位於 bottom tab bar 之上（不重疊分頁切換
             // 的點擊區）。每個分頁都看得到、都可觸發。
             const Positioned(
@@ -216,37 +220,6 @@ class _AppShellTabsState extends State<_AppShellTabs> {
       ),
     );
   }
-
-  Widget _tabSurface(BuildContext context, IgniPalette p, int i) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(
-        IgniSpacing.lg,
-        IgniSpacing.screenTitleTop,
-        IgniSpacing.lg,
-        IgniSpacing.xl3,
-      ),
-      children: [
-        Text(_tabSurfaceTitles[i], style: IgniTypography.titleLarge(p.text0)),
-        const SizedBox(height: IgniSpacing.sm),
-        Text(
-          '此分頁的功能模組將於 UI-F2 移入。',
-          style: IgniTypography.bodyMedium(p.text2),
-        ),
-        // 「我的」分頁：開發者診斷入口——只在 kDebugMode 渲染，且只能經
-        // debug-only 命名路由進入 DebugShell。release build 不會出現此入口。
-        if (i == kAppShellTabLabels.length - 1 && kDebugMode) ...[
-          const SizedBox(height: IgniSpacing.xl),
-          IgniButton(
-            label: '開發者診斷（DebugShell）',
-            icon: Icons.bug_report_outlined,
-            variant: IgniButtonVariant.ghost,
-            onPressed: () =>
-                Navigator.of(context).pushNamed(kDeveloperDiagnosticsRoute),
-          ),
-        ],
-      ],
-    );
-  }
 }
 
 /// 全域 SOS 進入鈕——導向既有 [SosScreen]（A8）。不改動 SOS 底層行為，只是入口。
@@ -256,6 +229,7 @@ class _GlobalSosButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IgniButton(
+      key: kGlobalSosButtonKey,
       label: 'SOS',
       icon: Icons.sos,
       variant: IgniButtonVariant.sos,

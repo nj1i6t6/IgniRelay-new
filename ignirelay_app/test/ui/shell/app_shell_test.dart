@@ -232,6 +232,10 @@ void main() {
     expect(find.textContaining('目前路徑'), findsOneWidget);
     expect(find.text('通訊狀態彙整 — 即將提供'), findsNothing);
     expect(find.textContaining('待送'), findsWidgets);
+    // UI-F5a: no motion source in the harness ⇒ diagnostic reads 尚未啟用,
+    // NEVER 靜止 (Owner boundary 2).
+    expect(find.text('動作偵測：尚未啟用'), findsOneWidget);
+    expect(find.text('動作偵測：靜止'), findsNothing);
   });
 
   testWidgets('安全 tab cancels its 5s refresh timer on dispose (no leak)',
@@ -267,6 +271,28 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
     expect(find.byType(SafetyTab), findsNothing);
     await tester.pump(const Duration(seconds: 6));
+  });
+
+  testWidgets('安全 tab pauses its 5s refresh while offstage (AppShell context)',
+      (tester) async {
+    // UI-F5a / Owner boundary 6 — proven in the real IndexedStack context, not
+    // an isolated SafetyTab. The refresh-tick counter only advances when the
+    // mounted + TickerMode guard passes (i.e. while 安全 is the visible tab).
+    SafetyTab.debugRefreshTicks = 0;
+    await _pumpShell(tester, joined: true); // 安全 onstage (index 0)
+
+    await tester.pump(const Duration(seconds: 6)); // one 5 s tick fires
+    expect(SafetyTab.debugRefreshTicks, greaterThan(0),
+        reason: 'refresh runs while 安全 is visible');
+
+    // Switch to 位置 → 安全 offstage (AppShell sets TickerMode(enabled:false)).
+    await tester.tap(find.text('位置'));
+    await tester.pump();
+    final whileOffstage = SafetyTab.debugRefreshTicks;
+
+    await tester.pump(const Duration(seconds: 12)); // two ticks would fire
+    expect(SafetyTab.debugRefreshTicks, whileOffstage,
+        reason: 'the 5 s timer fires but runs no setState while offstage');
   });
 
   testWidgets('位置 tab embeds the existing LastSeenScreen', (tester) async {

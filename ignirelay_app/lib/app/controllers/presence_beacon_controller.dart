@@ -7,13 +7,17 @@
 // manual `PresenceController.publishPresence` (A2) — and publishes through that
 // same path (the publish callback is wired to it in `main.dart`).
 //
-// CADENCE (all three are constructor constants — "參數常數化"):
-//   • normal:       every [normalInterval]      (120s default)
-//   • low battery:  every [lowBatteryInterval]  (300s default) when the battery
-//     reading is below [lowBatteryThreshold] (20%) — fewer radio wakeups when
-//     the battery is critical. The battery is re-read before every (re)arm, so
-//     the cadence adapts as the battery drains/charges, including the FIRST
-//     interval.
+// CADENCE (all constructor constants — "參數常數化"). UI-F5a makes it
+// motion-aware (§4.2): the interval is chosen by (motion × battery) via
+// `motionPresenceInterval`:
+//   • moving 30s / stationary 180s; low-battery moving 60s / stationary 300s;
+//   • `unknown` motion (no source wired — the F5a default, until F5b's native
+//     accelerometer) falls back to the prior fixed [normalInterval] (120s) /
+//     [lowBatteryInterval] (300s) — so F5a is a zero-behaviour-change cut.
+//   The battery is re-read before every (re)arm (low when < [lowBatteryThreshold],
+//   20%), so the cadence adapts as the battery drains/charges, incl. the FIRST
+//   interval. A `stationary → moving` transition publishes immediately (gated)
+//   when the last beacon is older than [transitionMinGap] (15s).
 //
 // GATES — the tick is a strict NO-OP unless BOTH hold (it never beacons
 // otherwise; this is the A9 prohibition "beacon 在未加入場域時發送"):
@@ -37,6 +41,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:ignirelay_app/app/services/motion/motion_state.dart';
+
 /// Publish one PRESENCE footprint, optionally tagging the coarse battery hint.
 /// Wired in production to `PresenceController.publishPresence`.
 typedef PresenceBeaconPublish = Future<void> Function({int? batteryHint});
@@ -52,6 +58,15 @@ class PresenceBeaconController extends ChangeNotifier {
     int lowBatteryThreshold = 20,
     DateTime Function()? now,
     bool enabled = true,
+    // UI-F5a — motion-aware cadence. When [motionStates] is null the controller
+    // behaves exactly as before (motion stays `unknown` → normal/low-battery
+    // fallback). The four motion intervals are §4.2 constants.
+    Stream<MotionState>? motionStates,
+    Duration movingInterval = const Duration(seconds: 30),
+    Duration stationaryInterval = const Duration(seconds: 180),
+    Duration lowBatteryMovingInterval = const Duration(seconds: 60),
+    Duration lowBatteryStationaryInterval = const Duration(seconds: 300),
+    Duration transitionMinGap = const Duration(seconds: 15),
   })  : _publish = publish,
         _isMeshRunning = isMeshRunning,
         _hasJoinedField = hasJoinedField,
@@ -59,9 +74,17 @@ class PresenceBeaconController extends ChangeNotifier {
         _normalInterval = normalInterval,
         _lowBatteryInterval = lowBatteryInterval,
         _lowBatteryThreshold = lowBatteryThreshold,
+        _movingInterval = movingInterval,
+        _stationaryInterval = stationaryInterval,
+        _lowBatteryMovingInterval = lowBatteryMovingInterval,
+        _lowBatteryStationaryInterval = lowBatteryStationaryInterval,
+        _transitionMinGap = transitionMinGap,
         _now = now ?? DateTime.now,
         _enabled = enabled {
     _currentInterval = _normalInterval;
+    if (motionStates != null) {
+      _motionSub = motionStates.listen(_onMotion);
+    }
     if (_enabled) unawaited(_arm());
   }
 
@@ -72,6 +95,11 @@ class PresenceBeaconController extends ChangeNotifier {
   final Duration _normalInterval;
   final Duration _lowBatteryInterval;
   final int _lowBatteryThreshold;
+  final Duration _movingInterval;
+  final Duration _stationaryInterval;
+  final Duration _lowBatteryMovingInterval;
+  final Duration _lowBatteryStationaryInterval;
+  final Duration _transitionMinGap;
   final DateTime Function() _now;
 
   bool _enabled;
@@ -81,6 +109,11 @@ class PresenceBeaconController extends ChangeNotifier {
   int? _lastBattery;
   DateTime? _lastBeaconAt;
   late Duration _currentInterval;
+
+  // UI-F5a — current coarse motion. `unknown` until a motion source (F5b) feeds
+  // the classifier; never faked as `stationary`.
+  MotionState _motion = MotionState.unknown;
+  StreamSubscription<MotionState>? _motionSub;
 
   /// The UI toggle state. Default ON; persists only in memory (the loop is a
   /// foreground affordance — it is re-created with the provider each launch).
@@ -105,6 +138,10 @@ class PresenceBeaconController extends ChangeNotifier {
   /// When the last footprint was actually published (null = none yet).
   DateTime? get lastBeaconAt => _lastBeaconAt;
 
+  /// (UI-F5a) Current coarse motion driving the cadence. `unknown` until a
+  /// motion source is wired (UI-F5b) — surfaced as a diagnostic; never faked.
+  MotionState get motionState => _motion;
+
   /// Turn the automatic beacon on/off (the debug-shell switch).
   void setEnabled(bool value) {
     if (_enabled == value) return;
@@ -118,22 +155,33 @@ class PresenceBeaconController extends ChangeNotifier {
     }
   }
 
-  /// Re-read the battery, recompute the cadence, and (re)arm the one-shot timer.
+  /// Re-read the battery, recompute the cadence (motion × battery — §4.2), and
+  /// (re)arm the one-shot timer.
   Future<void> _arm() async {
     if (_disposed || !_enabled) return;
     final battery = await _readBatterySafely();
     if (_disposed || !_enabled) return;
     _lastBattery = battery;
-    _currentInterval = (battery != null && battery < _lowBatteryThreshold)
-        ? _lowBatteryInterval
-        : _normalInterval;
+    final lowBattery = battery != null && battery < _lowBatteryThreshold;
+    _currentInterval = motionPresenceInterval(
+      motion: _motion,
+      lowBattery: lowBattery,
+      movingInterval: _movingInterval,
+      stationaryInterval: _stationaryInterval,
+      lowBatteryMovingInterval: _lowBatteryMovingInterval,
+      lowBatteryStationaryInterval: _lowBatteryStationaryInterval,
+      unknownInterval: _normalInterval,
+      unknownLowBatteryInterval: _lowBatteryInterval,
+    );
     _timer?.cancel();
     _timer = Timer(_currentInterval, _onFire);
     notifyListeners();
   }
 
-  Future<void> _onFire() async {
-    if (_disposed) return;
+  /// Publish one footprint IFF the gates pass (enabled ∧ mesh ∧ field). Shared
+  /// by the periodic tick and the motion transition trigger so BOTH obey the
+  /// A5 §21.6 gate (UI-F5a / Owner boundary 3).
+  Future<void> _publishIfGated() async {
     if (_enabled && _isMeshRunning() && _hasJoinedField()) {
       try {
         await _publish(batteryHint: _lastBattery);
@@ -144,8 +192,44 @@ class PresenceBeaconController extends ChangeNotifier {
         debugPrint('[PresenceBeacon] publish failed: $e');
       }
     }
+  }
+
+  Future<void> _onFire() async {
+    if (_disposed) return;
+    await _publishIfGated();
     // Re-arm even when gated, so the loop resumes beaconing the moment the mesh
     // starts / a field is joined — without waiting for the user to toggle.
+    await _arm();
+  }
+
+  /// UI-F5a — react to a motion-state change. A `stationary → moving`
+  /// transition publishes immediately (gates permitting) when the last beacon
+  /// is stale (older than [transitionMinGap], or none yet), then re-arms at the
+  /// moving cadence. Other changes just re-arm so the new cadence applies.
+  void _onMotion(MotionState next) {
+    if (_disposed) return;
+    final prev = _motion;
+    if (prev == next) return;
+    _motion = next;
+    final last = _lastBeaconAt;
+    final stale = last == null || _now().difference(last) >= _transitionMinGap;
+    if (prev == MotionState.stationary &&
+        next == MotionState.moving &&
+        stale) {
+      // Immediate (gated) publish, then re-arm at the new cadence.
+      _timer?.cancel();
+      _timer = null;
+      unawaited(_publishNowAndRearm());
+    } else if (_enabled) {
+      unawaited(_arm());
+    } else {
+      notifyListeners(); // motionState changed (diagnostics) even while paused.
+    }
+  }
+
+  Future<void> _publishNowAndRearm() async {
+    if (_disposed) return;
+    await _publishIfGated();
     await _arm();
   }
 
@@ -163,6 +247,8 @@ class PresenceBeaconController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _motionSub?.cancel();
+    _motionSub = null;
     _timer?.cancel();
     _timer = null;
     super.dispose();

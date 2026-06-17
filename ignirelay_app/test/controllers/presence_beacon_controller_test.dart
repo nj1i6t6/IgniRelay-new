@@ -10,11 +10,14 @@
 // It is already in the dependency tree (transitive via flutter_test); we suppress
 // `depend_on_referenced_packages` rather than declaring it, to keep the dep
 // manifest untouched (G13 — only 附錄 F whitelist deps).
+import 'dart:async';
+
 // ignore: depend_on_referenced_packages
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ignirelay_app/app/controllers/presence_beacon_controller.dart';
+import 'package:ignirelay_app/app/services/motion/motion_state.dart';
 
 void main() {
   // Build a controller with counting publish + adjustable gate/battery flags.
@@ -129,5 +132,117 @@ void main() {
       expect(h.count(), 0);
       h.c.dispose();
     });
+  });
+
+  // ── UI-F5a — motion-aware cadence ──────────────────────────────────────────
+
+  test('no motion stream → motionState unknown, cadence stays 120s/300s', () {
+    fakeAsync((async) {
+      final h = make(async); // no motionStates supplied
+      expect(h.c.motionState, MotionState.unknown);
+      expect(h.c.currentInterval, const Duration(seconds: 120));
+      h.c.dispose();
+    });
+  });
+
+  // Build a motion-aware controller with a counting publish + a motion stream.
+  ({
+    PresenceBeaconController c,
+    int Function() count,
+    StreamController<MotionState> motion,
+  }) makeMotion(
+    FakeAsync async, {
+    bool mesh = true,
+    bool field = true,
+    int? battery,
+    bool enabled = true,
+  }) {
+    var published = 0;
+    final motion = StreamController<MotionState>.broadcast();
+    final c = PresenceBeaconController(
+      publish: ({int? batteryHint}) async => published++,
+      isMeshRunning: () => mesh,
+      hasJoinedField: () => field,
+      readBattery: () async => battery,
+      enabled: enabled,
+      motionStates: motion.stream,
+    );
+    async.flushMicrotasks();
+    return (c: c, count: () => published, motion: motion);
+  }
+
+  test('moving → 30s, stationary → 180s (normal battery)', () {
+    fakeAsync((async) {
+      final h = makeMotion(async);
+
+      h.motion.add(MotionState.moving);
+      async.flushMicrotasks();
+      expect(h.c.motionState, MotionState.moving);
+      expect(h.c.currentInterval, const Duration(seconds: 30));
+      async.elapse(const Duration(seconds: 30));
+      expect(h.count(), 1);
+
+      h.motion.add(MotionState.stationary);
+      async.flushMicrotasks();
+      expect(h.c.currentInterval, const Duration(seconds: 180));
+
+      h.c.dispose();
+      h.motion.close();
+    });
+  });
+
+  test('low battery → moving 60s / stationary 300s', () {
+    fakeAsync((async) {
+      final h = makeMotion(async, battery: 15);
+
+      h.motion.add(MotionState.moving);
+      async.flushMicrotasks();
+      expect(h.c.currentInterval, const Duration(seconds: 60));
+
+      h.motion.add(MotionState.stationary);
+      async.flushMicrotasks();
+      expect(h.c.currentInterval, const Duration(seconds: 300));
+
+      h.c.dispose();
+      h.motion.close();
+    });
+  });
+
+  test('stationary→moving with a stale last-beacon → immediate publish', () {
+    fakeAsync((async) {
+      final h = makeMotion(async);
+      h.motion.add(MotionState.stationary);
+      async.flushMicrotasks();
+      expect(h.count(), 0, reason: 'no beacon has fired yet');
+
+      h.motion.add(MotionState.moving);
+      async.flushMicrotasks();
+      expect(h.count(), 1,
+          reason: 'stationary→moving + stale last-beacon → publish now');
+
+      h.c.dispose();
+      h.motion.close();
+    });
+  });
+
+  test('stationary→moving transition still obeys the gates (no send)', () {
+    // Owner boundary 3: disabled / no field / mesh off ⇒ no transition publish.
+    void noSend(String why,
+        {bool mesh = true, bool field = true, bool enabled = true}) {
+      fakeAsync((async) {
+        final h = makeMotion(async, mesh: mesh, field: field, enabled: enabled);
+        h.motion.add(MotionState.stationary);
+        async.flushMicrotasks();
+        h.motion.add(MotionState.moving);
+        async.flushMicrotasks();
+        expect(h.count(), 0, reason: why);
+        h.c.dispose();
+        h.motion.close();
+      });
+    }
+
+    noSend('no field → suppressed', field: false);
+    noSend('mesh off → suppressed', mesh: false);
+    noSend('disabled → suppressed', enabled: false);
   });
 }

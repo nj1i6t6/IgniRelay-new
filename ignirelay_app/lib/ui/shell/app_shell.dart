@@ -201,7 +201,17 @@ class _AppShellTabsState extends State<_AppShellTabs> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            IndexedStack(index: _index, children: _tabBodies),
+            // Each tab is wrapped in TickerMode(enabled: i == _index) so the
+            // non-selected tabs' tickers AND their periodic UI refreshes pause
+            // while offstage (UI-F5a power-saving). IndexedStack keeps them
+            // built; TickerMode just mutes the inactive ones.
+            IndexedStack(
+              index: _index,
+              children: <Widget>[
+                for (int i = 0; i < _tabBodies.length; i++)
+                  TickerMode(enabled: i == _index, child: _tabBodies[i]),
+              ],
+            ),
             // 全域 SOS：錨在 body 右下、位於 bottom tab bar 之上（不重疊分頁切換
             // 的點擊區）。每個分頁都看得到、都可觸發。
             const Positioned(

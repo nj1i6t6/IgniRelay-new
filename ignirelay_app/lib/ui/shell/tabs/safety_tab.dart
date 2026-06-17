@@ -20,6 +20,7 @@ import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/controllers/mesh_runtime_controller.dart';
 import 'package:ignirelay_app/app/controllers/presence_beacon_controller.dart';
 import 'package:ignirelay_app/app/controllers/presence_controller.dart';
+import 'package:ignirelay_app/app/services/motion/motion_state.dart';
 import 'package:ignirelay_app/ui/shell/tabs/communication_state.dart';
 import 'package:ignirelay_app/ui/theme/igni_colors.dart';
 import 'package:ignirelay_app/ui/theme/igni_tokens.dart';
@@ -31,6 +32,13 @@ import 'package:ignirelay_app/ui/widgets/mono_text.dart';
 
 class SafetyTab extends StatefulWidget {
   const SafetyTab({super.key});
+
+  /// Test-only: counts 5 s refresh ticks that actually ran `setState` (i.e.
+  /// passed the mounted + TickerMode guard). Lets the AppShell-context test
+  /// prove the refresh pauses while the 安全 tab is offstage (UI-F5a / Owner
+  /// boundary 6). Same-library writes only; tests reset it before use.
+  @visibleForTesting
+  static int debugRefreshTicks = 0;
 
   @override
   State<SafetyTab> createState() => _SafetyTabState();
@@ -69,9 +77,13 @@ class _SafetyTabState extends State<SafetyTab> {
         ? TransportState.running
         : TransportState.stopped;
     // UI-refresh only: keep the live peers / outbox counters fresh. Cancelled
-    // in dispose so no timer leaks and no setState fires after unmount.
+    // in dispose so no timer leaks and no setState fires after unmount. UI-F5a:
+    // also skip the rebuild while this tab is offstage (TickerMode disabled by
+    // AppShell for non-selected tabs) so it costs ~0 when not visible.
     _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (mounted) setState(() {});
+      if (!mounted || !TickerMode.valuesOf(context).enabled) return;
+      SafetyTab.debugRefreshTicks++;
+      setState(() {});
     });
     try {
       _stateSub = _runtime.transportStateChanges.listen((s) {
@@ -300,6 +312,9 @@ class _SafetyTabState extends State<SafetyTab> {
             subtitle: Text(_beaconStatus(beacon),
                 style: IgniTypography.bodySmall(p.text2)),
           ),
+          const SizedBox(height: IgniSpacing.xs),
+          Text('動作偵測：${_motionLabel(beacon.motionState)}',
+              style: IgniTypography.bodySmall(p.text3)),
         ],
       ),
     );
@@ -310,6 +325,19 @@ class _SafetyTabState extends State<SafetyTab> {
     final secs = b.currentInterval.inSeconds;
     final low = b.isLowBattery ? '（低電量降頻）' : '';
     return '每 $secs 秒 · 已更新 ${b.beaconCount} 次$low';
+  }
+
+  // UI-F5a diagnostic. `unknown` (no motion source yet — the F5a default) must
+  // read「尚未啟用」, never「靜止」(Owner boundary 2).
+  String _motionLabel(MotionState m) {
+    switch (m) {
+      case MotionState.moving:
+        return '移動中';
+      case MotionState.stationary:
+        return '靜止';
+      case MotionState.unknown:
+        return '尚未啟用';
+    }
   }
 
   Widget _recentCard(IgniPalette p) {

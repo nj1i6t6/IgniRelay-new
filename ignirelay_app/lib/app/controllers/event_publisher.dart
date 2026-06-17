@@ -32,6 +32,13 @@ class EventPublisher {
   final EventManager _em;
   final EventPublisherV2Facade? _v2;
 
+  /// Depth of the v0.3 facade's local pending outbox (envelopes queued but not
+  /// yet sent to a peer). `0` when no v2 facade is wired (legacy / test
+  /// harness). Read by the 安全 tab CommunicationState summary (UI-F4); a plain
+  /// read-through so UI keeps talking to this facade, not the lower-level v2
+  /// facade. Never throws.
+  int get pendingQueueDepth => _v2?.pendingQueueDepth ?? 0;
+
   /// Map legacy "urgency" (0..3+) to spec §5.3 SafetyState enum.
   ///
   /// Legacy `publishEvent` overloads multiple semantics into one

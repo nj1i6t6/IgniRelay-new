@@ -228,6 +228,45 @@ void main() {
     expect(find.textContaining('近距離通訊'), findsWidgets);
     expect(find.text('立即更新足跡'), findsOneWidget);
     expect(find.text('自動足跡信標'), findsOneWidget);
+    // UI-F4: the CommunicationState summary replaced the 即將提供 placeholder.
+    expect(find.textContaining('目前路徑'), findsOneWidget);
+    expect(find.text('通訊狀態彙整 — 即將提供'), findsNothing);
+    expect(find.textContaining('待送'), findsWidgets);
+  });
+
+  testWidgets('安全 tab cancels its 5s refresh timer on dispose (no leak)',
+      (tester) async {
+    // Build SafetyTab in isolation so only ITS periodic timer is in play.
+    final registry = PeerCapabilityRegistry();
+    final facade = EventPublisherV2Facade(registry: registry);
+    final field = await _makeField(joined: true);
+    final presence = _makePresence(registry, facade);
+    final checkpoint = _makeCheckpoint(facade);
+    final beacon = _makeBeacon(presence, field);
+    addTearDown(() async {
+      beacon.dispose();
+      await facade.dispose();
+      await registry.dispose();
+      field.dispose();
+    });
+
+    await tester.pumpWidget(_wrap(
+      const Scaffold(body: SafetyTab()),
+      field: field,
+      presence: presence,
+      checkpoint: checkpoint,
+      beacon: beacon,
+      facade: facade,
+    ));
+    await tester.pump();
+    expect(find.byType(SafetyTab), findsOneWidget);
+
+    // Dispose SafetyTab, then advance well past the 5s tick. A leaked periodic
+    // timer would be flagged pending at teardown, and a setState-after-dispose
+    // would throw — so reaching the end cleanly proves dispose() cancelled it.
+    await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+    expect(find.byType(SafetyTab), findsNothing);
+    await tester.pump(const Duration(seconds: 6));
   });
 
   testWidgets('位置 tab embeds the existing LastSeenScreen', (tester) async {

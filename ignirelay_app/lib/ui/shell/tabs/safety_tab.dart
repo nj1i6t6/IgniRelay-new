@@ -1,22 +1,26 @@
-// SafetyTab — UI-F2「安全」分頁。
+// SafetyTab —「安全」分頁（UI-F2 搬遷；UI-F4 通訊狀態彙整）。
 //
-// 我的安全面：近距離通訊（mesh）狀態 + 開關、立即更新足跡、自動足跡信標、最近足跡。
+// 我的安全面：近距離通訊（mesh）狀態 + 開關、通訊狀態彙整（UI-F4 CommunicationState：
+// 最佳路徑 / cloud / 待送 outbox / 最後足跡）、立即更新足跡、自動足跡信標、最近足跡。
 // 重用既有 controller（MeshRuntimeController / PresenceController /
-// PresenceBeaconController / EventStream），不改任何底層行為。
+// PresenceBeaconController / EventStream / EventPublisher / ActiveFieldController），
+// 只讀不改任何底層行為——彙整純由已存在的數值推導（見 communication_state.dart）。
 //
-// 全 token-clean（context.igni + ui/widgets），0 個 Colors.* / hex。文案為正式產品語：
-// 「近距離通訊」「立即更新足跡」「自動足跡信標」，不出現工程/除錯字樣。通訊狀態彙整
-// （cloud/peers/outbox 聚合）留 UI-F4。
+// 全 token-clean（context.igni + ui/widgets），0 個 Colors.* / hex。文案為正式產品語，
+// 不出現工程/除錯字樣；cloud 文案 Stage A 一律不宣稱「可達/已連線」。
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:ignirelay_app/app/controllers/active_field_controller.dart';
+import 'package:ignirelay_app/app/controllers/event_publisher.dart';
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/controllers/mesh_runtime_controller.dart';
 import 'package:ignirelay_app/app/controllers/presence_beacon_controller.dart';
 import 'package:ignirelay_app/app/controllers/presence_controller.dart';
+import 'package:ignirelay_app/ui/shell/tabs/communication_state.dart';
 import 'package:ignirelay_app/ui/theme/igni_colors.dart';
 import 'package:ignirelay_app/ui/theme/igni_tokens.dart';
 import 'package:ignirelay_app/ui/theme/igni_typography.dart';
@@ -36,9 +40,20 @@ class _SafetyTabState extends State<SafetyTab> {
   late final MeshRuntimeController _runtime;
   late final PresenceController _presence;
   late final EventStream _events;
+  late final EventPublisher _publisher;
 
   StreamSubscription<TransportState>? _stateSub;
   StreamSubscription<PresenceUpdate>? _presenceSub;
+
+  /// Periodic UI-refresh tick so live counters (peers / outbox) stay fresh while
+  /// the tab is visible. UI-only — the callback just rebuilds; it never mutates
+  /// or accumulates state. Cancelled in [dispose] (UI-F4 / Owner req 2).
+  Timer? _refreshTimer;
+
+  /// Last time a MANUAL「立即更新足跡」actually sent or queued. Only stamped on a
+  /// real send (UI-F4 / Owner req 1) — never on noField / failure / throw.
+  DateTime? _lastManualPresenceAt;
+
   final List<PresenceUpdate> _footprints = <PresenceUpdate>[];
   TransportState? _state;
   bool _busy = false;
@@ -49,9 +64,15 @@ class _SafetyTabState extends State<SafetyTab> {
     _runtime = context.read<MeshRuntimeController>();
     _presence = context.read<PresenceController>();
     _events = context.read<EventStream>();
+    _publisher = context.read<EventPublisher>();
     _state = _runtime.transportActive
         ? TransportState.running
         : TransportState.stopped;
+    // UI-refresh only: keep the live peers / outbox counters fresh. Cancelled
+    // in dispose so no timer leaks and no setState fires after unmount.
+    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) setState(() {});
+    });
     try {
       _stateSub = _runtime.transportStateChanges.listen((s) {
         if (mounted) setState(() => _state = s);
@@ -73,6 +94,7 @@ class _SafetyTabState extends State<SafetyTab> {
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _stateSub?.cancel();
     _presenceSub?.cancel();
     super.dispose();
@@ -98,6 +120,11 @@ class _SafetyTabState extends State<SafetyTab> {
     try {
       final o = await _presence.publishPresence();
       if (!mounted) return;
+      // Owner req 1: only a real send (accepted OR queued) stamps the manual
+      // presence time. noField / "已嘗試" / the catch path below never do.
+      if (presenceCountsAsSent(anyAccepted: o.anyAccepted, queued: o.queued)) {
+        _lastManualPresenceAt = DateTime.now();
+      }
       if (o.noField) {
         _snack('尚未加入場域 — 請先到「我的」加入或建立場域');
       } else if (o.anyAccepted) {
@@ -123,9 +150,20 @@ class _SafetyTabState extends State<SafetyTab> {
   Widget build(BuildContext context) {
     final p = context.igni;
     final beacon = context.watch<PresenceBeaconController>();
+    final field = context.watch<ActiveFieldController>();
     final active =
         _state == TransportState.running || _runtime.transportActive;
     final stats = _runtime.transportStats;
+    final comms = CommunicationState.from(
+      hasField: field.hasActiveField,
+      meshRunning: active,
+      peers: stats.connectedPeers,
+      sentCount: stats.sentCount,
+      receivedCount: stats.receivedCount,
+      outboxDepth: _publisher.pendingQueueDepth,
+      lastPresenceAt: _latestPresenceAt(beacon),
+      cloudConfigured: field.active?.cloudBaseUrl != null,
+    );
     return ListView(
       padding: const EdgeInsets.only(bottom: IgniSpacing.xl3),
       children: [
@@ -135,7 +173,7 @@ class _SafetyTabState extends State<SafetyTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _commsCard(p, active, stats),
+              _commsCard(p, comms),
               const SizedBox(height: IgniSpacing.md),
               _footprintCard(p, beacon),
               const SizedBox(height: IgniSpacing.md),
@@ -147,7 +185,17 @@ class _SafetyTabState extends State<SafetyTab> {
     );
   }
 
-  Widget _commsCard(IgniPalette p, bool active, TransportStats stats) {
+  /// Most recent of the auto-beacon's last send and the manual update.
+  DateTime? _latestPresenceAt(PresenceBeaconController beacon) {
+    final auto = beacon.lastBeaconAt;
+    final manual = _lastManualPresenceAt;
+    if (auto == null) return manual;
+    if (manual == null) return auto;
+    return auto.isAfter(manual) ? auto : manual;
+  }
+
+  Widget _commsCard(IgniPalette p, CommunicationState comms) {
+    final active = comms.meshRunning;
     return IgniCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -168,20 +216,28 @@ class _SafetyTabState extends State<SafetyTab> {
             ),
           ]),
           const SizedBox(height: IgniSpacing.sm),
-          Text(
-            active
-                ? '透過藍牙與附近裝置／節點接力傳遞，無需網路。'
-                : '開啟後可在離線環境與附近裝置互相看見、接力傳遞。',
-            style: IgniTypography.bodySmall(p.text2),
-          ),
+          // 最佳路徑：一眼看懂訊息目前怎麼送出。
+          Row(children: [
+            Icon(_pathIcon(comms.bestPath),
+                size: 16, color: _pathColor(p, comms.bestPath)),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text('目前路徑：${comms.bestPathLabel}',
+                  style: IgniTypography.bodyMedium(p.text0)),
+            ),
+          ]),
+          const SizedBox(height: IgniSpacing.xs),
+          Text(comms.cloudLabel, style: IgniTypography.bodySmall(p.text2)),
           const SizedBox(height: IgniSpacing.sm),
           Wrap(spacing: IgniSpacing.lg, runSpacing: IgniSpacing.xs, children: [
-            _stat(p, '鄰近裝置', stats.connectedPeers),
-            _stat(p, '已送', stats.sentCount),
-            _stat(p, '已收', stats.receivedCount),
+            _stat(p, '鄰近裝置', comms.peers),
+            _stat(p, '已送', comms.sentCount),
+            _stat(p, '已收', comms.receivedCount),
+            _stat(p, '待送', comms.outboxDepth),
           ]),
-          const SizedBox(height: IgniSpacing.sm),
-          Text('通訊狀態彙整 — 即將提供', style: IgniTypography.bodySmall(p.text3)),
+          const SizedBox(height: IgniSpacing.xs),
+          Text('最後足跡：${_fmtClock(comms.lastPresenceAt)}',
+              style: IgniTypography.bodySmall(p.text2)),
         ],
       ),
     );
@@ -189,6 +245,34 @@ class _SafetyTabState extends State<SafetyTab> {
 
   Widget _stat(IgniPalette p, String label, int v) =>
       Text('$label $v', style: IgniTypography.bodySmall(p.text1));
+
+  IconData _pathIcon(CommsPath path) {
+    switch (path) {
+      case CommsPath.meshRelay:
+        return Icons.hub_outlined;
+      case CommsPath.waitingPeers:
+        return Icons.hourglass_empty;
+      case CommsPath.offline:
+        return Icons.cloud_off_outlined;
+      case CommsPath.noField:
+        return Icons.shield_outlined;
+    }
+  }
+
+  Color _pathColor(IgniPalette p, CommsPath path) {
+    switch (path) {
+      case CommsPath.meshRelay:
+        return p.ok;
+      case CommsPath.waitingPeers:
+        return p.warn;
+      case CommsPath.offline:
+      case CommsPath.noField:
+        return p.text2;
+    }
+  }
+
+  String _fmtClock(DateTime? t) =>
+      t == null ? '—' : t.toIso8601String().substring(11, 19);
 
   Widget _footprintCard(IgniPalette p, PresenceBeaconController beacon) {
     return IgniCard(

@@ -26,6 +26,15 @@ import 'package:ignirelay_app/app/crypto/field_auth_v2.dart';
 import 'package:ignirelay_app/app/services/field_key_store.dart';
 import 'package:ignirelay_app/app/services/field_session_store.dart';
 
+/// Stage A field membership role (UI-F3). Derived purely from local
+/// create-vs-join — `owner` = this device created the field, `participant` =
+/// it joined an existing one — never from a second field secret (RD-1 / F0-7).
+///
+/// `staff` is a RESERVED future role (Stage E cloud staff-token); it is
+/// intentionally NOT an enum case here so Stage A can never fabricate it from
+/// an offline field. Add it only when the cloud staff path lands.
+enum FieldRole { owner, participant }
+
 /// One joined field's derived crypto + display state, as the publish path and
 /// the debug / field UI consume it. Never carries the `field_join_secret`.
 class ActiveField {
@@ -45,17 +54,26 @@ class ActiveField {
   /// before Stage E (E4).
   final String? cloudBaseUrl;
 
+  /// (v14 / UI-F3) Membership role for this device in this field. Defaults to
+  /// `participant`; `owner` only when this device created the field.
+  final FieldRole role;
+
   const ActiveField({
     required this.fieldIdHex,
     required this.fieldId,
     required this.macKey,
     required this.displayName,
     this.cloudBaseUrl,
+    this.role = FieldRole.participant,
   });
 
   /// First 8 hex chars of the field_id — the short label the debug card shows.
   String get shortId =>
       fieldIdHex.length <= 8 ? fieldIdHex : fieldIdHex.substring(0, 8);
+
+  /// `true` when this device owns (created) the field — gates owner-only UI
+  /// such as re-sharing the join QR (UI-F3 / D5).
+  bool get isOwner => role == FieldRole.owner;
 }
 
 class ActiveFieldController extends ChangeNotifier {
@@ -111,7 +129,8 @@ class ActiveFieldController extends ChangeNotifier {
         // may prune the orphan row; A5 just ignores it.
         continue;
       }
-      final field = await _deriveField(secret, s.displayName, s.cloudBaseUrl);
+      final field =
+          await _deriveField(secret, s.displayName, s.cloudBaseUrl, s.createdHere);
       _keyStore.addDerived(field.fieldId, field.macKey);
       _fields.add(field);
     }
@@ -126,16 +145,21 @@ class ActiveFieldController extends ChangeNotifier {
     List<int> secret, {
     required String displayName,
     String? cloudBaseUrl,
+    bool createdHere = false,
   }) async {
     final session = await _store.join(
       secret,
       displayName: displayName,
       cloudBaseUrl: cloudBaseUrl,
+      createdHere: createdHere,
     );
+    // Derive the role from the store's EFFECTIVE (merged) flag, not the
+    // incoming param: a re-join of an owned field keeps owner in memory too.
     final field = await _deriveField(
       secret,
       session.displayName,
       session.cloudBaseUrl,
+      session.createdHere,
     );
     _keyStore.addDerived(field.fieldId, field.macKey);
     _fields.removeWhere((f) => f.fieldIdHex == field.fieldIdHex);
@@ -160,6 +184,7 @@ class ActiveFieldController extends ChangeNotifier {
       secret,
       displayName: displayName,
       cloudBaseUrl: cloudBaseUrl,
+      createdHere: true, // creator → role owner (UI-F3 / D5).
     );
     return (field: field, secret: secret);
   }
@@ -216,6 +241,7 @@ class ActiveFieldController extends ChangeNotifier {
     List<int> secret,
     String displayName,
     String? cloudBaseUrl,
+    bool createdHere,
   ) async {
     final fieldId = await FieldAuthV2.deriveFieldId(secret);
     final macKey = await FieldAuthV2.deriveFieldMacKey(secret);
@@ -225,6 +251,7 @@ class ActiveFieldController extends ChangeNotifier {
       macKey: macKey,
       displayName: displayName,
       cloudBaseUrl: cloudBaseUrl,
+      role: createdHere ? FieldRole.owner : FieldRole.participant,
     );
   }
 

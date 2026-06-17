@@ -1,8 +1,9 @@
-// MyTab — UI-F2「我的」分頁。
+// MyTab —「我的」分頁（UI-F2 模組搬遷；UI-F3 身分與角色實作）。
 //
-// 作用場域摘要 + 場域管理入口（導向既有 A7 FieldScreen）+ 身分/角色、權限狀態的正式
-// 產品佔位（「即將提供」，角色模型留 UI-F3）+ 開發者診斷入口（僅 kDebugMode，從
-// app_shell 移來；經 debug-only 命名路由進 DebugShell）。
+// 作用場域摘要 + 場域管理入口（導向既有 A7 FieldScreen）+ 身分與角色（UI-F3：
+// owner「主辦」/ participant「成員」，由本機建立 vs 加入推導）+ 權限狀態正式產品佔位
+// （「即將提供」，OS 權限健康度與場域角色刻意分開，D10）+ 開發者診斷入口（僅 kDebugMode，
+// 從 app_shell 移來；經 debug-only 命名路由進 DebugShell）。
 //
 // token-clean（context.igni + ui/widgets），0 Colors.*。
 
@@ -19,6 +20,7 @@ import 'package:ignirelay_app/ui/theme/igni_tokens.dart';
 import 'package:ignirelay_app/ui/theme/igni_typography.dart';
 import 'package:ignirelay_app/ui/widgets/igni_button.dart';
 import 'package:ignirelay_app/ui/widgets/igni_card.dart';
+import 'package:ignirelay_app/ui/widgets/igni_chip.dart';
 import 'package:ignirelay_app/ui/widgets/igni_sub_page_header.dart';
 import 'package:ignirelay_app/ui/widgets/mono_text.dart';
 
@@ -47,8 +49,10 @@ class MyTab extends StatelessWidget {
             children: [
               _fieldCard(context, p, active, field.joinedFieldCount),
               const SizedBox(height: IgniSpacing.md),
-              _placeholderCard(p, '身分與角色', '即將提供'),
+              _roleCard(p, active),
               const SizedBox(height: IgniSpacing.md),
+              // 權限狀態 = OS permission health — kept SEPARATE from field role
+              // above (UI-F3 / D10). Real status lands later (permission UX).
               _placeholderCard(p, '權限狀態', '即將提供'),
               if (kDebugMode) ...[
                 const SizedBox(height: IgniSpacing.xl),
@@ -101,6 +105,42 @@ class MyTab extends StatelessWidget {
             ]),
           ] else
             Text('尚未加入場域。', style: IgniTypography.bodySmall(p.text2)),
+        ],
+      ),
+    );
+  }
+
+  // 身分與角色 — field membership role (UI-F3). owner「主辦」/ participant「成員」,
+  // derived from local create-vs-join. Distinct from OS 權限狀態 (D10).
+  Widget _roleCard(IgniPalette p, ActiveField? active) {
+    return IgniCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('身分與角色', style: IgniTypography.titleMedium(p.text0)),
+                const SizedBox(height: IgniSpacing.xs),
+                Text(
+                  active == null
+                      ? '加入或建立場域後顯示。'
+                      : active.isOwner
+                          ? '你建立了這個場域，可分享加入 QR。'
+                          : '你已加入這個場域。',
+                  style: IgniTypography.bodySmall(p.text2),
+                ),
+              ],
+            ),
+          ),
+          if (active != null) ...[
+            const SizedBox(width: IgniSpacing.sm),
+            IgniChip(
+              label: active.isOwner ? '主辦' : '成員',
+              tone: active.isOwner ? IgniChipTone.ok : IgniChipTone.info,
+            ),
+          ],
         ],
       ),
     );

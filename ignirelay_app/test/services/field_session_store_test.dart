@@ -46,7 +46,13 @@ void main() {
     expect(rows.single['field_id_hex'], hex);
     expect(
       rows.single.keys.toSet(),
-      <String>{'field_id_hex', 'display_name', 'joined_at_ms', 'cloud_base_url'},
+      <String>{
+        'field_id_hex',
+        'display_name',
+        'joined_at_ms',
+        'cloud_base_url',
+        'created_here',
+      },
     );
   });
 
@@ -100,6 +106,45 @@ void main() {
     expect(all.length, 1);
     expect(all.single.displayName, 'second');
     expect(all.single.cloudBaseUrl, 'https://x');
+  });
+
+  test('createdHere persists: true → 1, default → 0; loadAll round-trips',
+      () async {
+    final store =
+        FieldSessionStore(db: DatabaseHelper(), secureStore: _InMemorySecureKv());
+    final owned = await store.join(
+        Uint8List.fromList(List<int>.filled(32, 0x44)),
+        displayName: 'owned',
+        createdHere: true);
+    final joined = await store.join(
+        Uint8List.fromList(List<int>.filled(32, 0x55)),
+        displayName: 'joined');
+
+    expect(owned.createdHere, isTrue);
+    expect(joined.createdHere, isFalse);
+
+    final byHex = {for (final s in await store.loadAll()) s.fieldIdHex: s};
+    expect(byHex[owned.fieldIdHex]!.createdHere, isTrue);
+    expect(byHex[joined.fieldIdHex]!.createdHere, isFalse);
+  });
+
+  test('sticky-owner: a plain re-join never downgrades owner → participant',
+      () async {
+    final store =
+        FieldSessionStore(db: DatabaseHelper(), secureStore: _InMemorySecureKv());
+    final secret = Uint8List.fromList(List<int>.filled(32, 0x66));
+
+    await store.join(secret, displayName: 'mine', createdHere: true);
+    // Re-join via the QR/code path (createdHere defaults to false): the role
+    // must stay owner, while name/cloud still update.
+    final rejoined = await store.join(secret,
+        displayName: 'renamed', cloudBaseUrl: 'https://c');
+
+    expect(rejoined.createdHere, isTrue, reason: 'owner preserved on re-join');
+    final reloaded = (await store.loadAll()).single;
+    expect(reloaded.createdHere, isTrue);
+    expect(reloaded.displayName, 'renamed');
+    expect(reloaded.cloudBaseUrl, 'https://c');
   });
 }
 

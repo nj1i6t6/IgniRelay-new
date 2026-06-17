@@ -47,11 +47,18 @@ class FieldSession {
   /// identically to pre-A5.
   final String? cloudBaseUrl;
 
+  /// (v14 / UI-F3) `true` when THIS device CREATED the field (role `owner`);
+  /// `false` when it JOINED an existing field (role `participant`). Derived
+  /// from local create-vs-join, never from a second field secret. Monotonic:
+  /// once `true` it stays `true` across re-joins (see [FieldSessionStore.join]).
+  final bool createdHere;
+
   const FieldSession({
     required this.fieldIdHex,
     required this.displayName,
     required this.joinedAtMs,
     this.cloudBaseUrl,
+    this.createdHere = false,
   });
 }
 
@@ -88,11 +95,17 @@ class FieldSessionStore {
   /// metadata row to SQLite, and returns the resulting [FieldSession].
   /// Re-joining an existing field replaces its row (updated name / cloud url)
   /// and refreshes its secret — idempotent on `field_id`.
+  ///
+  /// [createdHere] records the owner/participant role (v14 / UI-F3). It is
+  /// **monotonic**: a re-join can promote participant → owner but NEVER demotes
+  /// an existing owner. The returned [FieldSession.createdHere] is the EFFECTIVE
+  /// (merged) value, so callers derive the role from the result, not the input.
   Future<FieldSession> join(
     List<int> secret, {
     required String displayName,
     String? cloudBaseUrl,
     int? joinedAtMs,
+    bool createdHere = false,
   }) async {
     final fieldId = await FieldAuthV2.deriveFieldId(secret);
     final hex = _hex(fieldId);
@@ -100,13 +113,27 @@ class FieldSessionStore {
       _secretKey(hex),
       _encodeHex(Uint8List.fromList(secret)),
     );
+    final database = await _db.database;
+    // Sticky-owner: OR the incoming flag with any already-stored value so a
+    // plain re-join (createdHere: false) of a field this device created can
+    // never downgrade owner → participant.
+    final existing = await database.query(
+      'Field_Sessions',
+      columns: <String>['created_here'],
+      where: 'field_id_hex = ?',
+      whereArgs: <Object?>[hex],
+      limit: 1,
+    );
+    final existingCreatedHere =
+        existing.isNotEmpty && ((existing.first['created_here'] as int?) ?? 0) == 1;
+    final effectiveCreatedHere = createdHere || existingCreatedHere;
     final session = FieldSession(
       fieldIdHex: hex,
       displayName: displayName,
       joinedAtMs: joinedAtMs ?? DateTime.now().millisecondsSinceEpoch,
       cloudBaseUrl: cloudBaseUrl,
+      createdHere: effectiveCreatedHere,
     );
-    final database = await _db.database;
     await database.insert(
       'Field_Sessions',
       <String, Object?>{
@@ -114,6 +141,7 @@ class FieldSessionStore {
         'display_name': session.displayName,
         'joined_at_ms': session.joinedAtMs,
         'cloud_base_url': session.cloudBaseUrl,
+        'created_here': session.createdHere ? 1 : 0,
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
@@ -141,6 +169,7 @@ class FieldSessionStore {
         displayName: (row['display_name'] as String?) ?? '',
         joinedAtMs: (row['joined_at_ms'] as int?) ?? 0,
         cloudBaseUrl: row['cloud_base_url'] as String?,
+        createdHere: ((row['created_here'] as int?) ?? 0) == 1,
       );
 
   static String _hex(List<int> bytes) {

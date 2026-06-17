@@ -103,6 +103,40 @@ void main() {
     expect(second.keyStore.isJoined(a.fieldId), isTrue);
     expect(second.keyStore.macKeyFor(a.fieldId), orderedEquals(a.macKey));
   });
+
+  test('createField → role owner; joinBySecret → participant', () async {
+    final c = makeController(_InMemorySecureKv());
+    final created = await c.createField(displayName: 'Mine');
+    expect(created.field.role, FieldRole.owner);
+    expect(c.active?.isOwner, isTrue);
+
+    final joined = await c.joinBySecret(_secretB, displayName: 'Theirs');
+    expect(joined.role, FieldRole.participant);
+    expect(joined.isOwner, isFalse);
+  });
+
+  test('role survives an initialize() reload (owner stays owner)', () async {
+    final kv = _InMemorySecureKv();
+    final first = makeController(kv);
+    final created = await first.createField(displayName: 'Mine');
+
+    final second = makeController(kv);
+    await second.initialize();
+    expect(second.active?.fieldIdHex, created.field.fieldIdHex);
+    expect(second.active?.isOwner, isTrue, reason: 'owner re-derived from DB');
+  });
+
+  test('sticky-owner: re-joining an owned field keeps isOwner in memory',
+      () async {
+    final c = makeController(_InMemorySecureKv());
+    final created = await c.createField(displayName: 'Mine');
+    final secret = await c.exportSecretForQr(created.field.fieldIdHex);
+
+    // Re-join via the participant path (createdHere defaults false).
+    final rejoined = await c.joinBySecret(secret!, displayName: 'Mine again');
+    expect(rejoined.isOwner, isTrue, reason: 'owner not downgraded on re-join');
+    expect(c.active?.isOwner, isTrue);
+  });
 }
 
 class _InMemorySecureKv implements SecureKvStore {

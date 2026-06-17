@@ -41,7 +41,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 13,
+      version: 14,
       onConfigure: (db) async {
         await db.rawQuery('PRAGMA journal_mode=WAL');
       },
@@ -281,6 +281,24 @@ class DatabaseHelper {
       await db.execute('DROP TABLE IF EXISTS Outbox_V2');
       await _createOutboxV2Table(db);
     }
+    if (oldVersion < 14) {
+      // v14 (UI-F3) — field membership role. Persist whether THIS device
+      // CREATED the field (owner) vs JOINED it (participant). The role is
+      // derived from local create-vs-join, never from a second field secret
+      // (RD-1 / F0-7), so a single non-secret boolean on the existing
+      // Field_Sessions row is all that is needed — no wire/proto/crypto change.
+      //
+      // Guarded ALTER: a device upgrading from < 13 already got `created_here`
+      // from `_createFieldSessionsTable` (called in the < 13 block above), so
+      // re-adding it here would throw "duplicate column". Only the device that
+      // already ran v13 (table created without the column) needs the ALTER.
+      // `DEFAULT 0` ⇒ any pre-v14 field is treated as participant — the
+      // conservative default (no QR-share privilege).
+      if (!await _columnExists(db, 'Field_Sessions', 'created_here')) {
+        await db.execute(
+            'ALTER TABLE Field_Sessions ADD COLUMN created_here INTEGER NOT NULL DEFAULT 0');
+      }
+    }
   }
 
   /// True when a table named [name] exists in the database.
@@ -290,6 +308,15 @@ class DatabaseHelper {
       [name],
     );
     return rows.isNotEmpty;
+  }
+
+  /// True when [table] has a column named [column]. Used to make additive
+  /// `ALTER TABLE ... ADD COLUMN` migrations idempotent across the upgrade
+  /// paths where an earlier block may have already created the table with the
+  /// new column (see the v14 `created_here` block).
+  Future<bool> _columnExists(Database db, String table, String column) async {
+    final rows = await db.rawQuery('PRAGMA table_info($table)');
+    return rows.any((r) => r['name'] == column);
   }
 
   /// v0.3 Stage 0c1 — schema for the Envelope v2 storage layer.
@@ -477,12 +504,18 @@ class DatabaseHelper {
   /// public scope label and PK. `cloud_base_url` (v1.2) is written by A7 (QR
   /// segment 3, `https://` only) and unused before Stage E.
   Future<void> _createFieldSessionsTable(Database db) async {
+    // `created_here` (v14 / UI-F3): 1 = this device CREATED the field (role
+    // owner), 0 = joined an existing field (role participant). Non-secret;
+    // derived from local create-vs-join, never a second field secret. Devices
+    // upgrading from exactly v13 get this column via the guarded v14 ALTER
+    // instead (the table already exists for them).
     await db.execute('''
       CREATE TABLE IF NOT EXISTS Field_Sessions (
         field_id_hex   TEXT PRIMARY KEY,
         display_name   TEXT NOT NULL,
         joined_at_ms   INTEGER NOT NULL,
-        cloud_base_url TEXT
+        cloud_base_url TEXT,
+        created_here   INTEGER NOT NULL DEFAULT 0
       )
     ''');
   }

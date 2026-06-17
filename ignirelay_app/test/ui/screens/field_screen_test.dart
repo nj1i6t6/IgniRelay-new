@@ -80,10 +80,11 @@ void main() {
     await tester.pumpWidget(_wrap(field));
     await tester.pump();
 
-    // Active card: name + 作用中 chip.
+    // Active card: name + 作用中 chip. Joined (not created) ⇒ participant 成員.
     expect(find.text('中正紀念堂站'), findsWidgets);
     expect(find.text('作用中'), findsOneWidget);
     expect(find.text('已加入的場域（1）'), findsOneWidget);
+    expect(find.text('成員'), findsWidgets);
   });
 
   testWidgets('code input joins from a valid IGNI1 code', (tester) async {
@@ -125,13 +126,11 @@ void main() {
     expect(find.textContaining('密鑰格式錯誤'), findsOneWidget);
   });
 
-  testWidgets('QR sheet shows a QrImageView for a joined field', (tester) async {
+  testWidgets('QR sheet shows a QrImageView for an owned field', (tester) async {
     final field = await _makeController();
     addTearDown(field.dispose);
-    await field.joinBySecret(
-      Uint8List.fromList(List<int>.filled(32, 0x33)),
-      displayName: 'QR 場域',
-    );
+    // Created locally ⇒ owner ⇒ the row exposes the 顯示 QR action.
+    await field.createField(displayName: 'QR 場域');
     await tester.pumpWidget(_wrap(field));
     await tester.pump();
 
@@ -140,5 +139,24 @@ void main() {
 
     expect(find.byType(QrImageView), findsOneWidget);
     expect(find.text('完成'), findsOneWidget);
+  });
+
+  testWidgets('owner-only share: owned row shows 顯示 QR, participant row hides it',
+      (tester) async {
+    final field = await _makeController();
+    addTearDown(field.dispose);
+    await field.createField(displayName: '我建立的'); // owner
+    await field.joinBySecret(
+      Uint8List.fromList(List<int>.filled(32, 0x5C)),
+      displayName: '我加入的',
+    ); // participant
+    await tester.pumpWidget(_wrap(field));
+    await tester.pump();
+
+    // Exactly one share button across the two joined rows — the owner's.
+    expect(find.byIcon(Icons.qr_code_2), findsOneWidget);
+    // Both roles are visible.
+    expect(find.text('主辦'), findsWidgets);
+    expect(find.text('成員'), findsWidgets);
   });
 }

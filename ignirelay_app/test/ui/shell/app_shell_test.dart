@@ -260,6 +260,10 @@ void main() {
 
     expect(find.byType(MyTab), findsOneWidget);
     expect(find.text('場域管理'), findsOneWidget);
+    // UI-F3: 身分與角色 is now a real role card. The harness joins (not creates)
+    // ⇒ participant 成員 chip, replacing the old 即將提供 placeholder.
+    expect(find.text('身分與角色'), findsOneWidget);
+    expect(find.text('成員'), findsOneWidget);
     // kDebugMode is true under flutter test → the developer entry renders.
     expect(find.text('開發者診斷'), findsOneWidget);
   });

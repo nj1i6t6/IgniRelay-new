@@ -114,6 +114,8 @@ class _FieldScreenState extends State<FieldScreen> {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            _roleChip(active),
+            const SizedBox(width: IgniSpacing.xs),
             const IgniChip(label: '作用中', tone: IgniChipTone.ok),
           ]),
           const SizedBox(height: IgniSpacing.sm),
@@ -175,6 +177,12 @@ class _FieldScreenState extends State<FieldScreen> {
     );
   }
 
+  // ── Role chip (UI-F3) — owner「主辦」/ participant「成員」 ─────────────────
+  Widget _roleChip(ActiveField f) => IgniChip(
+        label: f.isOwner ? '主辦' : '成員',
+        tone: f.isOwner ? IgniChipTone.ok : IgniChipTone.info,
+      );
+
   // ── One joined field row ───────────────────────────────────────────────
   Widget _fieldRow(IgniPalette p, ActiveField f, bool isActive) {
     return IgniCard(
@@ -197,11 +205,15 @@ class _FieldScreenState extends State<FieldScreen> {
             ],
           ),
         ),
-        IconButton(
-          tooltip: '顯示 QR',
-          icon: Icon(Icons.qr_code_2, size: 20, color: p.text1),
-          onPressed: _busy ? null : () => _showQrForField(f),
-        ),
+        _roleChip(f),
+        // Owner-only: only the field's creator can re-share its join QR
+        // (UI-F3 / D5). Participants joined via QR/code cannot re-share.
+        if (f.isOwner)
+          IconButton(
+            tooltip: '顯示 QR',
+            icon: Icon(Icons.qr_code_2, size: 20, color: p.text1),
+            onPressed: _busy ? null : () => _showQrForField(f),
+          ),
         IconButton(
           tooltip: '離開場域',
           icon: Icon(Icons.logout, size: 18, color: p.sos),

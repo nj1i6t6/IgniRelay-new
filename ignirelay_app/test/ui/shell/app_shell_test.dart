@@ -186,6 +186,12 @@ void main() {
     expect(find.text('建立場域'), findsOneWidget);
     expect(find.text('先看功能'), findsOneWidget);
     expect(find.byType(DebugShell), findsNothing);
+
+    // UI-F2-polish: no internal build-stage / debug copy may leak onto the
+    // production no-field surface.
+    expect(find.textContaining('UI-G'), findsNothing);
+    expect(find.textContaining('UI-F'), findsNothing);
+    expect(find.textContaining('將於'), findsNothing);
   });
 
   testWidgets(

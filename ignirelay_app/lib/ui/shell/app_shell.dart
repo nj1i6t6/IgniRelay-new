@@ -84,7 +84,7 @@ class NoFieldEntry extends StatelessWidget {
 
   void _previewStub(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('引導模式（先看功能）將於 UI-G 提供')),
+      const SnackBar(content: Text('先看功能即將提供。')),
     );
   }
 
@@ -146,7 +146,7 @@ class NoFieldEntry extends StatelessWidget {
                   ),
                   const SizedBox(height: IgniSpacing.sm),
                   Text(
-                    '「先看功能」引導模式將於 UI-G 提供。',
+                    '先看功能即將提供。',
                     style: IgniTypography.bodySmall(p.text3),
                     textAlign: TextAlign.center,
                   ),

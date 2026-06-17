@@ -13,6 +13,7 @@ import 'package:ignirelay_app/ui/theme/app_theme.dart';
 import 'package:ignirelay_app/ui/theme/igni_text_scale.dart';
 import 'package:ignirelay_app/ui/secondary/onboarding_screen.dart';
 import 'package:ignirelay_app/ui/screens/design_showcase_screen.dart';
+import 'package:ignirelay_app/ui/shell/app_shell.dart';
 import 'package:ignirelay_app/ui/shell/debug_shell.dart';
 import 'package:ignirelay_app/app/db/database_helper.dart';
 import 'package:ignirelay_app/app/crypto/identity_manager.dart';
@@ -585,6 +586,10 @@ class _IgniRelayAppState extends State<IgniRelayApp> {
         // 不註冊此路由以免誤入。kDebugMode 與 kProfileMode 皆視為「非正式」環境。
         if (kDebugMode || kProfileMode)
           '/design-showcase': (_) => const DesignShowcaseScreen(),
+        // UI-F1：開發者診斷（舊 mapless DebugShell）降級為 debug-only 路由——
+        // 與 design-showcase 同模式，release build 不註冊；正式 home 是 AppShell。
+        if (kDebugMode || kProfileMode)
+          kDeveloperDiagnosticsRoute: (_) => const DebugShell(),
       },
       home: const _StartupRouter(),
     );
@@ -824,9 +829,10 @@ class _StartupRouterState extends State<_StartupRouter> {
       );
     }
 
-    // Phase 0b：舊 `MainShell`（地圖優先 tab 殼）已不再是入口,改用 mapless
-    // debug shell。MainShell 與其 tab 子畫面(match/supply/chat/map)成為待刪
-    // orphan,將在後續 consumers-first commit 移除。見 docs/REBUILD_PLAN.md §4。
-    return const DebugShell();
+    // UI-F1：production home = 正式 [AppShell]（無 active field → no-field entry；
+    // 有 active field → 五分頁殼 + 全域 SOS）。舊 mapless `DebugShell` 降級為
+    // 開發者診斷，僅經 [kDeveloperDiagnosticsRoute]（上方 routes，kDebugMode/
+    // kProfileMode 才註冊）進入。模組搬遷/角色/motion 留 UI-F2..UI-F5。
+    return const AppShell();
   }
 }

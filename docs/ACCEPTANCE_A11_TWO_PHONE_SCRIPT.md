@@ -1,6 +1,6 @@
-# A11 — 雙機實機驗收 Runbook v1.5（USER-GATE）
+# A11 — 雙機實機驗收 Runbook v1.5.1（USER-GATE）
 
-> **任務**：MASTER_EXECUTION_PLAN v1.5 §5 A11。
+> **任務**：MASTER_EXECUTION_PLAN v1.5.1 §5 A11。
 > **前置**：UI-F（正式 AppShell + motion-aware 定位節流）與 UI-G（先看功能/引導模式）已 DONE。
 > **D1**：本檔 = AGENT 產出的可執行驗收腳本。
 > **D2**：Owner 兩台 Android 實機照本檔實測、截圖/logcat、回填全項 PASS。
@@ -15,6 +15,24 @@
 |---|---|---|
 | 自動 / 半自動 | `adb devices`、build/install、logcat、截圖、`force-stop`、`:app:connectedDebugAndroidTest` | AI 可代跑 |
 | 人工操作 | QR 掃碼、選角色密鑰、按 SOS/SAFE/HAZARD、移動手機、目視雷達方位 | Owner |
+
+---
+
+## 0.1 UI-F0 preflight 對本驗收的邊界（v1.5.1）
+
+UI-F0（見 `APP_UI_IA_REWORK_PLAN.md` §4.0.1）已釘定 Stage A 邊界，本 runbook 對應如下：
+
+- **HAZARD 角色**：step 9 由手機 B（participant）發 HAZARD 即為合格——Stage A 的正式 HAZARD 入口
+  **participant 與 owner 皆可發**，無角色 gating。不需要也不應要求只有 owner 能發 HAZARD。
+- **不驗 field lifecycle**：Stage A 只有 active/current field；本 runbook **不驗**「進行中 / 結束 /
+  封存」生命週期（該模型延後）。step 11 的「離開 / 重新加入 field」只測 field-scope 隔離，非 lifecycle。
+- **僅 Android 雙機**：iOS 的 motion-aware 來源已明確延後（R3/iOS source-parity），本驗收為
+  Android-only；無 iOS 驗收項。
+- **不驗 staff offline QR**：staff 會員資格延後到 Stage E cloud staff-token；codec 已強制 staff token
+  需伴隨 https cloud URL，offline staff QR 不可能。step 3 只驗 owner/participant，看到 staff path
+  必須標 deferred/disabled（已寫入 step 3 預期）。
+- **motion 權限查核**：step 6 的 `ACTIVITY_RECOGNITION` dumpsys 查核必須為空（UI-F5 走窄版
+  SensorManager / 注入式 source，不申請該權限、不加 `sensors_plus`）。
 
 ---
 

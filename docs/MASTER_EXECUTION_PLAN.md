@@ -1,6 +1,6 @@
 # 烽傳 IgniRelay — 總施工計畫 MASTER EXECUTION PLAN
 
-> **版本 v1.5 · 2026-06-16 · Owner: simon（本文件中稱「Owner」）**
+> **版本 v1.5.1 · 2026-06-17 · Owner: simon（本文件中稱「Owner」）**
 > 範圍：從本日現況，一路到「手機 App + 實體 Field Node + Gateway + 管理者 Web 後台
 > + **雲端場域服務（Owner VPS，Stage E）**」整套產品跑通為止的完整施工路線。
 > **本文件是給施工 AI（以下稱 AGENT）逐字遵守的施工規格**，
@@ -736,6 +736,28 @@ D3 通用 gate 綠。
 **v1.5 拆刀規則**：UI-F 必須分成 UI-F0～UI-F5 小任務施工（preflight、AppShell entry、module
 placement、field membership、CommunicationState、motion cadence）。每一刀都要維持 gate 綠並更新
 `STATUS.md`；不得用一個 commit 混完整個 UI-F。
+
+**UI-F0 preflight 結論（v1.5.1 釘定；docs-only，已對程式碼實證）**：UI-F0 已查驗現況並釘定下列
+邊界，UI-F1～UI-F5 不得偏離（細節、檔案行號與證據見 `APP_UI_IA_REWORK_PLAN.md` §4.0.1）：
+1. **UI-F1 必須新增 widget smoke test**，至少斷言：(a) production home 不是 `DebugShell`；
+   (b) no-field entry 同時出現「加入場域 / 建立場域 / 先看功能」；(c) 五分頁 label 精確為
+   `安全 / 位置 / 事件 / 協助 / 我的`；(d) global SOS 從每個 tab 可達。
+2. **motion source 僅 Android**：iOS 的 motion-aware 來源明確延後（沿用 R3/iOS source-parity
+   延後策略，不讓它變暗洞），不在 UI-F5 驗收範圍；UI-F5 走窄版 Android `SensorManager` native
+   bridge 或注入式 source（現有 `lib/platform/` `MethodChannel('network.ignirelay/native')`
+   pattern 可承載），不得新增 `sensors_plus` / `ACTIVITY_RECOGNITION` / step counter。
+3. **UI-F5 低電量來源沿用** `PresenceBeaconController` 既有 `readBattery` callback（每次 re-arm
+   前重讀、`_lowBatteryThreshold` 驅動節流），不得新增 battery 來源。
+4. **Field.status lifecycle 延後**：Stage A 只需 active/current field（`FieldSession` =
+   fieldIdHex/displayName/joinedAtMs/cloudBaseUrl，無 status 欄；`ActiveFieldController` 僅
+   join/switch/leave）。進行中 / 結束 / 封存的完整生命週期模型明確不在 Stage A。
+5. **HAZARD Stage A 權限定案**：participant 與 owner 都可發 HAZARD（現況無角色 gating）；
+   `staff` deferred 不影響 HAZARD 入口。UI-F2 把 HAZARD 從 debug card 升為正式事件入口時，
+   兩種角色皆可達。
+6. **Debug diagnostics 僅 debug/developer**：release/production home 不可直接落 `DebugShell`；
+   `DebugShell` 只能經 debug-only route 進入（呼應本任務 DoD D7/D8）。
+7. **staff offline QR 不做回來**：`field_qr_codec.dart` 已以結構強制 staff token（seg4）必須
+   伴隨 `https://` cloud URL（seg3），offline staff QR 在編碼層即不可能，無須額外防護。
 
 **步驟**：
 1. **正式入口 / 首次啟動**：production home 不再進 `DebugShell`。無 active field 時顯示 field entry：
@@ -1758,3 +1780,14 @@ crc16 = CRC-16/CCITT-FALSE(hdr‖body‖mac8)，poly 0x1021 init 0xFFFF
   Android `SensorManager`/注入式 source、hysteresis、無 `ACTIVITY_RECOGNITION`、無 `sensors_plus`。
   ④A11 改驗 owner+participant，補 motion 權限查核；visibility policy 只釘「SOS 永不被角色/可見性隱藏」，
   完整 `peer_visibility=staff_only` 留 Stage E。作者：Codex（Owner 要求審查後完善）。
+- v1.5.1（2026-06-17，UI-F0 preflight；Owner 於 UI-F0 任務明示授權編輯本文件）：docs-only。
+  UI-F 章補「UI-F0 preflight 結論」七條，全部對程式碼實證後釘定：①UI-F1 必須新增 widget
+  smoke test（home≠DebugShell、no-field 三入口、五分頁精確 label、global SOS 每 tab 可達）；
+  ②iOS motion source 明確延後（R3/iOS source-parity 策略），UI-F5 僅 Android 窄版 SensorManager/
+  注入式 source，沿用既有 `lib/platform/` MethodChannel pattern；③UI-F5 低電量沿用
+  `PresenceBeaconController.readBattery`，不新增 battery 來源；④Field.status lifecycle 延後，
+  Stage A 只做 active/current field；⑤HAZARD participant+owner 皆可發，staff deferred 不影響；
+  ⑥debug diagnostics 僅 debug/developer，release home 不落 DebugShell；⑦staff offline QR 不做回來
+  （codec 層已強制 staff token 需伴隨 https cloud URL）。細節落 `APP_UI_IA_REWORK_PLAN.md` §4.0.1、
+  `ACCEPTANCE_A11_TWO_PHONE_SCRIPT.md` §0.1。任務/scope/順序零變更；wire/proto/GATT/crypto 零變更；
+  未動任何 app code / pubspec / manifest / test。作者：Claude（Owner 明示授權的 session）。

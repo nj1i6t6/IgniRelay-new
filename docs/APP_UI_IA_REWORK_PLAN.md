@@ -1,8 +1,10 @@
 # IgniRelay App UI/IA Rework Plan
 
-> Version: v0.2, 2026-06-16. Owner-approved planning basis for MASTER_EXECUTION_PLAN v1.5.
+> Version: v0.2.1, 2026-06-17. Owner-approved planning basis for MASTER_EXECUTION_PLAN v1.5.1.
 > Scope: formal App shell, field-first UX, motion-aware location cadence, and guided preview.
 > This document does not change wire/GATT/crypto contracts.
+> v0.2.1 adds §4.0.1 — the UI-F0 preflight findings (frozen for UI-F1..UI-F5), each verified
+> against the current code (read-only; no app code/pubspec/manifest changed).
 
 ## 0. Review Decisions
 
@@ -100,6 +102,65 @@ Purpose: finish the product shell except guided preview/tutorial mode.
 - **UI-F4 CommunicationState**: aggregate cloud stub/off, BLE/mesh, peers/nodes, outbox count, last presence, and best
   path copy.
 - **UI-F5 Motion-aware cadence**: native/injected motion source, hysteresis, diagnostics, and presence/GPS cadence tests.
+
+### 4.0.1 UI-F0 Preflight Findings (frozen for UI-F1..UI-F5)
+
+UI-F0 verified the current code (read-only) before opening UI-F1. The decisions below are frozen;
+later subtasks must not drift from them. Each cites the file:line evidence checked.
+
+**F0-1 — UI-F1 must add a widget smoke test.** Production home today is `DebugShell`
+(`lib/main.dart:830`, via `_StartupRouter` after one-time `OnboardingScreen`). UI-F1's smoke test
+must assert at least:
+
+- production home is **not** `DebugShell`;
+- the no-field entry shows all three of `加入場域` / `建立場域` / `先看功能`;
+- the five tab labels are exactly `安全` / `位置` / `事件` / `協助` / `我的` (no `地圖` tab);
+- the global SOS action is reachable from **every** tab (widget-test coverage, not just visual).
+
+(No new test file is created in UI-F0; this only fixes the DoD that UI-F1 will satisfy.)
+
+**F0-2 — iOS motion source is explicitly deferred.** There is no accelerometer/gyroscope code in
+the repo today (`rg ACTIVITY_RECOGNITION|sensors_plus|SensorManager|TYPE_ACCELEROMETER` → no matches;
+`pubspec.yaml` has no `sensors_plus`). UI-F5 adds a **narrow Android-only** motion source via the
+existing platform bridge pattern (`lib/platform/native_bridge.dart`,
+`MethodChannel('network.ignirelay/native')` + `EventChannel`) **or** an injected platform source for
+tests. iOS motion-aware cadence follows the existing R3/iOS source-parity deferral and is **not** a
+UI-F5 acceptance target — recorded here so it is a known deferral, not a silent hole. Hard
+constraints (per RD-2 / MASTER UI-F): no `sensors_plus`, no `ACTIVITY_RECOGNITION`, no step
+counter/detector, compass not part of radar heading.
+
+**F0-3 — UI-F5 low-battery cadence reuses the existing battery source.**
+`PresenceBeaconController` already exposes a `readBattery` callback
+(`lib/app/controllers/presence_beacon_controller.dart` — `Future<int?> Function()? readBattery`,
+re-read before every (re)arm; `_lowBatteryThreshold` drives the slow cadence). UI-F5's motion-aware
+policy must consume this same callback for its low-battery intervals; it must **not** introduce a new
+battery source.
+
+**F0-4 — Field.status lifecycle is deferred.** `FieldSession`
+(`lib/app/services/field_session_store.dart`) carries only `fieldIdHex` / `displayName` /
+`joinedAtMs` / `cloudBaseUrl` — there is **no** status/ended/archived field.
+`ActiveFieldController` (`lib/app/controllers/active_field_controller.dart`) supports only
+`join` / `switchActive` / `leave` (leave is irreversible). Stage A needs only an active/current
+field. A full in-progress / ended / archived lifecycle model is explicitly **out of Stage A** and
+deferred (Stage E / a later task).
+
+**F0-5 — HAZARD Stage A permission: participant and owner can both send.** Today the only HAZARD
+send UI is the `kDebugMode` button in `lib/ui/shell/hazard_card.dart` (wired to
+`EventPublisher.publishHazard` → facade `publishHazardMarker`); there is **no** role gating anywhere.
+When UI-F2 promotes HAZARD from a debug card to a formal event action, **both** `participant` and
+`owner` may send it. `staff` being deferred does not affect the HAZARD entry. (SOS visibility rule
+RD-4 is unrelated: SOS is never hidden by role; HAZARD is simply role-agnostic for sending in
+Stage A.)
+
+**F0-6 — Debug diagnostics is debug/developer only.** The release/production home must not land in
+`DebugShell`. `DebugShell` may be reached only through a debug-only / developer-diagnostics route
+(this is the same intent as UI-F DoD D7/D8 and is restated here so UI-F1 does not regress it).
+
+**F0-7 — staff offline QR stays deferred (no work needed).** `field_qr_codec.dart` already makes an
+offline staff QR impossible by construction: a staff token (seg4) without an `https://` cloud URL
+(seg3) is a hard `staffWithoutCloud` reject (codec lines ~76-77, ~129-131, ~177-179). A Stage A
+offline field therefore has exactly one `field_join_secret`; role is derived from local-create vs
+joined, never from a second secret (RD-1). UI-F must not reintroduce a second field secret.
 
 ### 4.1 Required Scope
 

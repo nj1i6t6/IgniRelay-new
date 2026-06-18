@@ -23,7 +23,9 @@ class LocationService {
   DateTime? _lastFixAt;
   bool _initialized = false;
 
-  final StreamController<LatLng> _locationController =
+  // Reassignable so the singleton can self-heal after [dispose] closes it — see
+  // [_ensureLocationControllerOpen] (Owner UI-F5b-polish refinement).
+  StreamController<LatLng> _locationController =
       StreamController<LatLng>.broadcast();
 
   // ── Test seams ────────────────────────────────────────────────────────────
@@ -70,7 +72,10 @@ class LocationService {
 
   /// 位置更新 stream（broadcast）。每次取得新 fix（init 或 [refreshOnce]）會 push。
   /// 注意：UI-F5b 起不再有背景連續 high-accuracy stream，僅在 refresh 時推送。
-  Stream<LatLng> get locationStream => _locationController.stream;
+  Stream<LatLng> get locationStream {
+    _ensureLocationControllerOpen();
+    return _locationController.stream;
+  }
 
   /// GPS 不可用原因 (null = 正常可用或尚未檢查)
   String? _unavailableReason;
@@ -83,10 +88,21 @@ class LocationService {
   /// GPS 首次就緒時的回呼（用於自動加入聊天室等）
   void Function()? onFirstFix;
 
+  /// Rebuild the broadcast controller if it was closed (e.g. by [dispose]) so the
+  /// shared singleton self-heals: a fix obtained after dispose still publishes and
+  /// a fresh listener gets a live stream. Called before every add/listen — events
+  /// are never silently dropped after dispose (Owner UI-F5b-polish refinement).
+  void _ensureLocationControllerOpen() {
+    if (_locationController.isClosed) {
+      _locationController = StreamController<LatLng>.broadcast();
+    }
+  }
+
   void _adoptFix(LatLng loc) {
     final wasNull = _currentLocation == null;
     _currentLocation = loc;
     _lastFixAt = now();
+    _ensureLocationControllerOpen();
     _locationController.add(loc);
     if (_unavailableReason != null) {
       _unavailableReason = null;
@@ -258,6 +274,7 @@ class LocationService {
     _permDeniedForever = false;
     _inFlightRefresh = null;
     onFirstFix = null;
+    _ensureLocationControllerOpen();
   }
 
   void dispose() {

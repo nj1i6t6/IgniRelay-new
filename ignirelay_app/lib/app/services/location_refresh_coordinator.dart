@@ -66,6 +66,7 @@ class LocationRefreshCoordinator {
     _lastReason = gpsReasonForBeacon(
       motion: motion,
       hasAnyFix: _lastFixAt() != null,
+      refreshed: refresh,
     );
   }
 

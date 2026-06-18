@@ -343,6 +343,8 @@ class _SafetyTabState extends State<SafetyTab> {
     switch (r) {
       case GpsPolicyReason.movingRefresh:
         return '移動時更新';
+      case GpsPolicyReason.movingReuseFreshFix:
+        return '移動中沿用新定位';
       case GpsPolicyReason.stationaryReuse:
         return '靜止沿用上次';
       case GpsPolicyReason.unknownReuse:

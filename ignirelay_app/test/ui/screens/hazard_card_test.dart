@@ -3,8 +3,10 @@
 // LocalPositionSource provider needed), mirroring the LastSeenScreen seams.
 //
 // Covers: a received typed HAZARD renders a row; the kDebugMode send button
-// publishes via the seam with the chosen type + the device's own coordinate;
-// and the no-GPS fallback uses the sample coordinate (never a peer).
+// publishes via the seam with the chosen type + the device's own coordinate
+// (injected through the `localEstimate` seam); and the no-GPS case refuses to
+// publish on BOTH the debug and the formal path (UI-F5b-polish / Owner rule: no
+// fake/sample/default coordinate in any runtime path, incl. the debug shell).
 
 import 'dart:async';
 
@@ -121,8 +123,11 @@ void main() {
     expect(capturedDesc, isNotEmpty);
   });
 
-  testWidgets('no GPS fix → DEBUG send falls back to the sample coordinate',
+  testWidgets('no GPS fix → DEBUG send also does NOT publish; shows the prompt',
       (tester) async {
+    // UI-F5b-polish: the sample coordinate is gone — the debug stand-in now
+    // refuses without a real fix, exactly like the formal path (no fake/sample/
+    // default coordinate anywhere in app runtime, including the debug shell).
     await tester.pumpWidget(card(localEstimate: () => null));
     await tester.pump();
 
@@ -131,11 +136,9 @@ void main() {
     await tester.tap(find.text('送出'));
     await tester.pumpAndSettle();
 
-    expect(publishCalls, 1);
-    // The documented debug-only fallback (NOT a peer's position). The FORMAL path
-    // can never reach this (asserted below).
-    expect(capturedLat, closeTo(25.0339, 1e-9));
-    expect(capturedLng, closeTo(121.5645, 1e-9));
+    expect(publishCalls, 0,
+        reason: 'no fake/sample coordinate in the debug path either');
+    expect(find.text('目前沒有位置，請取得位置後再回報'), findsOneWidget);
   });
 
   // ── UI-F5b — FORMAL path: NO fake/sample coordinate (Owner boundary 1) ──────

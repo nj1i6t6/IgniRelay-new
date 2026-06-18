@@ -43,13 +43,13 @@ void main() {
     expect(c.lastReason, GpsPolicyReason.movingRefresh);
   });
 
-  test('beacon moving + fresh → NO refresh (reason still movingRefresh)',
-      () async {
+  test('beacon moving + fresh → NO refresh, reason movingReuseFreshFix '
+      '(never claims a refresh that did not happen)', () async {
     fixAt = now.subtract(const Duration(seconds: 10));
     final c = build();
     await c.ensureFreshForBeacon(MotionState.moving);
     expect(refreshCalls, 0);
-    expect(c.lastReason, GpsPolicyReason.movingRefresh);
+    expect(c.lastReason, GpsPolicyReason.movingReuseFreshFix);
   });
 
   test('beacon stationary → NO refresh, reason stationaryReuse', () async {

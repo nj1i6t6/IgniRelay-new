@@ -179,5 +179,33 @@ void main() {
       expect(results[0], const LatLng(3.0, 4.0));
       expect(results[1], const LatLng(3.0, 4.0));
     });
+
+    test('after dispose: a listener via locationStream still receives the next '
+        'refreshOnce fix (controller self-heals — events not dropped)', () async {
+      final t0 = DateTime(2026, 1, 1, 12, 0, 0);
+      svc
+        ..now = (() => t0)
+        ..getCurrentFn = (() async => const LatLng(5.0, 6.0));
+
+      svc.dispose(); // closes the broadcast controller
+
+      // Subscribe AFTER dispose: the getter rebuilds the closed controller so a
+      // fresh listener gets a live stream (Owner UI-F5b-polish refinement).
+      final received = <LatLng>[];
+      final sub = svc.locationStream.listen(received.add);
+
+      // refreshOnce adopts a fix → _adoptFix rebuilds-if-closed then adds; it must
+      // NOT throw "Cannot add event after closing", and the listener must receive.
+      final fix = await svc.refreshOnce(timeout: const Duration(seconds: 1));
+      await Future<void>.delayed(Duration.zero); // flush broadcast microtask
+
+      expect(fix, const LatLng(5.0, 6.0),
+          reason: 'refreshOnce never throws after dispose');
+      expect(svc.currentLocation, const LatLng(5.0, 6.0));
+      expect(received, const [LatLng(5.0, 6.0)],
+          reason: 'event delivered, not silently dropped after dispose');
+
+      await sub.cancel();
+    });
   });
 }

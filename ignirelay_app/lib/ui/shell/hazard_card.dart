@@ -12,12 +12,13 @@
 // from the device's OWN `LocalPositionSource` (never a peer — same rule as the
 // A10b radar origin).
 //
-// UI-F5b / Owner rule — the production path must NEVER emit a fake/sample/default
-// coordinate. The FORMAL path takes ONE bounded fresh GPS fix; if there is still
-// no real fix it does NOT publish (it shows a "需要位置" prompt). The sample
-// coordinate (`_kSampleLat/_kSampleLng`) is reachable ONLY on the DEBUG stand-in
-// path (`formalSend == false`), so the acceptance send still rides the wire. The
-// received-hazard list always renders (read-model display is fine in release).
+// UI-F5b-polish / Owner rule — NO fake/sample/default coordinate in ANY runtime
+// path (production OR the debug shell). BOTH the formal entry and the kDebugMode
+// stand-in refuse to publish without a real fix — they show a "需要位置" prompt
+// instead. The FORMAL path additionally takes ONE bounded fresh GPS fix first
+// (§4.2 manual event). Coordinate-positive tests inject a real estimate through
+// the `localEstimate` seam; there is no built-in sample coordinate. The received-
+// hazard list always renders (read-model display is fine in release).
 //
 // Layer rules: lives in lib/ui/shell/, imports only app/controllers +
 // app/services facades (no app/proto/mesh/db). `HazardEvent` is a plain Dart
@@ -47,14 +48,6 @@ typedef HazardPublisher = Future<String> Function({
   double radiusMeters,
   String description,
 });
-
-/// DEBUG-ONLY fallback coordinate (`formalSend == false`) used when the device
-/// has no GPS fix, so the acceptance send still produces a typed HAZARD on the
-/// wire. Marked in the snackbar so the operator knows it is not a real location.
-/// The FORMAL path NEVER uses this — it refuses to publish without a real fix
-/// (Owner rule: no fake coordinates in production).
-const double _kSampleLat = 25.0339;
-const double _kSampleLng = 121.5645;
 
 class HazardCard extends StatefulWidget {
   const HazardCard({
@@ -204,24 +197,17 @@ class _HazardCardState extends State<HazardCard> {
         if (!mounted) return;
       }
 
+      // Owner rule (UI-F5b-polish): NO fake/sample/default coordinate in ANY
+      // runtime path — production OR debug shell. Without a real fix we do NOT
+      // publish a mis-located hazard; prompt for location instead (both paths).
       final est = _origin();
-      final hasFix = est != null && est.lat != null && est.lng != null;
-      final double lat;
-      final double lng;
-      if (hasFix) {
-        lat = est.lat!;
-        lng = est.lng!;
-      } else if (widget.formalSend) {
-        // Owner rule: NO fake/sample coordinate in production. Without a real fix
-        // we do NOT publish a mis-located hazard — prompt for location instead.
+      final double? lat = est?.lat;
+      final double? lng = est?.lng;
+      if (lat == null || lng == null) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('目前沒有位置，請取得位置後再回報')));
         return;
-      } else {
-        // DEBUG stand-in only (formalSend == false): sample coordinate so the
-        // acceptance send still rides the wire.
-        lat = _kSampleLat;
-        lng = _kSampleLng;
       }
 
       final id = await _publish(
@@ -233,13 +219,9 @@ class _HazardCardState extends State<HazardCard> {
       );
       if (!mounted) return;
       final short = id.length <= 8 ? id : id.substring(0, 8);
-      final String msg;
-      if (widget.formalSend) {
-        msg = '已回報危害「${draft.type}」· 需已加入場域才會廣播';
-      } else {
-        final note = hasFix ? '' : '（無 GPS，用樣本座標）';
-        msg = 'HAZARD「${draft.type}」已送出（id $short）$note · 需已加入場域才會實際廣播';
-      }
+      final msg = widget.formalSend
+          ? '已回報危害「${draft.type}」· 需已加入場域才會廣播'
+          : 'HAZARD「${draft.type}」已送出（id $short） · 需已加入場域才會實際廣播';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } catch (e) {
       if (mounted) {
@@ -277,7 +259,7 @@ class _HazardCardState extends State<HazardCard> {
               widget.formalSend
                   ? '附近的危害事件。回報時座標取自本機定位；無定位時無法回報，請先取得位置。'
                   : '收到的 typed HAZARD 事件（A3 接收側）。手動送出為 debug 占位'
-                      '（座標取本機 GPS，無則用樣本）。',
+                      '（座標取本機 GPS，無定位則不送）。',
               style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
             const SizedBox(height: 8),

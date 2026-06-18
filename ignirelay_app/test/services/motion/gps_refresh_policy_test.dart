@@ -71,10 +71,20 @@ void main() {
       }
     });
 
-    test('with a fix: moving→movingRefresh, stationary→stationaryReuse, '
-        'unknown→unknownReuse', () {
-      expect(gpsReasonForBeacon(motion: MotionState.moving, hasAnyFix: true),
+    test('with a fix + moving: refreshed→movingRefresh, not-refreshed→'
+        'movingReuseFreshFix; stationary→stationaryReuse, unknown→unknownReuse',
+        () {
+      expect(
+          gpsReasonForBeacon(
+              motion: MotionState.moving, hasAnyFix: true, refreshed: true),
           GpsPolicyReason.movingRefresh);
+      expect(
+          gpsReasonForBeacon(
+              motion: MotionState.moving, hasAnyFix: true, refreshed: false),
+          GpsPolicyReason.movingReuseFreshFix);
+      // Default refreshed:false → never claims a refresh that did not happen.
+      expect(gpsReasonForBeacon(motion: MotionState.moving, hasAnyFix: true),
+          GpsPolicyReason.movingReuseFreshFix);
       expect(
           gpsReasonForBeacon(motion: MotionState.stationary, hasAnyFix: true),
           GpsPolicyReason.stationaryReuse);
@@ -91,6 +101,7 @@ void main() {
         GpsPolicyReason.values.toSet(),
         {
           GpsPolicyReason.movingRefresh,
+          GpsPolicyReason.movingReuseFreshFix,
           GpsPolicyReason.stationaryReuse,
           GpsPolicyReason.unknownReuse,
           GpsPolicyReason.manualEvent,

@@ -14,7 +14,7 @@
 //   • owner/participant 角色模型 → UI-F3（「我的」顯示產品佔位）。
 //   • CommunicationState 聚合 → UI-F4（「安全」顯示產品佔位）。
 //   • motion-aware 定位節流 → UI-F5。
-//   • 「先看功能」引導模式 → UI-G（此處僅提示佔位）。
+//   • 「先看功能」引導模式 → UI-G（已實作：導向 PreviewScreen 純 fixture 導覽）。
 //
 // DESIGN_LANGUAGE §4：本殼是正式畫面，一律經 `context.igni` 與 `ui/widgets/`
 // 既有元件取值，檔內不寫死 `Colors.*` / hex。`DebugShell` 僅能經
@@ -27,6 +27,7 @@ import 'package:provider/provider.dart';
 import 'package:ignirelay_app/app/controllers/active_field_controller.dart';
 import 'package:ignirelay_app/ui/screens/field/field_screen.dart';
 import 'package:ignirelay_app/ui/screens/position/last_seen_screen.dart';
+import 'package:ignirelay_app/ui/screens/preview/preview_screen.dart';
 import 'package:ignirelay_app/ui/screens/sos/sos_screen.dart';
 import 'package:ignirelay_app/ui/shell/tabs/assist_tab.dart';
 import 'package:ignirelay_app/ui/shell/tabs/events_tab.dart';
@@ -72,7 +73,8 @@ class AppShell extends StatelessWidget {
 ///
 /// 「加入場域」「建立場域」導向既有的 [FieldScreen]（A7，已含掃碼/代碼/建立）；
 /// 加入或建立成功後 [ActiveFieldController] 變動 → [AppShell] 自動切到五分頁殼。
-/// 「先看功能」在 UI-F1 僅佔位（引導模式實作留 UI-G）。
+/// 「先看功能」導向 [PreviewScreen]（UI-G 引導預覽：純 fixture、不啟動 mesh、
+/// 不送事件、不索取權限、不顯示真 secret）。
 class NoFieldEntry extends StatelessWidget {
   const NoFieldEntry({super.key});
 
@@ -82,9 +84,9 @@ class NoFieldEntry extends StatelessWidget {
     );
   }
 
-  void _previewStub(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('先看功能即將提供。')),
+  void _openPreview(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const PreviewScreen()),
     );
   }
 
@@ -142,13 +144,7 @@ class NoFieldEntry extends StatelessWidget {
                     variant: IgniButtonVariant.ghost,
                     size: IgniButtonSize.large,
                     fullWidth: true,
-                    onPressed: () => _previewStub(context),
-                  ),
-                  const SizedBox(height: IgniSpacing.sm),
-                  Text(
-                    '先看功能即將提供。',
-                    style: IgniTypography.bodySmall(p.text3),
-                    textAlign: TextAlign.center,
+                    onPressed: () => _openPreview(context),
                   ),
                 ],
               ),

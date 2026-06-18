@@ -42,12 +42,15 @@ import 'package:ignirelay_app/app/services/local_position_source.dart';
 import 'package:ignirelay_app/app/services/location_evidence_builder.dart';
 import 'package:ignirelay_app/app/services/location_refresh_coordinator.dart';
 import 'package:ignirelay_app/app/services/peer_capability_registry.dart';
+import 'package:ignirelay_app/ui/screens/field/field_screen.dart';
 import 'package:ignirelay_app/ui/screens/position/last_seen_screen.dart';
+import 'package:ignirelay_app/ui/screens/preview/preview_screen.dart';
 import 'package:ignirelay_app/ui/shell/app_shell.dart';
 import 'package:ignirelay_app/ui/shell/debug_shell.dart';
 import 'package:ignirelay_app/ui/shell/tabs/events_tab.dart';
 import 'package:ignirelay_app/ui/shell/tabs/my_tab.dart';
 import 'package:ignirelay_app/ui/shell/tabs/safety_tab.dart';
+import 'package:ignirelay_app/ui/widgets/igni_button.dart';
 
 class _FakeKvStore implements SecureKvStore {
   final Map<String, String> _m = {};
@@ -201,6 +204,51 @@ void main() {
     expect(find.textContaining('UI-G'), findsNothing);
     expect(find.textContaining('UI-F'), findsNothing);
     expect(find.textContaining('將於'), findsNothing);
+  });
+
+  // UI-G — the「先看功能」entry now opens the real PreviewScreen (not a SnackBar),
+  // and its exit CTAs reach FieldScreen / pop back. These run under the full
+  // AppShell provider harness because FieldScreen depends on providers (Owner
+  // boundary ②); the standalone fixture-only render lives in preview_screen_test.
+  testWidgets('先看功能 opens PreviewScreen (not the old SnackBar)',
+      (tester) async {
+    await _pumpShell(tester, joined: false);
+
+    await tester.tap(find.text('先看功能'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PreviewScreen), findsOneWidget);
+    expect(find.byType(NoFieldEntry), findsNothing);
+    expect(find.text('先看功能即將提供。'), findsNothing); // placeholder retired
+  });
+
+  testWidgets('preview CTA 加入場域 pushReplacement → FieldScreen',
+      (tester) async {
+    await _pumpShell(tester, joined: false);
+
+    await tester.tap(find.text('先看功能'));
+    await tester.pumpAndSettle();
+    // Page 1 (加入場域) carries the join CTA. Target the BUTTON specifically —
+    // the page title is also「加入場域」, so a bare text finder is ambiguous.
+    await tester.tap(find.widgetWithText(IgniButton, '加入場域'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(FieldScreen), findsOneWidget);
+    expect(find.byType(PreviewScreen), findsNothing); // replaced, not stacked
+  });
+
+  testWidgets('preview 返回 pops back to the no-field entry', (tester) async {
+    await _pumpShell(tester, joined: false);
+
+    await tester.tap(find.text('先看功能'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PreviewScreen), findsOneWidget);
+
+    await tester.tap(find.text('返回')); // page-0 nav-left
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PreviewScreen), findsNothing);
+    expect(find.byType(NoFieldEntry), findsOneWidget);
   });
 
   testWidgets(

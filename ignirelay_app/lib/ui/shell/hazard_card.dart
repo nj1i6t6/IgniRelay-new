@@ -7,12 +7,17 @@
 // retired with the old map screen, which blocked the two-phone acceptance
 // (A11 step 5). This card restores a send entry behind `kDebugMode`.
 //
-// The MANUAL publish button is `kDebugMode`-only: in v0.3 a hazard send is a
-// debug stand-in. Coordinates come from the device's OWN `LocalPositionSource`
-// (never a peer — same rule as the A10b radar origin); with no GPS fix it falls
-// back to a clearly-marked sample coordinate so the send still rides the wire
-// for acceptance. The received-hazard list always renders (read-model display
-// is fine in release).
+// The MANUAL publish button: `formalSend` shows it in production (participant +
+// owner); otherwise it is a `kDebugMode`-only debug stand-in. Coordinates come
+// from the device's OWN `LocalPositionSource` (never a peer — same rule as the
+// A10b radar origin).
+//
+// UI-F5b / Owner rule — the production path must NEVER emit a fake/sample/default
+// coordinate. The FORMAL path takes ONE bounded fresh GPS fix; if there is still
+// no real fix it does NOT publish (it shows a "需要位置" prompt). The sample
+// coordinate (`_kSampleLat/_kSampleLng`) is reachable ONLY on the DEBUG stand-in
+// path (`formalSend == false`), so the acceptance send still rides the wire. The
+// received-hazard list always renders (read-model display is fine in release).
 //
 // Layer rules: lives in lib/ui/shell/, imports only app/controllers +
 // app/services facades (no app/proto/mesh/db). `HazardEvent` is a plain Dart
@@ -28,6 +33,7 @@ import 'package:provider/provider.dart';
 import 'package:ignirelay_app/app/controllers/event_publisher.dart';
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/services/local_position_source.dart';
+import 'package:ignirelay_app/app/services/location_refresh_coordinator.dart';
 import 'package:ignirelay_app/app/services/position_estimator.dart';
 
 /// Publish seam matching `EventPublisher.publishHazard`. A tear-off of that
@@ -42,9 +48,11 @@ typedef HazardPublisher = Future<String> Function({
   String description,
 });
 
-/// Debug fallback coordinate used only when the device has no GPS fix, so the
-/// acceptance send still produces a typed HAZARD on the wire. Marked in the
-/// snackbar so the operator knows it is not a real location.
+/// DEBUG-ONLY fallback coordinate (`formalSend == false`) used when the device
+/// has no GPS fix, so the acceptance send still produces a typed HAZARD on the
+/// wire. Marked in the snackbar so the operator knows it is not a real location.
+/// The FORMAL path NEVER uses this — it refuses to publish without a real fix
+/// (Owner rule: no fake coordinates in production).
 const double _kSampleLat = 25.0339;
 const double _kSampleLng = 121.5645;
 
@@ -54,6 +62,7 @@ class HazardCard extends StatefulWidget {
     this.hazardSource,
     this.onPublish,
     this.localEstimate,
+    this.ensureFreshLocation,
     this.formalSend = false,
   });
 
@@ -73,6 +82,12 @@ class HazardCard extends StatefulWidget {
   /// The device's own position (for the send coordinate). Defaults to
   /// `LocalPositionSource.currentEstimate`.
   final PositionEstimate? Function()? localEstimate;
+
+  /// Bounded fresh-GPS hook for the FORMAL path (§4.2 manual event). Defaults to
+  /// `LocationRefreshCoordinator.ensureFreshForManualEvent(timeout: 2s)`, read
+  /// lazily at send time (so the debug `DebugShell` path, which never calls it,
+  /// does not require the coordinator provider).
+  final Future<void> Function()? ensureFreshLocation;
 
   @override
   State<HazardCard> createState() => _HazardCardState();
@@ -175,10 +190,40 @@ class _HazardCardState extends State<HazardCard> {
     if (!mounted) return;
     setState(() => _busy = true);
     try {
+      // FORMAL path: take ONE bounded fresh fix first (§4.2 manual event). Never
+      // throws / never blocks past its timeout.
+      if (widget.formalSend) {
+        final fresh = widget.ensureFreshLocation ??
+            () => context
+                .read<LocationRefreshCoordinator>()
+                .ensureFreshForManualEvent(
+                    timeout: const Duration(seconds: 2));
+        try {
+          await fresh();
+        } catch (_) {/* best-effort */}
+        if (!mounted) return;
+      }
+
       final est = _origin();
       final hasFix = est != null && est.lat != null && est.lng != null;
-      final lat = hasFix ? est.lat! : _kSampleLat;
-      final lng = hasFix ? est.lng! : _kSampleLng;
+      final double lat;
+      final double lng;
+      if (hasFix) {
+        lat = est.lat!;
+        lng = est.lng!;
+      } else if (widget.formalSend) {
+        // Owner rule: NO fake/sample coordinate in production. Without a real fix
+        // we do NOT publish a mis-located hazard — prompt for location instead.
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('目前沒有位置，請取得位置後再回報')));
+        return;
+      } else {
+        // DEBUG stand-in only (formalSend == false): sample coordinate so the
+        // acceptance send still rides the wire.
+        lat = _kSampleLat;
+        lng = _kSampleLng;
+      }
+
       final id = await _publish(
         type: draft.type,
         severity: 2,
@@ -190,8 +235,7 @@ class _HazardCardState extends State<HazardCard> {
       final short = id.length <= 8 ? id : id.substring(0, 8);
       final String msg;
       if (widget.formalSend) {
-        final note = hasFix ? '' : '（無定位，使用預設座標）';
-        msg = '已回報危害「${draft.type}」$note · 需已加入場域才會廣播';
+        msg = '已回報危害「${draft.type}」· 需已加入場域才會廣播';
       } else {
         final note = hasFix ? '' : '（無 GPS，用樣本座標）';
         msg = 'HAZARD「${draft.type}」已送出（id $short）$note · 需已加入場域才會實際廣播';
@@ -231,7 +275,7 @@ class _HazardCardState extends State<HazardCard> {
             const SizedBox(height: 4),
             Text(
               widget.formalSend
-                  ? '附近的危害事件。回報時座標取自本機定位（無定位時用預設座標）。'
+                  ? '附近的危害事件。回報時座標取自本機定位；無定位時無法回報，請先取得位置。'
                   : '收到的 typed HAZARD 事件（A3 接收側）。手動送出為 debug 占位'
                       '（座標取本機 GPS，無則用樣本）。',
               style: const TextStyle(fontSize: 12, color: Colors.grey),

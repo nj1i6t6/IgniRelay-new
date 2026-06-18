@@ -53,7 +53,11 @@ import 'package:ignirelay_app/app/controllers/tier_manager.dart';
 import 'package:ignirelay_app/app/services/event_decoder.dart';
 import 'package:ignirelay_app/app/services/event_store.dart';
 import 'package:ignirelay_app/app/services/local_position_source.dart';
+import 'package:ignirelay_app/app/services/location_refresh_coordinator.dart';
 import 'package:ignirelay_app/app/services/location_service.dart';
+import 'package:ignirelay_app/app/services/motion/motion_service.dart';
+import 'package:ignirelay_app/app/services/motion/motion_source.dart';
+import 'package:ignirelay_app/app/services/motion/native_motion_source.dart';
 import 'package:ignirelay_app/app/mesh/mesh_event_handler.dart';
 import 'package:ignirelay_app/app/controllers/mesh_runtime_controller.dart';
 import 'package:ignirelay_app/app/crdt/hlc.dart';
@@ -159,6 +163,18 @@ final EventPublisherV2Facade _eventPublisherV2 = EventPublisherV2Facade(
 /// production dispatcher is built against that same key store.
 final ActiveFieldController _activeFieldController = ActiveFieldController(
   store: FieldSessionStore(db: DatabaseHelper()),
+);
+
+/// UI-F5b — motion source feeding the presence-beacon cadence. Android uses the
+/// existing `NativeBridge` accelerometer; every other platform (incl. iOS, which
+/// is deferred) uses [NoopMotionSource], so motion stays `unknown` → the fixed
+/// 120s/300s fallback cadence. Long-lived (like [_activeFieldController]); its
+/// [MotionService.stateChanges] drive the beacon, and it is started/paused with
+/// the app lifecycle in [_IgniRelayAppState]. No new dependency, no extra channel.
+final MotionService _motionService = MotionService(
+  source: defaultTargetPlatform == TargetPlatform.android
+      ? NativeMotionSource()
+      : const NoopMotionSource(),
 );
 
 /// Visible-for-test accessors so the 0d-gate test runner can drive the
@@ -323,7 +339,8 @@ class IgniRelayApp extends StatefulWidget {
   State<IgniRelayApp> createState() => _IgniRelayAppState();
 }
 
-class _IgniRelayAppState extends State<IgniRelayApp> {
+class _IgniRelayAppState extends State<IgniRelayApp>
+    with WidgetsBindingObserver {
   Locale? _locale;
   // Stage 7-r3：預設改為 light（產品決策：第一次使用較舒適；急難模式仍會
   // 在 build() 動態切回深色高對比）。
@@ -334,6 +351,32 @@ class _IgniRelayAppState extends State<IgniRelayApp> {
   void initState() {
     super.initState();
     _loadPrefs();
+    // UI-F5b: start low-rate motion sampling once the first frame is up; it is
+    // paused on background and resumed on foreground (power). Idempotent.
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_motionService.start());
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_motionService.start());
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      unawaited(_motionService.stop());
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    // Stop sampling but keep the long-lived module service alive (mirrors
+    // _activeFieldController — never torn down in production).
+    unawaited(_motionService.stop());
+    super.dispose();
   }
 
   Future<void> _loadPrefs() async {
@@ -424,6 +467,19 @@ class _IgniRelayAppState extends State<IgniRelayApp> {
                 context.read<LocationService>().currentLocation,
           ),
         ),
+        // UI-F5b — §4.2 GPS-fix-age coordinator. Wraps LocationService's fix age
+        // + one-shot refresh; the beacon's pre-publish hook (moving & stale) and
+        // the manual safety events (SOS/HAZARD/CHECKPOINT) call it. Plain service
+        // (not Listenable) — read, not watched.
+        Provider<LocationRefreshCoordinator>(
+          create: (context) {
+            final loc = context.read<LocationService>();
+            return LocationRefreshCoordinator(
+              lastFixAt: () => loc.lastFixAt,
+              refreshOnce: (timeout) => loc.refreshOnce(timeout: timeout),
+            );
+          },
+        ),
         Provider<DeviceInfoController>(
           create: (_) => DeviceInfoController.instance,
         ),
@@ -477,6 +533,14 @@ class _IgniRelayAppState extends State<IgniRelayApp> {
               currentLocation: () =>
                   context.read<LocationService>().currentLocation,
             ),
+            // UI-F5b §4.2: one bounded fresh fix (≤2s) before send, last-known
+            // fallback; never aborts.
+            ensureFreshLocation: () async {
+              await context
+                  .read<LocationRefreshCoordinator>()
+                  .ensureFreshForManualEvent(
+                      timeout: const Duration(seconds: 2));
+            },
           ),
         ),
         // A8 — SOS publish state machine (long-press → countdown → send-with-
@@ -490,6 +554,14 @@ class _IgniRelayAppState extends State<IgniRelayApp> {
               currentLocation: () =>
                   context.read<LocationService>().currentLocation,
             ),
+            // UI-F5b §4.2: one bounded fresh fix (≤1500ms) before send, last-known
+            // fallback. GPS failure NEVER aborts/delays the SOS (zero-delay).
+            ensureFreshLocation: () async {
+              await context
+                  .read<LocationRefreshCoordinator>()
+                  .ensureFreshForManualEvent(
+                      timeout: const Duration(milliseconds: 1500));
+            },
           ),
         ),
         // #4-7 (A5) — active-field source. Long-lived module-level instance
@@ -522,6 +594,11 @@ class _IgniRelayAppState extends State<IgniRelayApp> {
                 return null;
               }
             },
+            // UI-F5b — motion-aware cadence + §4.2 GPS refresh hook (runs inside
+            // the gate, before publish; failure never aborts the beacon).
+            motionStates: _motionService.stateChanges,
+            onBeforePublish: (motion) =>
+                context.read<LocationRefreshCoordinator>().ensureFreshForBeacon(motion),
           ),
         ),
         Provider<MeshTransport>.value(

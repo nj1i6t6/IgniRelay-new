@@ -25,13 +25,19 @@ class CheckpointController {
     required EventPublisherV2Facade facade,
     required AnonIdentityService anonIdentity,
     required LocationEvidenceBuilder locationBuilder,
+    // UI-F5b — optional bounded fresh-GPS hook (§4.2 manual event). Wired in
+    // main.dart to a ≤2000ms one-shot refresh that falls back to last-known; its
+    // failure never aborts the send (a null location is acceptable).
+    Future<void> Function()? ensureFreshLocation,
   })  : _facade = facade,
         _anonIdentity = anonIdentity,
-        _locationBuilder = locationBuilder;
+        _locationBuilder = locationBuilder,
+        _ensureFreshLocation = ensureFreshLocation;
 
   final EventPublisherV2Facade _facade;
   final AnonIdentityService _anonIdentity;
   final LocationEvidenceBuilder _locationBuilder;
+  final Future<void> Function()? _ensureFreshLocation;
 
   /// Publish a CHECKPOINT crossing at [checkpointId]: resolve the anon_user_id,
   /// attach the best current GPS evidence (or none), and broadcast via the v2
@@ -41,6 +47,14 @@ class CheckpointController {
     required String checkpointId,
   }) async {
     final anonUserId = await _anonIdentity.getOrCreate();
+    final f = _ensureFreshLocation;
+    if (f != null) {
+      try {
+        await f(); // §4.2: one bounded fresh fix, fall back to last-known
+      } catch (_) {
+        // Best-effort — a refresh failure must not abort the checkpoint send.
+      }
+    }
     final location = _locationBuilder.build(); // null when GPS unavailable
     return _facade.publishCheckpoint(
       anonUserId: Uint8List.fromList(anonUserId),

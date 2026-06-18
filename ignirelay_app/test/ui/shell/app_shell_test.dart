@@ -40,6 +40,7 @@ import 'package:ignirelay_app/app/services/event_store.dart';
 import 'package:ignirelay_app/app/services/field_session_store.dart';
 import 'package:ignirelay_app/app/services/local_position_source.dart';
 import 'package:ignirelay_app/app/services/location_evidence_builder.dart';
+import 'package:ignirelay_app/app/services/location_refresh_coordinator.dart';
 import 'package:ignirelay_app/app/services/peer_capability_registry.dart';
 import 'package:ignirelay_app/ui/screens/position/last_seen_screen.dart';
 import 'package:ignirelay_app/ui/shell/app_shell.dart';
@@ -90,6 +91,14 @@ Widget _wrap(
       ),
       Provider<LocalPositionSource>(
         create: (_) => LocalPositionSource(currentLocation: () => null),
+      ),
+      // UI-F5b — SafetyTab reads the coordinator for the GPS diagnostic; the
+      // formal HazardCard reads it lazily at send time. No fix in the harness.
+      Provider<LocationRefreshCoordinator>(
+        create: (_) => LocationRefreshCoordinator(
+          lastFixAt: () => null,
+          refreshOnce: (timeout) async => null,
+        ),
       ),
       ListenableProvider<ActiveFieldController>.value(value: field),
       ChangeNotifierProvider<PresenceBeaconController>.value(value: beacon),
@@ -236,6 +245,10 @@ void main() {
     // NEVER 靜止 (Owner boundary 2).
     expect(find.text('動作偵測：尚未啟用'), findsOneWidget);
     expect(find.text('動作偵測：靜止'), findsNothing);
+    // UI-F5b: §4.2 GPS diagnostics — fix age + honest policy reason. No fix in
+    // the harness ⇒ 尚無定位; the reason line is present and never low-battery.
+    expect(find.text('GPS 定位：尚無定位'), findsOneWidget);
+    expect(find.textContaining('定位策略：'), findsOneWidget);
   });
 
   testWidgets('安全 tab cancels its 5s refresh timer on dispose (no leak)',

@@ -121,7 +121,7 @@ void main() {
     expect(capturedDesc, isNotEmpty);
   });
 
-  testWidgets('no GPS fix → send falls back to the sample coordinate',
+  testWidgets('no GPS fix → DEBUG send falls back to the sample coordinate',
       (tester) async {
     await tester.pumpWidget(card(localEstimate: () => null));
     await tester.pump();
@@ -132,8 +132,76 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(publishCalls, 1);
-    // The documented debug fallback (NOT a peer's position).
+    // The documented debug-only fallback (NOT a peer's position). The FORMAL path
+    // can never reach this (asserted below).
     expect(capturedLat, closeTo(25.0339, 1e-9));
     expect(capturedLng, closeTo(121.5645, 1e-9));
+  });
+
+  // ── UI-F5b — FORMAL path: NO fake/sample coordinate (Owner boundary 1) ──────
+
+  Widget formalCard({
+    PositionEstimate? Function()? localEstimate,
+    Future<void> Function()? ensureFreshLocation,
+  }) =>
+      MaterialApp(
+        home: Scaffold(
+          body: HazardCard(
+            hazardSource: hz.stream,
+            onPublish: spy,
+            localEstimate: localEstimate ?? () => origin,
+            ensureFreshLocation: ensureFreshLocation ?? () async {},
+            formalSend: true,
+          ),
+        ),
+      );
+
+  testWidgets('formal send WITH a fix publishes the REAL coordinate',
+      (tester) async {
+    await tester.pumpWidget(formalCard());
+    await tester.pump();
+
+    await tester.tap(find.text('回報危害')); // the button
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('送出'));
+    await tester.pumpAndSettle();
+
+    expect(publishCalls, 1);
+    expect(capturedLat, 25.0); // the device's own fix — never the sample
+    expect(capturedLng, 121.0);
+  });
+
+  testWidgets('formal send with NO fix does NOT publish; shows the prompt',
+      (tester) async {
+    await tester.pumpWidget(formalCard(localEstimate: () => null));
+    await tester.pump();
+
+    await tester.tap(find.text('回報危害'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('送出'));
+    await tester.pumpAndSettle();
+
+    expect(publishCalls, 0,
+        reason: 'no fake/sample coordinate in the production path');
+    expect(find.text('目前沒有位置，請取得位置後再回報'), findsOneWidget);
+  });
+
+  testWidgets('formal: a refresh that yields a fix → publishes the real coord '
+      '(hook awaited before reading the origin)', (tester) async {
+    PositionEstimate? est; // null until the bounded refresh runs
+    await tester.pumpWidget(formalCard(
+      localEstimate: () => est,
+      ensureFreshLocation: () async => est = origin,
+    ));
+    await tester.pump();
+
+    await tester.tap(find.text('回報危害'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('送出'));
+    await tester.pumpAndSettle();
+
+    expect(publishCalls, 1, reason: 'fresh fix obtained before reading origin');
+    expect(capturedLat, 25.0);
+    expect(capturedLng, 121.0);
   });
 }

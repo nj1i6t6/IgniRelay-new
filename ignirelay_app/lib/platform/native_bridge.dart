@@ -444,6 +444,57 @@ class NativeBridge {
         .map((event) => List<int>.from(event));
   }
 
+  // ── UI-F5b — low-rate accelerometer motion source (Android-only) ──────────
+  //
+  // Spec: docs/APP_UI_IA_REWORK_PLAN.md §4.2. The native `SensorManager`
+  // accelerometer emits a throttled magnitude (~5Hz) over the shared
+  // EventChannel as `{type:"motion", magnitude:<double>}`; the Dart
+  // `MotionClassifier` consumes it. No permission, no ACTIVITY_RECOGNITION, no
+  // step counter, no compass.
+
+  /// Start the native accelerometer source. Returns false when the device has no
+  /// accelerometer, or on non-Android / unwired platforms (→ motion stays
+  /// `unknown` → fixed fallback cadence).
+  static Future<bool> startMotionSensor() async {
+    try {
+      final bool ok = await _channel.invokeMethod('startMotionSensor');
+      return ok;
+    } on PlatformException catch (e) {
+      debugPrint("startMotionSensor failed: '${e.message}'.");
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  /// Stop the native accelerometer source (power). Safe when never started.
+  static Future<void> stopMotionSensor() async {
+    try {
+      await _channel.invokeMethod('stopMotionSensor');
+    } on PlatformException catch (e) {
+      debugPrint("stopMotionSensor failed: '${e.message}'.");
+    } on MissingPluginException {
+      // Not wired on this platform — nothing to stop.
+    }
+  }
+
+  /// Accelerometer magnitude samples (m/s², ≈9.8 at rest) from the native source.
+  /// Mirrors [handoffEvents] — filters the shared event stream by `type`.
+  static Stream<double> get motionMagnitudes => nativeEventStream
+      .map(parseMotionMagnitude)
+      .where((m) => m != null)
+      .cast<double>();
+
+  /// Pure parser: a native event → its motion magnitude, or null when it is not
+  /// a `{type:"motion"}` event / is malformed. Extracted for unit testing.
+  static double? parseMotionMagnitude(dynamic event) {
+    if (event is! Map) return null;
+    if (event['type'] != 'motion') return null;
+    final m = event['magnitude'];
+    if (m is num) return m.toDouble();
+    return null;
+  }
+
   // ── Stage 0c wave 3E — 0d acceptance-gate debug hooks ─────────────────
   //
   // Spec: native_transport_v1 §7.4 (force MTU) + §8.5 (force adapter idle).

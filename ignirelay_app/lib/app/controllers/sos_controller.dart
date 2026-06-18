@@ -49,13 +49,30 @@ class SosController extends ChangeNotifier {
     required EventPublisherV2Facade facade,
     required LocationEvidenceBuilder locationBuilder,
     Duration countdownDuration = const Duration(seconds: 5),
+    // UI-F5b — optional bounded fresh-GPS hook (§4.2 manual event). Wired in
+    // main.dart to a ≤1500ms one-shot refresh that falls back to last-known.
+    // Its failure NEVER aborts or delays the send beyond its own timeout
+    // (SOS zero-delay red line); a null location is still sent.
+    Future<void> Function()? ensureFreshLocation,
   })  : _facade = facade,
         _locationBuilder = locationBuilder,
-        _countdown = countdownDuration;
+        _countdown = countdownDuration,
+        _ensureFreshLocation = ensureFreshLocation;
 
   final EventPublisherV2Facade _facade;
   final LocationEvidenceBuilder _locationBuilder;
   final Duration _countdown;
+  final Future<void> Function()? _ensureFreshLocation;
+
+  Future<void> _ensureFresh() async {
+    final f = _ensureFreshLocation;
+    if (f == null) return;
+    try {
+      await f();
+    } catch (_) {
+      // Best-effort: a refresh failure must never block/abort the SOS send.
+    }
+  }
 
   Timer? _tickTimer;
   Timer? _sendTimer;
@@ -125,6 +142,7 @@ class SosController extends ChangeNotifier {
     if (severity == null) return;
     _phase = SosPhase.sending;
     notifyListeners();
+    await _ensureFresh(); // §4.2: one bounded fresh fix, fall back to last-known
     try {
       final outcome = await _facade.publishStatusUpdate(
         safetyState: severity.safetyState,
@@ -145,6 +163,7 @@ class SosController extends ChangeNotifier {
   /// armed state).
   Future<BroadcastOutcome?> markSafe() async {
     _cancelTimers();
+    await _ensureFresh(); // §4.2: one bounded fresh fix, fall back to last-known
     final outcome = await _facade.publishStatusUpdate(
       safetyState: SafetyState.safe,
       location: _locationBuilder.build(),

@@ -10,6 +10,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:ignirelay_app/app/controllers/active_field_controller.dart';
@@ -65,6 +66,8 @@ void main() {
 
   Future<({SosController sos, EventPublisherV2Facade facade})> makeSos({
     Duration countdown = const Duration(milliseconds: 40),
+    Future<void> Function()? ensureFreshLocation,
+    LatLng? Function()? currentLocation,
   }) async {
     final registry = PeerCapabilityRegistry(
       helloTimeout: const Duration(seconds: 5),
@@ -75,8 +78,11 @@ void main() {
     facade.attachActiveField(field);
     final sos = SosController(
       facade: facade,
-      locationBuilder: noGps(),
+      locationBuilder: currentLocation == null
+          ? noGps()
+          : LocationEvidenceBuilder(currentLocation: currentLocation),
       countdownDuration: countdown,
+      ensureFreshLocation: ensureFreshLocation,
     );
     addTearDown(() async {
       sos.dispose();
@@ -156,5 +162,49 @@ void main() {
     expect(safe.safetyState, SafetyState.safe);
     // SAFE has no SOS floor → STATUS priority (no SOS_CANCELLED wire type).
     expect(rows.last['priority'], PriorityV2.status);
+  });
+
+  // ── UI-F5b — bounded fresh-GPS hook (§4.2 manual event) ─────────────────────
+
+  test('SOS send awaits ensureFreshLocation BEFORE reading the location',
+      () async {
+    final order = <String>[];
+    final h = await makeSos(
+      ensureFreshLocation: () async => order.add('refresh'),
+      currentLocation: () {
+        order.add('build');
+        return null;
+      },
+    );
+    h.sos.arm(SosSeverity.trapped);
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    expect(h.sos.phase, SosPhase.sent);
+    expect(order, containsAllInOrder(<String>['refresh', 'build']),
+        reason: 'one fresh fix requested before building the SOS location');
+  });
+
+  test('a throwing/failed ensureFreshLocation NEVER aborts the SOS send',
+      () async {
+    // Owner boundaries 1 & 3 / SOS zero-delay: GPS failure → still sent.
+    final h = await makeSos(
+      ensureFreshLocation: () async => throw Exception('gps boom'),
+    );
+    h.sos.arm(SosSeverity.trapped);
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    expect(h.sos.phase, SosPhase.sent, reason: 'GPS failure must not abort SOS');
+    final rows = await outbox();
+    expect(rows.length, 1, reason: 'SOS queued despite refresh failure');
+    final data = StatusUpdateData.decode(rows.single['payload'] as Uint8List);
+    expect(data.safetyState, SafetyState.trapped);
+  });
+
+  test('markSafe also requests one bounded fresh fix before SAFE', () async {
+    var refreshCalls = 0;
+    final h = await makeSos(ensureFreshLocation: () async => refreshCalls++);
+    h.sos.arm(SosSeverity.trapped);
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    final afterSend = refreshCalls; // _send called the hook once
+    await h.sos.markSafe();
+    expect(refreshCalls, afterSend + 1, reason: 'markSafe refreshes too');
   });
 }

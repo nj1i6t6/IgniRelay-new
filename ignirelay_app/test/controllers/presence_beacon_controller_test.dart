@@ -275,4 +275,73 @@ void main() {
       h.motion.close();
     });
   });
+
+  // ── UI-F5b — onBeforePublish (GPS refresh) hook ─────────────────────────────
+
+  test('onBeforePublish is awaited BEFORE publish, inside the gate', () {
+    fakeAsync((async) {
+      final order = <String>[];
+      var beforeCalls = 0;
+      final c = PresenceBeaconController(
+        publish: ({int? batteryHint}) async => order.add('publish'),
+        onBeforePublish: (m) async {
+          beforeCalls++;
+          order.add('before');
+        },
+        isMeshRunning: () => true,
+        hasJoinedField: () => true,
+        readBattery: () async => null,
+      );
+      async.flushMicrotasks();
+      async.elapse(const Duration(seconds: 120));
+      expect(beforeCalls, 1);
+      expect(order, <String>['before', 'publish'],
+          reason: 'hook awaited before the publish');
+      c.dispose();
+    });
+  });
+
+  test('onBeforePublish is NOT called when the gate fails '
+      '(no field / mesh off / disabled)', () {
+    // Owner boundary 11: the refresh hook runs INSIDE the gate.
+    void noHook(String why,
+        {bool mesh = true, bool field = true, bool enabled = true}) {
+      fakeAsync((async) {
+        var beforeCalls = 0;
+        final c = PresenceBeaconController(
+          publish: ({int? batteryHint}) async {},
+          onBeforePublish: (m) async => beforeCalls++,
+          isMeshRunning: () => mesh,
+          hasJoinedField: () => field,
+          readBattery: () async => null,
+          enabled: enabled,
+        );
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 600));
+        expect(beforeCalls, 0, reason: why);
+        c.dispose();
+      });
+    }
+
+    noHook('no field → hook suppressed', field: false);
+    noHook('mesh off → hook suppressed', mesh: false);
+    noHook('disabled → hook suppressed', enabled: false);
+  });
+
+  test('a throwing onBeforePublish never aborts the publish', () {
+    fakeAsync((async) {
+      var published = 0;
+      final c = PresenceBeaconController(
+        publish: ({int? batteryHint}) async => published++,
+        onBeforePublish: (m) async => throw Exception('gps boom'),
+        isMeshRunning: () => true,
+        hasJoinedField: () => true,
+        readBattery: () async => null,
+      );
+      async.flushMicrotasks();
+      async.elapse(const Duration(seconds: 120));
+      expect(published, 1, reason: 'refresh failure must not abort the beacon');
+      c.dispose();
+    });
+  });
 }

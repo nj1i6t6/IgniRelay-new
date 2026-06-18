@@ -20,6 +20,8 @@ import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/controllers/mesh_runtime_controller.dart';
 import 'package:ignirelay_app/app/controllers/presence_beacon_controller.dart';
 import 'package:ignirelay_app/app/controllers/presence_controller.dart';
+import 'package:ignirelay_app/app/services/location_refresh_coordinator.dart';
+import 'package:ignirelay_app/app/services/motion/gps_refresh_policy.dart';
 import 'package:ignirelay_app/app/services/motion/motion_state.dart';
 import 'package:ignirelay_app/ui/shell/tabs/communication_state.dart';
 import 'package:ignirelay_app/ui/theme/igni_colors.dart';
@@ -163,6 +165,7 @@ class _SafetyTabState extends State<SafetyTab> {
     final p = context.igni;
     final beacon = context.watch<PresenceBeaconController>();
     final field = context.watch<ActiveFieldController>();
+    final coord = context.read<LocationRefreshCoordinator>();
     final active =
         _state == TransportState.running || _runtime.transportActive;
     final stats = _runtime.transportStats;
@@ -187,7 +190,7 @@ class _SafetyTabState extends State<SafetyTab> {
             children: [
               _commsCard(p, comms),
               const SizedBox(height: IgniSpacing.md),
-              _footprintCard(p, beacon),
+              _footprintCard(p, beacon, coord),
               const SizedBox(height: IgniSpacing.md),
               _recentCard(p),
             ],
@@ -286,7 +289,8 @@ class _SafetyTabState extends State<SafetyTab> {
   String _fmtClock(DateTime? t) =>
       t == null ? '—' : t.toIso8601String().substring(11, 19);
 
-  Widget _footprintCard(IgniPalette p, PresenceBeaconController beacon) {
+  Widget _footprintCard(
+      IgniPalette p, PresenceBeaconController beacon, LocationRefreshCoordinator coord) {
     return IgniCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -315,9 +319,39 @@ class _SafetyTabState extends State<SafetyTab> {
           const SizedBox(height: IgniSpacing.xs),
           Text('動作偵測：${_motionLabel(beacon.motionState)}',
               style: IgniTypography.bodySmall(p.text3)),
+          // §4.2 A11 diagnostics — last GPS fix age + honest GPS policy reason.
+          // Low-battery cadence stays on the beacon line above, NOT mixed in here
+          // (Owner boundary 8).
+          Text('GPS 定位：${_gpsAgeLabel(coord.lastFixAge)}',
+              style: IgniTypography.bodySmall(p.text3)),
+          Text('定位策略：${_gpsReasonLabel(coord.lastReason)}',
+              style: IgniTypography.bodySmall(p.text3)),
         ],
       ),
     );
+  }
+
+  String _gpsAgeLabel(Duration? age) {
+    if (age == null) return '尚無定位';
+    if (age.inSeconds < 60) return '${age.inSeconds} 秒前';
+    if (age.inMinutes < 60) return '${age.inMinutes} 分鐘前';
+    return '${age.inHours} 小時前';
+  }
+
+  // Honest GPS policy reason (Owner boundary 8) — never shows low-battery here.
+  String _gpsReasonLabel(GpsPolicyReason r) {
+    switch (r) {
+      case GpsPolicyReason.movingRefresh:
+        return '移動時更新';
+      case GpsPolicyReason.stationaryReuse:
+        return '靜止沿用上次';
+      case GpsPolicyReason.unknownReuse:
+        return '沿用上次';
+      case GpsPolicyReason.manualEvent:
+        return '手動更新';
+      case GpsPolicyReason.unavailable:
+        return '定位不可用';
+    }
   }
 
   String _beaconStatus(PresenceBeaconController b) {

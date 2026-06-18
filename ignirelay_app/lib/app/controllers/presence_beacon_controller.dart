@@ -67,7 +67,12 @@ class PresenceBeaconController extends ChangeNotifier {
     Duration lowBatteryMovingInterval = const Duration(seconds: 60),
     Duration lowBatteryStationaryInterval = const Duration(seconds: 300),
     Duration transitionMinGap = const Duration(seconds: 15),
+    // UI-F5b — optional pre-publish hook (§4.2 GPS refresh). Runs INSIDE the
+    // gate, just before [publish], with the current motion; its failure never
+    // aborts the publish. When null the beacon behaves exactly as before.
+    Future<void> Function(MotionState motion)? onBeforePublish,
   })  : _publish = publish,
+        _onBeforePublish = onBeforePublish,
         _isMeshRunning = isMeshRunning,
         _hasJoinedField = hasJoinedField,
         _readBattery = readBattery,
@@ -89,6 +94,7 @@ class PresenceBeaconController extends ChangeNotifier {
   }
 
   final PresenceBeaconPublish _publish;
+  final Future<void> Function(MotionState motion)? _onBeforePublish;
   final bool Function() _isMeshRunning;
   final bool Function() _hasJoinedField;
   final Future<int?> Function()? _readBattery;
@@ -183,6 +189,14 @@ class PresenceBeaconController extends ChangeNotifier {
   /// A5 §21.6 gate (UI-F5a / Owner boundary 3).
   Future<void> _publishIfGated() async {
     if (_enabled && _isMeshRunning() && _hasJoinedField()) {
+      // UI-F5b: GPS refresh hook runs INSIDE the gate, before publish. Its
+      // failure must NEVER abort the publish (§4.2 / Owner boundaries 3 & 11),
+      // so it is awaited in its own guarded block.
+      try {
+        await _onBeforePublish?.call(_motion);
+      } catch (e) {
+        debugPrint('[PresenceBeacon] onBeforePublish failed: $e');
+      }
       try {
         await _publish(batteryHint: _lastBattery);
         _beaconCount++;

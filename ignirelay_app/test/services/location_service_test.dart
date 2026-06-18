@@ -3,7 +3,10 @@
 // Bug 4 驗證：LocationService 靜態工具函數 + onFirstFix 回呼機制
 // GPS 實際呼叫無法在 unit test 中測試，但可測試 haversine / bearing / formatDistance
 
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:ignirelay_app/app/services/location_service.dart';
 
@@ -87,6 +90,94 @@ void main() {
       final service = LocationService();
       // This test just validates the property accessor doesn't throw
       expect(service.hasLocation, isA<bool>());
+    });
+  });
+
+  // UI-F5b — §4.2: one-shot refresh, fix timestamp, no continuous high-accuracy
+  // stream. Uses the injected Geolocator seams + resetForTest so the shared
+  // singleton never leaks fakes/state across the suite (Owner boundary 7).
+  group('LocationService — §4.2 refresh (UI-F5b)', () {
+    late LocationService svc;
+
+    setUp(() {
+      svc = LocationService();
+      svc.resetForTest();
+    });
+    tearDown(() {
+      svc.resetForTest();
+    });
+
+    test('init takes ONE fix, stamps lastFixAt, no continuous re-fetch',
+        () async {
+      var currentCalls = 0;
+      final base = DateTime(2026, 1, 1, 12, 0, 0);
+      svc
+        ..now = (() => base)
+        ..isServiceEnabledFn = (() async => true)
+        ..checkPermissionFn = (() async => LocationPermission.whileInUse)
+        ..getLastKnownFn = (() async => null)
+        ..getCurrentFn = (() async {
+          currentCalls++;
+          return const LatLng(25.0, 121.5);
+        });
+
+      await svc.init();
+
+      expect(svc.currentLocation, const LatLng(25.0, 121.5));
+      expect(svc.lastFixAt, base);
+      // One-shot only: UI-F5b removed the always-on getPositionStream, so init
+      // does not keep re-fetching (no hot high-accuracy stream).
+      expect(currentCalls, 1);
+    });
+
+    test('refreshOnce updates currentLocation + lastFixAt', () async {
+      final t0 = DateTime(2026, 1, 1, 12, 0, 0);
+      svc
+        ..now = (() => t0)
+        ..getCurrentFn = (() async => const LatLng(10.0, 20.0));
+
+      final fix = await svc.refreshOnce(timeout: const Duration(seconds: 2));
+
+      expect(fix, const LatLng(10.0, 20.0));
+      expect(svc.currentLocation, const LatLng(10.0, 20.0));
+      expect(svc.lastFixAt, t0);
+    });
+
+    test('refreshOnce timeout keeps last-known + returns it (never throws)',
+        () async {
+      svc.getCurrentFn = (() async => const LatLng(1.0, 2.0));
+      await svc.refreshOnce(timeout: const Duration(seconds: 2));
+
+      // A fix that never completes (Completer → no pending timer) → timeout fires.
+      svc.getCurrentFn = (() => Completer<LatLng?>().future);
+      final fix =
+          await svc.refreshOnce(timeout: const Duration(milliseconds: 50));
+
+      expect(fix, const LatLng(1.0, 2.0), reason: 'falls back to last-known');
+      expect(svc.currentLocation, const LatLng(1.0, 2.0));
+    });
+
+    test('refreshOnce failure keeps last-known; returns null when none',
+        () async {
+      svc.getCurrentFn = (() async => throw Exception('gps off'));
+      final fix = await svc.refreshOnce(timeout: const Duration(seconds: 1));
+      expect(fix, isNull);
+      expect(svc.currentLocation, isNull);
+    });
+
+    test('concurrent refreshOnce calls dedup to one underlying fetch', () async {
+      var calls = 0;
+      svc.getCurrentFn = (() async {
+        calls++;
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        return const LatLng(3.0, 4.0);
+      });
+
+      final results = await Future.wait([svc.refreshOnce(), svc.refreshOnce()]);
+
+      expect(calls, 1, reason: 'in-flight dedup');
+      expect(results[0], const LatLng(3.0, 4.0));
+      expect(results[1], const LatLng(3.0, 4.0));
     });
   });
 }

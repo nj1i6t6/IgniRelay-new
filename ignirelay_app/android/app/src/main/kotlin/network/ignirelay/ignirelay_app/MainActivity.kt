@@ -4,10 +4,15 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.net.Uri
 import android.os.*
 import android.provider.Settings
 import android.util.Log
+import kotlin.math.sqrt
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -65,6 +70,13 @@ class MainActivity : FlutterFragmentActivity() {
 
     private var nordicManager: NordicMeshManager? = null
     private var dataMuleServiceRunning = false
+
+    // UI-F5b — low-rate accelerometer motion source (Android-only). Drives the
+    // Dart MotionClassifier → presence-beacon cadence. Permission-free; emits a
+    // throttled magnitude over the shared EventChannel as {type:"motion"}.
+    private var sensorManager: SensorManager? = null
+    private var motionListener: SensorEventListener? = null
+    private var lastMotionEmitMs: Long = 0L
 
     // Bloom Filter 快取（由 Dart 端推送更新）
     @Volatile
@@ -392,6 +404,15 @@ class MainActivity : FlutterFragmentActivity() {
                         result.success(true)
                     }
 
+                    // ── UI-F5b — accelerometer motion source ──────────────
+                    "startMotionSensor" -> {
+                        result.success(startMotionSensor())
+                    }
+                    "stopMotionSensor" -> {
+                        stopMotionSensor()
+                        result.success(true)
+                    }
+
                     "debugForceAdapterIdle" -> {
                         val durationMs = (call.argument<Number>("durationMs"))?.toLong() ?: 0L
                         if (durationMs <= 0L) {
@@ -435,6 +456,56 @@ class MainActivity : FlutterFragmentActivity() {
         stopService(Intent(this, IgniRelayForegroundService::class.java))
         dataMuleServiceRunning = false
         Log.i(TAG, "Data Mule service stopped")
+    }
+
+    // ── UI-F5b — accelerometer motion source ──────────────────────────────────
+
+    /**
+     * Register a low-rate accelerometer listener (§4.2). Idempotent: a second
+     * call while already running is a no-op (never double-registers). Returns
+     * false when the device has no accelerometer. Each callback emits a throttled
+     * (>=200ms, ~5Hz) magnitude over the shared EventChannel; the Dart side
+     * classifies it. No permission required.
+     */
+    private fun startMotionSensor(): Boolean {
+        if (motionListener != null) return true // already running — idempotent
+        val sm = getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+        val sensor = sm?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        if (sm == null || sensor == null) {
+            Log.w(TAG, "startMotionSensor: no accelerometer available")
+            return false
+        }
+        sensorManager = sm
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                if (event.values.size < 3) return
+                val nowMs = System.currentTimeMillis()
+                // §4.2 low-rate: throttle to ~5Hz to keep channel + power low.
+                if (nowMs - lastMotionEmitMs < 200L) return
+                lastMotionEmitMs = nowMs
+                val x = event.values[0]
+                val y = event.values[1]
+                val z = event.values[2]
+                val magnitude = sqrt((x * x + y * y + z * z).toDouble())
+                sharedEventSink?.success(
+                    mapOf("type" to "motion", "magnitude" to magnitude)
+                )
+            }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+        motionListener = listener
+        sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+        Log.i(TAG, "Motion sensor started (SENSOR_DELAY_NORMAL, >=200ms throttle)")
+        return true
+    }
+
+    /** Unregister the accelerometer listener. Safe to call when not running. */
+    private fun stopMotionSensor() {
+        val listener = motionListener ?: return
+        sensorManager?.unregisterListener(listener)
+        motionListener = null
+        Log.i(TAG, "Motion sensor stopped")
     }
 
     // ── PIN 驗證 ──────────────────────────────────────────────────────────
@@ -534,6 +605,7 @@ class MainActivity : FlutterFragmentActivity() {
     // ── Lifecycle ─────────────────────────────────────────────────────────
 
     override fun onDestroy() {
+        stopMotionSensor()
         nordicManager?.destroy()
         nordicManager = null
         super.onDestroy()

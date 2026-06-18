@@ -245,4 +245,34 @@ void main() {
     noSend('mesh off → suppressed', mesh: false);
     noSend('disabled → suppressed', enabled: false);
   });
+
+  test('disabled: a stationary→moving change still notifies the UI '
+      '(diagnostic refresh) without publishing or arming', () {
+    // UI-F5a-polish (Owner): while paused, the immediate-publish transition
+    // branch is skipped — but the motion diagnostic still changed, so the UI
+    // must be notified. Regression guard: before the fix this transition took
+    // the publish/arm path, both of which early-return without notifyListeners.
+    fakeAsync((async) {
+      final h = makeMotion(async, enabled: false);
+      // Settle into stationary while paused.
+      h.motion.add(MotionState.stationary);
+      async.flushMicrotasks();
+
+      // Count ONLY notifications caused by the stationary→moving transition.
+      var notifications = 0;
+      h.c.addListener(() => notifications++);
+      h.motion.add(MotionState.moving);
+      async.flushMicrotasks();
+
+      expect(h.c.motionState, MotionState.moving,
+          reason: 'diagnostic reflects motion even while paused');
+      expect(notifications, 1,
+          reason: 'paused stationary→moving must still refresh the diagnostic');
+      expect(h.count(), 0, reason: 'disabled → never publishes');
+      expect(h.c.isRunning, isFalse, reason: 'disabled → no timer armed');
+
+      h.c.dispose();
+      h.motion.close();
+    });
+  });
 }

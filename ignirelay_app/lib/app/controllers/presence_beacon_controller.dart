@@ -211,6 +211,15 @@ class PresenceBeaconController extends ChangeNotifier {
     final prev = _motion;
     if (prev == next) return;
     _motion = next;
+    // Paused (disabled): never publish or arm, but the motion diagnostic still
+    // changed — notify so the UI refreshes. This must come BEFORE the
+    // transition branch: a `stationary → moving` change while disabled would
+    // otherwise fall into [_publishNowAndRearm] → [_arm], both of which early-
+    // return without notifying, leaving the diagnostic stale (UI-F5a-polish).
+    if (!_enabled) {
+      notifyListeners();
+      return;
+    }
     final last = _lastBeaconAt;
     final stale = last == null || _now().difference(last) >= _transitionMinGap;
     if (prev == MotionState.stationary &&
@@ -220,10 +229,8 @@ class PresenceBeaconController extends ChangeNotifier {
       _timer?.cancel();
       _timer = null;
       unawaited(_publishNowAndRearm());
-    } else if (_enabled) {
-      unawaited(_arm());
     } else {
-      notifyListeners(); // motionState changed (diagnostics) even while paused.
+      unawaited(_arm());
     }
   }
 

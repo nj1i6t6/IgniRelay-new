@@ -3972,4 +3972,516 @@ class SEn extends S {
 
   @override
   String get previewCheckpointAgo => '12 min ago';
+
+  @override
+  String get commonSend => 'Send';
+
+  @override
+  String get noCoordinate => 'No coordinates';
+
+  @override
+  String get noCoordinateParen => '(no coordinates)';
+
+  @override
+  String get timeJustNow => 'just now';
+
+  @override
+  String timeAgoSeconds(int seconds) {
+    return '${seconds}s ago';
+  }
+
+  @override
+  String timeAgoMinutes(int minutes) {
+    return '$minutes min ago';
+  }
+
+  @override
+  String timeAgoHours(int hours) {
+    return '${hours}h ago';
+  }
+
+  @override
+  String timeAgoDays(int days) {
+    return '${days}d ago';
+  }
+
+  @override
+  String get safetyTitle => 'My safety';
+
+  @override
+  String get safetySubtitle => 'Comms & footprint';
+
+  @override
+  String safetyToggleFailed(String error) {
+    return 'Failed to switch comms: $error';
+  }
+
+  @override
+  String get safetyUpdateNoField =>
+      'Not in a field yet — join or create one from the My tab.';
+
+  @override
+  String safetyUpdateSent(int count) {
+    return 'Footprint updated ($count nearby devices)';
+  }
+
+  @override
+  String get safetyUpdateQueued =>
+      'Footprint queued; it will send once nearby devices come online';
+
+  @override
+  String get safetyUpdateAttempted => 'Footprint update attempted';
+
+  @override
+  String safetyUpdateFailed(String error) {
+    return 'Failed to update footprint: $error';
+  }
+
+  @override
+  String get safetyCommsOn => 'Nearby comms: on';
+
+  @override
+  String get safetyCommsOff => 'Nearby comms: off';
+
+  @override
+  String get safetyTurnOn => 'Turn on';
+
+  @override
+  String get safetyTurnOff => 'Turn off';
+
+  @override
+  String safetyCurrentPath(String path) {
+    return 'Current path: $path';
+  }
+
+  @override
+  String get safetyStatPeers => 'Nearby';
+
+  @override
+  String get safetyStatSent => 'Sent';
+
+  @override
+  String get safetyStatReceived => 'Received';
+
+  @override
+  String get safetyStatQueued => 'Queued';
+
+  @override
+  String safetyLastFootprint(String time) {
+    return 'Last footprint: $time';
+  }
+
+  @override
+  String get safetyFootprintTitle => 'Footprint';
+
+  @override
+  String get safetyFootprintBody =>
+      'Let nearby people see your last trusted position.';
+
+  @override
+  String get safetyUpdateNow => 'Update footprint now';
+
+  @override
+  String get safetyAutoBeacon => 'Auto footprint beacon';
+
+  @override
+  String safetyMotion(String state) {
+    return 'Motion: $state';
+  }
+
+  @override
+  String safetyGpsFix(String age) {
+    return 'GPS fix: $age';
+  }
+
+  @override
+  String safetyGpsPolicy(String reason) {
+    return 'Fix policy: $reason';
+  }
+
+  @override
+  String get safetyRecentTitle => 'Recent footprints';
+
+  @override
+  String get safetyNoFootprint => 'No footprints yet';
+
+  @override
+  String get commsPathNoField => 'Not in a field yet';
+
+  @override
+  String get commsPathOffline => 'Offline (nearby comms off)';
+
+  @override
+  String get commsPathWaiting => 'Waiting for nearby devices…';
+
+  @override
+  String get commsPathMesh => 'Nearby mesh relay';
+
+  @override
+  String get cloudOffline => 'Cloud: offline';
+
+  @override
+  String get cloudConfigured => 'Cloud: configured (not active yet)';
+
+  @override
+  String get gpsNoFix => 'No fix yet';
+
+  @override
+  String get gpsReasonMovingRefresh => 'Refresh while moving';
+
+  @override
+  String get gpsReasonMovingReuse => 'Moving, reuse fresh fix';
+
+  @override
+  String get gpsReasonStationary => 'Stationary, reuse last';
+
+  @override
+  String get gpsReasonUnknown => 'Reuse last';
+
+  @override
+  String get gpsReasonManual => 'Manual update';
+
+  @override
+  String get gpsReasonUnavailable => 'Location unavailable';
+
+  @override
+  String get beaconOff => 'Off';
+
+  @override
+  String beaconStatus(int secs, int count, String low) {
+    return 'Every ${secs}s · sent $count×$low';
+  }
+
+  @override
+  String get beaconLowSuffix => ' (low battery, slowed)';
+
+  @override
+  String get motionMoving => 'Moving';
+
+  @override
+  String get motionStationary => 'Stationary';
+
+  @override
+  String get motionUnknown => 'Not enabled yet';
+
+  @override
+  String get eventsTitle => 'Events';
+
+  @override
+  String get eventsSubtitle =>
+      'Hazards, broadcasts, checkpoints and system events';
+
+  @override
+  String get eventsRecentTitle => 'Recent events';
+
+  @override
+  String get eventsRefresh => 'Refresh';
+
+  @override
+  String get eventsEmpty => 'No events yet';
+
+  @override
+  String eventsRowType(String type) {
+    return 'Type $type';
+  }
+
+  @override
+  String get assistTitle => 'Help';
+
+  @override
+  String get assistSubtitle => 'Offline help and resources';
+
+  @override
+  String get assistOfflineTitle => 'Offline help';
+
+  @override
+  String get assistOfflineBody =>
+      'Offline help resources and post-SOS guidance are coming soon. For an emergency, you can always use the on-screen global SOS button.';
+
+  @override
+  String get hazardCardTitleFormal => 'Hazard report';
+
+  @override
+  String get hazardCardTitleDebug => 'Hazard (HAZARD)';
+
+  @override
+  String get hazardCardReport => 'Report hazard';
+
+  @override
+  String get hazardCardManualDebug => 'Manual HAZARD';
+
+  @override
+  String get hazardCardManualDebugTitle => 'Manual HAZARD (debug)';
+
+  @override
+  String get hazardCardDebugSampleDesc => 'Test hazard (debug)';
+
+  @override
+  String get hazardCardBodyFormal =>
+      'Nearby hazard events. Reports use your device\'s location; without a fix you can\'t report — get a location first.';
+
+  @override
+  String get hazardCardBodyDebug =>
+      'Received typed HAZARD events (A3 receive side). Manual send is a debug stand-in (uses device GPS; no fix → no send).';
+
+  @override
+  String get hazardCardDescLabel => 'Description (≤800B)';
+
+  @override
+  String get hazardCardNoLocation =>
+      'No location right now — get a fix before reporting';
+
+  @override
+  String hazardCardSentFormal(String type) {
+    return 'Hazard \"$type\" reported · only broadcasts after you join a field';
+  }
+
+  @override
+  String hazardCardSentDebug(String type, String id) {
+    return 'HAZARD \"$type\" sent (id $id) · only broadcasts after you join a field';
+  }
+
+  @override
+  String hazardCardSendFailed(String error) {
+    return 'HAZARD send failed: $error';
+  }
+
+  @override
+  String get hazardCardEmpty => '(no HAZARD yet)';
+
+  @override
+  String get hazardCardTypeFire => 'Fire (FIRE)';
+
+  @override
+  String get hazardCardTypeFlood => 'Flood (FLOOD)';
+
+  @override
+  String get hazardCardTypeCollapse => 'Collapse (COLLAPSE)';
+
+  @override
+  String get hazardCardTypeChemical => 'Chemical (CHEMICAL)';
+
+  @override
+  String get hazardCardTypeRoadblock => 'Roadblock (ROADBLOCK)';
+
+  @override
+  String get hazardCardTypeOther => 'Other (OTHER)';
+
+  @override
+  String get checkpointCardTitle => 'CHECKPOINT (roll-call)';
+
+  @override
+  String get checkpointCardManual => 'Manual CHECKPOINT';
+
+  @override
+  String get checkpointCardIdHint => 'Roll-call point / Field Node anchor id';
+
+  @override
+  String get checkpointCardBody =>
+      'Received roll-call crossings (not LWW; each crossing is kept independently).';
+
+  @override
+  String get checkpointCardEmpty => '(no CHECKPOINT yet)';
+
+  @override
+  String get checkpointCardNoField =>
+      'Not in a field yet — join or create one from the Field card first';
+
+  @override
+  String checkpointCardSent(String id, int count) {
+    return 'CHECKPOINT \"$id\" sent ($count peers)';
+  }
+
+  @override
+  String checkpointCardQueued(String id, int depth) {
+    return 'CHECKPOINT \"$id\" queued (no online peers, depth $depth)';
+  }
+
+  @override
+  String checkpointCardAttempted(String id, int count) {
+    return 'CHECKPOINT \"$id\" attempted ($count peers, none accepted)';
+  }
+
+  @override
+  String checkpointCardSendFailed(String error) {
+    return 'CHECKPOINT send failed: $error';
+  }
+
+  @override
+  String get adminScopeField => 'Field announcement';
+
+  @override
+  String get adminScopeAll => 'Network-wide announcement';
+
+  @override
+  String get adminScopeDefault => 'Announcement';
+
+  @override
+  String adminExpiry(String time) {
+    return 'Until $time';
+  }
+
+  @override
+  String get adminPublishTest => 'Send test ADMIN broadcast';
+
+  @override
+  String adminTestMessage(String time) {
+    return 'Test admin broadcast $time';
+  }
+
+  @override
+  String get adminNoField => 'Not in a field yet — join or create one first';
+
+  @override
+  String adminSent(int count) {
+    return 'ADMIN broadcast sent ($count peers)';
+  }
+
+  @override
+  String adminQueued(int depth) {
+    return 'ADMIN broadcast queued (depth $depth)';
+  }
+
+  @override
+  String adminAttempted(int count) {
+    return 'ADMIN broadcast attempted ($count peers)';
+  }
+
+  @override
+  String adminSendFailed(String error) {
+    return 'ADMIN broadcast send failed: $error';
+  }
+
+  @override
+  String get sosTitle => 'Emergency SOS';
+
+  @override
+  String get sosSubtitle =>
+      'Hold the SOS button for 1.5s; after choosing a status you have 5s to cancel';
+
+  @override
+  String sosNearbyHeader(int count) {
+    return 'Nearby SOS ($count)';
+  }
+
+  @override
+  String get sosNoneNearby => 'No SOS signals received right now.';
+
+  @override
+  String get sosSending => 'Sending SOS…';
+
+  @override
+  String get sosTriggerTitle => 'Send an SOS';
+
+  @override
+  String get sosTriggerBody =>
+      'Hold the button below for 1.5s, then choose your status. You still have 5s to cancel before it sends.';
+
+  @override
+  String get sosHoldButton => 'Hold to call for help';
+
+  @override
+  String get sosCountdownTrapped => 'Trapped SOS';
+
+  @override
+  String get sosCountdownInjured => 'Injured SOS';
+
+  @override
+  String get sosCountdownHint =>
+      'seconds until it sends — you can still cancel';
+
+  @override
+  String get sosActiveTitle => 'You\'ve sent an SOS';
+
+  @override
+  String get sosChipTrapped => 'Trapped';
+
+  @override
+  String get sosChipInjured => 'Injured';
+
+  @override
+  String get sosMarkSafe => 'I\'m safe now';
+
+  @override
+  String get sosChooseStatus => 'Choose your status';
+
+  @override
+  String get sosSeverityTrapped => 'Trapped (highest priority)';
+
+  @override
+  String get sosMarkSafeNoField =>
+      'Not in a field yet — can\'t send a status update';
+
+  @override
+  String get sosMarkSafeSent => 'Sent \"I\'m safe now\"';
+
+  @override
+  String get sosResolvedChip => 'Resolved';
+
+  @override
+  String get sosOutcomeSent => 'Sent.';
+
+  @override
+  String get sosOutcomeNoField =>
+      'Not in a field yet — the SOS wasn\'t sent; join a field first.';
+
+  @override
+  String sosOutcomeAccepted(int count) {
+    return 'Delivered to $count nearby devices.';
+  }
+
+  @override
+  String sosOutcomeQueued(int depth) {
+    return 'Queued (no nearby devices online, depth $depth).';
+  }
+
+  @override
+  String sosOutcomeAttempted(int count) {
+    return 'Send attempted ($count; nobody received yet).';
+  }
+
+  @override
+  String get lastSeenTitle => 'Last trusted position';
+
+  @override
+  String get lastSeenSubtitle =>
+      'Estimated from footprints / roll-calls, not live tracking';
+
+  @override
+  String get lastSeenNeedLocalPosition =>
+      'Your own position is needed to show relative bearings';
+
+  @override
+  String get lastSeenToggleList => 'List';
+
+  @override
+  String get lastSeenToggleRadar => 'Radar';
+
+  @override
+  String get lastSeenEmpty =>
+      'No position evidence yet — once footprints (PRESENCE) or roll-calls (CHECKPOINT) arrive, each person\'s last trusted position appears here.';
+
+  @override
+  String lastSeenUncertainty(int meters) {
+    return '±~$meters m';
+  }
+
+  @override
+  String lastSeenAnchor(String id) {
+    return 'Anchor $id';
+  }
+
+  @override
+  String get confidenceHigh => 'Confidence: high';
+
+  @override
+  String get confidenceMedium => 'Confidence: medium';
+
+  @override
+  String get confidenceLow => 'Confidence: low';
+
+  @override
+  String radarCaption(String range) {
+    return 'North up · outer ring $range · centre is you (last trusted position)';
+  }
 }

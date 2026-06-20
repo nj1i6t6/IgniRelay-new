@@ -21,6 +21,7 @@ import 'package:ignirelay_app/app/services/event_store.dart';
 import 'package:ignirelay_app/app/services/field_session_store.dart';
 import 'package:ignirelay_app/app/services/location_evidence_builder.dart';
 import 'package:ignirelay_app/app/services/peer_capability_registry.dart';
+import 'package:ignirelay_app/l10n/generated/app_localizations.dart';
 import 'package:ignirelay_app/ui/screens/sos/sos_hold_button.dart';
 import 'package:ignirelay_app/ui/screens/sos/sos_screen.dart';
 
@@ -80,12 +81,19 @@ void main() {
     return (sos: sos, events: events);
   }
 
-  Widget wrap(SosController sos, EventStream events) => MultiProvider(
+  Widget wrap(SosController sos, EventStream events,
+          {Locale locale = const Locale('zh')}) =>
+      MultiProvider(
         providers: [
           ChangeNotifierProvider<SosController>.value(value: sos),
           Provider<EventStream>.value(value: events),
         ],
-        child: const MaterialApp(home: SosScreen()),
+        child: MaterialApp(
+          locale: locale,
+          supportedLocales: S.supportedLocales,
+          localizationsDelegates: S.localizationsDelegates,
+          home: const SosScreen(),
+        ),
       );
 
   // Drive the 1.5s press-and-hold to completion and pick a severity.
@@ -144,5 +152,16 @@ void main() {
     expect(h.sos.hasActiveSos, isTrue);
     expect(find.text('你已發出求救'), findsOneWidget);
     expect(find.text('我安全了'), findsOneWidget);
+  });
+
+  testWidgets('en: trigger + empty receiver render English (UI-H2c)',
+      (tester) async {
+    final h = await harness(countdown: const Duration(seconds: 5));
+    await tester.pumpWidget(wrap(h.sos, h.events, locale: const Locale('en')));
+    await tester.pump();
+
+    expect(find.text('Emergency SOS'), findsOneWidget);
+    expect(find.textContaining('No SOS signals received'), findsOneWidget);
+    expect(find.text('緊急求救'), findsNothing);
   });
 }

@@ -22,6 +22,7 @@ import 'package:ignirelay_app/app/services/event_store.dart';
 import 'package:ignirelay_app/app/services/field_session_store.dart';
 import 'package:ignirelay_app/app/services/location_evidence_builder.dart';
 import 'package:ignirelay_app/app/services/peer_capability_registry.dart';
+import 'package:ignirelay_app/l10n/generated/app_localizations.dart';
 import 'package:ignirelay_app/ui/shell/checkpoint_card.dart';
 
 class _Kv implements SecureKvStore {
@@ -45,7 +46,8 @@ void main() {
     await DatabaseHelper().resetForTest();
   });
 
-  Future<({EventPublisherV2Facade facade, Widget tree})> harness() async {
+  Future<({EventPublisherV2Facade facade, Widget tree})> harness(
+      {Locale locale = const Locale('zh')}) async {
     final registry = PeerCapabilityRegistry();
     final facade = EventPublisherV2Facade(registry: registry);
     final field = ActiveFieldController(
@@ -77,8 +79,11 @@ void main() {
         Provider<EventStream>.value(value: events),
         Provider<CheckpointController>.value(value: checkpoint),
       ],
-      child: const MaterialApp(
-        home: Scaffold(body: CheckpointCard()),
+      child: MaterialApp(
+        locale: locale,
+        supportedLocales: S.supportedLocales,
+        localizationsDelegates: S.localizationsDelegates,
+        home: const Scaffold(body: CheckpointCard()),
       ),
     );
     return (facade: facade, tree: tree);
@@ -112,5 +117,16 @@ void main() {
     // Active field + no peer → queued in the facade's pending queue.
     expect(h.facade.pendingQueueDepth, 1);
     expect(find.textContaining('佇列'), findsOneWidget);
+  });
+
+  testWidgets('en: card + empty state render English (UI-H2c)', (tester) async {
+    final h = await harness(locale: const Locale('en'));
+    await tester.pumpWidget(h.tree);
+    await tester.pump();
+
+    expect(find.text('CHECKPOINT (roll-call)'), findsOneWidget);
+    expect(find.text('Manual CHECKPOINT'), findsOneWidget);
+    expect(find.textContaining('no CHECKPOINT yet'), findsOneWidget);
+    expect(find.text('CHECKPOINT（點名通過）'), findsNothing);
   });
 }

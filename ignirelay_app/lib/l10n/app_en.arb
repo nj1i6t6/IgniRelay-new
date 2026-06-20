@@ -1594,5 +1594,403 @@
   "previewBroadcastDetail": "Assembly point moved to the north exit",
   "previewBroadcastAgo": "10 min ago",
   "previewCheckpointTitle": "Check-in · Safe",
-  "previewCheckpointAgo": "12 min ago"
+  "previewCheckpointAgo": "12 min ago",
+  "commonSend": "Send",
+  "noCoordinate": "No coordinates",
+  "noCoordinateParen": "(no coordinates)",
+  "timeJustNow": "just now",
+  "timeAgoSeconds": "{seconds}s ago",
+  "@timeAgoSeconds": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "timeAgoMinutes": "{minutes} min ago",
+  "@timeAgoMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "timeAgoHours": "{hours}h ago",
+  "@timeAgoHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "timeAgoDays": "{days}d ago",
+  "@timeAgoDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "safetyTitle": "My safety",
+  "safetySubtitle": "Comms & footprint",
+  "safetyToggleFailed": "Failed to switch comms: {error}",
+  "@safetyToggleFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "safetyUpdateNoField": "Not in a field yet — join or create one from the My tab.",
+  "safetyUpdateSent": "Footprint updated ({count} nearby devices)",
+  "@safetyUpdateSent": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "safetyUpdateQueued": "Footprint queued; it will send once nearby devices come online",
+  "safetyUpdateAttempted": "Footprint update attempted",
+  "safetyUpdateFailed": "Failed to update footprint: {error}",
+  "@safetyUpdateFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "safetyCommsOn": "Nearby comms: on",
+  "safetyCommsOff": "Nearby comms: off",
+  "safetyTurnOn": "Turn on",
+  "safetyTurnOff": "Turn off",
+  "safetyCurrentPath": "Current path: {path}",
+  "@safetyCurrentPath": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "safetyStatPeers": "Nearby",
+  "safetyStatSent": "Sent",
+  "safetyStatReceived": "Received",
+  "safetyStatQueued": "Queued",
+  "safetyLastFootprint": "Last footprint: {time}",
+  "@safetyLastFootprint": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "safetyFootprintTitle": "Footprint",
+  "safetyFootprintBody": "Let nearby people see your last trusted position.",
+  "safetyUpdateNow": "Update footprint now",
+  "safetyAutoBeacon": "Auto footprint beacon",
+  "safetyMotion": "Motion: {state}",
+  "@safetyMotion": {
+    "placeholders": {
+      "state": {
+        "type": "String"
+      }
+    }
+  },
+  "safetyGpsFix": "GPS fix: {age}",
+  "@safetyGpsFix": {
+    "placeholders": {
+      "age": {
+        "type": "String"
+      }
+    }
+  },
+  "safetyGpsPolicy": "Fix policy: {reason}",
+  "@safetyGpsPolicy": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "safetyRecentTitle": "Recent footprints",
+  "safetyNoFootprint": "No footprints yet",
+  "commsPathNoField": "Not in a field yet",
+  "commsPathOffline": "Offline (nearby comms off)",
+  "commsPathWaiting": "Waiting for nearby devices…",
+  "commsPathMesh": "Nearby mesh relay",
+  "cloudOffline": "Cloud: offline",
+  "cloudConfigured": "Cloud: configured (not active yet)",
+  "gpsNoFix": "No fix yet",
+  "gpsReasonMovingRefresh": "Refresh while moving",
+  "gpsReasonMovingReuse": "Moving, reuse fresh fix",
+  "gpsReasonStationary": "Stationary, reuse last",
+  "gpsReasonUnknown": "Reuse last",
+  "gpsReasonManual": "Manual update",
+  "gpsReasonUnavailable": "Location unavailable",
+  "beaconOff": "Off",
+  "beaconStatus": "Every {secs}s · sent {count}×{low}",
+  "@beaconStatus": {
+    "placeholders": {
+      "secs": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      },
+      "low": {
+        "type": "String"
+      }
+    }
+  },
+  "beaconLowSuffix": " (low battery, slowed)",
+  "motionMoving": "Moving",
+  "motionStationary": "Stationary",
+  "motionUnknown": "Not enabled yet",
+  "eventsTitle": "Events",
+  "eventsSubtitle": "Hazards, broadcasts, checkpoints and system events",
+  "eventsRecentTitle": "Recent events",
+  "eventsRefresh": "Refresh",
+  "eventsEmpty": "No events yet",
+  "eventsRowType": "Type {type}",
+  "@eventsRowType": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "assistTitle": "Help",
+  "assistSubtitle": "Offline help and resources",
+  "assistOfflineTitle": "Offline help",
+  "assistOfflineBody": "Offline help resources and post-SOS guidance are coming soon. For an emergency, you can always use the on-screen global SOS button.",
+  "hazardCardTitleFormal": "Hazard report",
+  "hazardCardTitleDebug": "Hazard (HAZARD)",
+  "hazardCardReport": "Report hazard",
+  "hazardCardManualDebug": "Manual HAZARD",
+  "hazardCardManualDebugTitle": "Manual HAZARD (debug)",
+  "hazardCardDebugSampleDesc": "Test hazard (debug)",
+  "hazardCardBodyFormal": "Nearby hazard events. Reports use your device's location; without a fix you can't report — get a location first.",
+  "hazardCardBodyDebug": "Received typed HAZARD events (A3 receive side). Manual send is a debug stand-in (uses device GPS; no fix → no send).",
+  "hazardCardDescLabel": "Description (≤800B)",
+  "hazardCardNoLocation": "No location right now — get a fix before reporting",
+  "hazardCardSentFormal": "Hazard \"{type}\" reported · only broadcasts after you join a field",
+  "@hazardCardSentFormal": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "hazardCardSentDebug": "HAZARD \"{type}\" sent (id {id}) · only broadcasts after you join a field",
+  "@hazardCardSentDebug": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      },
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "hazardCardSendFailed": "HAZARD send failed: {error}",
+  "@hazardCardSendFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "hazardCardEmpty": "(no HAZARD yet)",
+  "hazardCardTypeFire": "Fire (FIRE)",
+  "hazardCardTypeFlood": "Flood (FLOOD)",
+  "hazardCardTypeCollapse": "Collapse (COLLAPSE)",
+  "hazardCardTypeChemical": "Chemical (CHEMICAL)",
+  "hazardCardTypeRoadblock": "Roadblock (ROADBLOCK)",
+  "hazardCardTypeOther": "Other (OTHER)",
+  "checkpointCardTitle": "CHECKPOINT (roll-call)",
+  "checkpointCardManual": "Manual CHECKPOINT",
+  "checkpointCardIdHint": "Roll-call point / Field Node anchor id",
+  "checkpointCardBody": "Received roll-call crossings (not LWW; each crossing is kept independently).",
+  "checkpointCardEmpty": "(no CHECKPOINT yet)",
+  "checkpointCardNoField": "Not in a field yet — join or create one from the Field card first",
+  "checkpointCardSent": "CHECKPOINT \"{id}\" sent ({count} peers)",
+  "@checkpointCardSent": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "checkpointCardQueued": "CHECKPOINT \"{id}\" queued (no online peers, depth {depth})",
+  "@checkpointCardQueued": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      },
+      "depth": {
+        "type": "int"
+      }
+    }
+  },
+  "checkpointCardAttempted": "CHECKPOINT \"{id}\" attempted ({count} peers, none accepted)",
+  "@checkpointCardAttempted": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "checkpointCardSendFailed": "CHECKPOINT send failed: {error}",
+  "@checkpointCardSendFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "adminScopeField": "Field announcement",
+  "adminScopeAll": "Network-wide announcement",
+  "adminScopeDefault": "Announcement",
+  "adminExpiry": "Until {time}",
+  "@adminExpiry": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "adminPublishTest": "Send test ADMIN broadcast",
+  "adminTestMessage": "Test admin broadcast {time}",
+  "@adminTestMessage": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "adminNoField": "Not in a field yet — join or create one first",
+  "adminSent": "ADMIN broadcast sent ({count} peers)",
+  "@adminSent": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "adminQueued": "ADMIN broadcast queued (depth {depth})",
+  "@adminQueued": {
+    "placeholders": {
+      "depth": {
+        "type": "int"
+      }
+    }
+  },
+  "adminAttempted": "ADMIN broadcast attempted ({count} peers)",
+  "@adminAttempted": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "adminSendFailed": "ADMIN broadcast send failed: {error}",
+  "@adminSendFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "sosTitle": "Emergency SOS",
+  "sosSubtitle": "Hold the SOS button for 1.5s; after choosing a status you have 5s to cancel",
+  "sosNearbyHeader": "Nearby SOS ({count})",
+  "@sosNearbyHeader": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sosNoneNearby": "No SOS signals received right now.",
+  "sosSending": "Sending SOS…",
+  "sosTriggerTitle": "Send an SOS",
+  "sosTriggerBody": "Hold the button below for 1.5s, then choose your status. You still have 5s to cancel before it sends.",
+  "sosHoldButton": "Hold to call for help",
+  "sosCountdownTrapped": "Trapped SOS",
+  "sosCountdownInjured": "Injured SOS",
+  "sosCountdownHint": "seconds until it sends — you can still cancel",
+  "sosActiveTitle": "You've sent an SOS",
+  "sosChipTrapped": "Trapped",
+  "sosChipInjured": "Injured",
+  "sosMarkSafe": "I'm safe now",
+  "sosChooseStatus": "Choose your status",
+  "sosSeverityTrapped": "Trapped (highest priority)",
+  "sosMarkSafeNoField": "Not in a field yet — can't send a status update",
+  "sosMarkSafeSent": "Sent \"I'm safe now\"",
+  "sosResolvedChip": "Resolved",
+  "sosOutcomeSent": "Sent.",
+  "sosOutcomeNoField": "Not in a field yet — the SOS wasn't sent; join a field first.",
+  "sosOutcomeAccepted": "Delivered to {count} nearby devices.",
+  "@sosOutcomeAccepted": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sosOutcomeQueued": "Queued (no nearby devices online, depth {depth}).",
+  "@sosOutcomeQueued": {
+    "placeholders": {
+      "depth": {
+        "type": "int"
+      }
+    }
+  },
+  "sosOutcomeAttempted": "Send attempted ({count}; nobody received yet).",
+  "@sosOutcomeAttempted": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lastSeenTitle": "Last trusted position",
+  "lastSeenSubtitle": "Estimated from footprints / roll-calls, not live tracking",
+  "lastSeenNeedLocalPosition": "Your own position is needed to show relative bearings",
+  "lastSeenToggleList": "List",
+  "lastSeenToggleRadar": "Radar",
+  "lastSeenEmpty": "No position evidence yet — once footprints (PRESENCE) or roll-calls (CHECKPOINT) arrive, each person's last trusted position appears here.",
+  "lastSeenUncertainty": "±~{meters} m",
+  "@lastSeenUncertainty": {
+    "placeholders": {
+      "meters": {
+        "type": "int"
+      }
+    }
+  },
+  "lastSeenAnchor": "Anchor {id}",
+  "@lastSeenAnchor": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "confidenceHigh": "Confidence: high",
+  "confidenceMedium": "Confidence: medium",
+  "confidenceLow": "Confidence: low",
+  "radarCaption": "North up · outer ring {range} · centre is you (last trusted position)",
+  "@radarCaption": {
+    "placeholders": {
+      "range": {
+        "type": "String"
+      }
+    }
+  }
 }

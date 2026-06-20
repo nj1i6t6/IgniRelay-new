@@ -23,6 +23,8 @@ import 'package:ignirelay_app/app/controllers/presence_controller.dart';
 import 'package:ignirelay_app/app/services/location_refresh_coordinator.dart';
 import 'package:ignirelay_app/app/services/motion/gps_refresh_policy.dart';
 import 'package:ignirelay_app/app/services/motion/motion_state.dart';
+import 'package:ignirelay_app/l10n/generated/app_localizations.dart';
+import 'package:ignirelay_app/l10n/l10n_ext.dart';
 import 'package:ignirelay_app/ui/shell/tabs/communication_state.dart';
 import 'package:ignirelay_app/ui/theme/igni_colors.dart';
 import 'package:ignirelay_app/ui/theme/igni_tokens.dart';
@@ -115,6 +117,7 @@ class _SafetyTabState extends State<SafetyTab> {
   }
 
   Future<void> _toggleComms() async {
+    final l = context.l10n;
     setState(() => _busy = true);
     try {
       if (_runtime.transportActive) {
@@ -123,13 +126,14 @@ class _SafetyTabState extends State<SafetyTab> {
         await _runtime.startTransport();
       }
     } catch (e) {
-      _snack('通訊切換失敗：$e');
+      _snack(l.safetyToggleFailed('$e'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
   Future<void> _updateFootprint() async {
+    final l = context.l10n;
     setState(() => _busy = true);
     try {
       final o = await _presence.publishPresence();
@@ -140,16 +144,16 @@ class _SafetyTabState extends State<SafetyTab> {
         _lastManualPresenceAt = DateTime.now();
       }
       if (o.noField) {
-        _snack('尚未加入場域 — 請先到「我的」加入或建立場域');
+        _snack(l.safetyUpdateNoField);
       } else if (o.anyAccepted) {
-        _snack('已更新足跡（${o.attempted} 個鄰近裝置）');
+        _snack(l.safetyUpdateSent(o.attempted));
       } else if (o.queued) {
-        _snack('足跡已排入佇列，待鄰近裝置上線後送出');
+        _snack(l.safetyUpdateQueued);
       } else {
-        _snack('已嘗試更新足跡');
+        _snack(l.safetyUpdateAttempted);
       }
     } catch (e) {
-      _snack('更新足跡失敗：$e');
+      _snack(l.safetyUpdateFailed('$e'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -179,20 +183,21 @@ class _SafetyTabState extends State<SafetyTab> {
       lastPresenceAt: _latestPresenceAt(beacon),
       cloudConfigured: field.active?.cloudBaseUrl != null,
     );
+    final l = context.l10n;
     return ListView(
       padding: const EdgeInsets.only(bottom: IgniSpacing.xl3),
       children: [
-        const IgniSubPageHeader(title: '我的安全', subtitle: '通訊與足跡'),
+        IgniSubPageHeader(title: l.safetyTitle, subtitle: l.safetySubtitle),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: IgniSpacing.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _commsCard(p, comms),
+              _commsCard(p, l, comms),
               const SizedBox(height: IgniSpacing.md),
-              _footprintCard(p, beacon, coord),
+              _footprintCard(p, l, beacon, coord),
               const SizedBox(height: IgniSpacing.md),
-              _recentCard(p),
+              _recentCard(p, l),
             ],
           ),
         ),
@@ -209,7 +214,7 @@ class _SafetyTabState extends State<SafetyTab> {
     return auto.isAfter(manual) ? auto : manual;
   }
 
-  Widget _commsCard(IgniPalette p, CommunicationState comms) {
+  Widget _commsCard(IgniPalette p, S l, CommunicationState comms) {
     final active = comms.meshRunning;
     return IgniCard(
       child: Column(
@@ -219,11 +224,11 @@ class _SafetyTabState extends State<SafetyTab> {
             Icon(active ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
                 size: 18, color: active ? p.ok : p.text2),
             const SizedBox(width: IgniSpacing.sm),
-            Text(active ? '近距離通訊：開啟' : '近距離通訊：關閉',
+            Text(active ? l.safetyCommsOn : l.safetyCommsOff,
                 style: IgniTypography.titleMedium(p.text0)),
             const Spacer(),
             IgniButton(
-              label: active ? '關閉' : '開啟',
+              label: active ? l.safetyTurnOff : l.safetyTurnOn,
               variant:
                   active ? IgniButtonVariant.ghost : IgniButtonVariant.primary,
               size: IgniButtonSize.small,
@@ -231,27 +236,29 @@ class _SafetyTabState extends State<SafetyTab> {
             ),
           ]),
           const SizedBox(height: IgniSpacing.sm),
-          // 最佳路徑：一眼看懂訊息目前怎麼送出。
+          // 最佳路徑：一眼看懂訊息目前怎麼送出。CommunicationState 維持純 Dart；
+          // bestPath enum → 文案在這個 render seam 經 l10n（UI-H2c）。
           Row(children: [
             Icon(_pathIcon(comms.bestPath),
                 size: 16, color: _pathColor(p, comms.bestPath)),
             const SizedBox(width: 6),
             Expanded(
-              child: Text('目前路徑：${comms.bestPathLabel}',
+              child: Text(l.safetyCurrentPath(_bestPathLabel(l, comms.bestPath)),
                   style: IgniTypography.bodyMedium(p.text0)),
             ),
           ]),
           const SizedBox(height: IgniSpacing.xs),
-          Text(comms.cloudLabel, style: IgniTypography.bodySmall(p.text2)),
+          Text(_cloudLabel(l, comms.cloudConfigured),
+              style: IgniTypography.bodySmall(p.text2)),
           const SizedBox(height: IgniSpacing.sm),
           Wrap(spacing: IgniSpacing.lg, runSpacing: IgniSpacing.xs, children: [
-            _stat(p, '鄰近裝置', comms.peers),
-            _stat(p, '已送', comms.sentCount),
-            _stat(p, '已收', comms.receivedCount),
-            _stat(p, '待送', comms.outboxDepth),
+            _stat(p, l.safetyStatPeers, comms.peers),
+            _stat(p, l.safetyStatSent, comms.sentCount),
+            _stat(p, l.safetyStatReceived, comms.receivedCount),
+            _stat(p, l.safetyStatQueued, comms.outboxDepth),
           ]),
           const SizedBox(height: IgniSpacing.xs),
-          Text('最後足跡：${_fmtClock(comms.lastPresenceAt)}',
+          Text(l.safetyLastFootprint(_fmtClock(comms.lastPresenceAt)),
               style: IgniTypography.bodySmall(p.text2)),
         ],
       ),
@@ -260,6 +267,25 @@ class _SafetyTabState extends State<SafetyTab> {
 
   Widget _stat(IgniPalette p, String label, int v) =>
       Text('$label $v', style: IgniTypography.bodySmall(p.text1));
+
+  // CommsPath enum → 使用者文案（產品語、無工程/階段名）。communication_state.dart
+  // 維持純 Dart 不 import l10n，故映射放在這個 render seam（UI-H2c）。
+  String _bestPathLabel(S l, CommsPath path) {
+    switch (path) {
+      case CommsPath.noField:
+        return l.commsPathNoField;
+      case CommsPath.offline:
+        return l.commsPathOffline;
+      case CommsPath.waitingPeers:
+        return l.commsPathWaiting;
+      case CommsPath.meshRelay:
+        return l.commsPathMesh;
+    }
+  }
+
+  // Cloud 狀態一行 —— Stage A 永不宣稱可達/已連線（誠實措辭由 ARB 保證）。
+  String _cloudLabel(S l, bool configured) =>
+      configured ? l.cloudConfigured : l.cloudOffline;
 
   IconData _pathIcon(CommsPath path) {
     switch (path) {
@@ -289,19 +315,19 @@ class _SafetyTabState extends State<SafetyTab> {
   String _fmtClock(DateTime? t) =>
       t == null ? '—' : t.toIso8601String().substring(11, 19);
 
-  Widget _footprintCard(
-      IgniPalette p, PresenceBeaconController beacon, LocationRefreshCoordinator coord) {
+  Widget _footprintCard(IgniPalette p, S l, PresenceBeaconController beacon,
+      LocationRefreshCoordinator coord) {
     return IgniCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('足跡', style: IgniTypography.titleMedium(p.text0)),
+          Text(l.safetyFootprintTitle,
+              style: IgniTypography.titleMedium(p.text0)),
           const SizedBox(height: IgniSpacing.xs),
-          Text('讓附近的人看見你最後可信的位置。',
-              style: IgniTypography.bodySmall(p.text2)),
+          Text(l.safetyFootprintBody, style: IgniTypography.bodySmall(p.text2)),
           const SizedBox(height: IgniSpacing.sm),
           IgniButton(
-            label: '立即更新足跡',
+            label: l.safetyUpdateNow,
             icon: Icons.my_location,
             fullWidth: true,
             onPressed: _busy ? null : _updateFootprint,
@@ -312,94 +338,96 @@ class _SafetyTabState extends State<SafetyTab> {
             dense: true,
             value: beacon.enabled,
             onChanged: (v) => beacon.setEnabled(v),
-            title: Text('自動足跡信標', style: IgniTypography.bodyMedium(p.text0)),
-            subtitle: Text(_beaconStatus(beacon),
+            title: Text(l.safetyAutoBeacon,
+                style: IgniTypography.bodyMedium(p.text0)),
+            subtitle: Text(_beaconStatus(l, beacon),
                 style: IgniTypography.bodySmall(p.text2)),
           ),
           const SizedBox(height: IgniSpacing.xs),
-          Text('動作偵測：${_motionLabel(beacon.motionState)}',
+          Text(l.safetyMotion(_motionLabel(l, beacon.motionState)),
               style: IgniTypography.bodySmall(p.text3)),
           // §4.2 A11 diagnostics — last GPS fix age + honest GPS policy reason.
           // Low-battery cadence stays on the beacon line above, NOT mixed in here
           // (Owner boundary 8).
-          Text('GPS 定位：${_gpsAgeLabel(coord.lastFixAge)}',
+          Text(l.safetyGpsFix(_gpsAgeLabel(l, coord.lastFixAge)),
               style: IgniTypography.bodySmall(p.text3)),
-          Text('定位策略：${_gpsReasonLabel(coord.lastReason)}',
+          Text(l.safetyGpsPolicy(_gpsReasonLabel(l, coord.lastReason)),
               style: IgniTypography.bodySmall(p.text3)),
         ],
       ),
     );
   }
 
-  String _gpsAgeLabel(Duration? age) {
-    if (age == null) return '尚無定位';
-    if (age.inSeconds < 60) return '${age.inSeconds} 秒前';
-    if (age.inMinutes < 60) return '${age.inMinutes} 分鐘前';
-    return '${age.inHours} 小時前';
+  String _gpsAgeLabel(S l, Duration? age) {
+    if (age == null) return l.gpsNoFix;
+    if (age.inSeconds < 60) return l.timeAgoSeconds(age.inSeconds);
+    if (age.inMinutes < 60) return l.timeAgoMinutes(age.inMinutes);
+    return l.timeAgoHours(age.inHours);
   }
 
   // Honest GPS policy reason (Owner boundary 8) — never shows low-battery here.
-  String _gpsReasonLabel(GpsPolicyReason r) {
+  String _gpsReasonLabel(S l, GpsPolicyReason r) {
     switch (r) {
       case GpsPolicyReason.movingRefresh:
-        return '移動時更新';
+        return l.gpsReasonMovingRefresh;
       case GpsPolicyReason.movingReuseFreshFix:
-        return '移動中沿用新定位';
+        return l.gpsReasonMovingReuse;
       case GpsPolicyReason.stationaryReuse:
-        return '靜止沿用上次';
+        return l.gpsReasonStationary;
       case GpsPolicyReason.unknownReuse:
-        return '沿用上次';
+        return l.gpsReasonUnknown;
       case GpsPolicyReason.manualEvent:
-        return '手動更新';
+        return l.gpsReasonManual;
       case GpsPolicyReason.unavailable:
-        return '定位不可用';
+        return l.gpsReasonUnavailable;
     }
   }
 
-  String _beaconStatus(PresenceBeaconController b) {
-    if (!b.enabled) return '已關閉';
+  String _beaconStatus(S l, PresenceBeaconController b) {
+    if (!b.enabled) return l.beaconOff;
     final secs = b.currentInterval.inSeconds;
-    final low = b.isLowBattery ? '（低電量降頻）' : '';
-    return '每 $secs 秒 · 已更新 ${b.beaconCount} 次$low';
+    final low = b.isLowBattery ? l.beaconLowSuffix : '';
+    return l.beaconStatus(secs, b.beaconCount, low);
   }
 
   // UI-F5a diagnostic. `unknown` (no motion source yet — the F5a default) must
   // read「尚未啟用」, never「靜止」(Owner boundary 2).
-  String _motionLabel(MotionState m) {
+  String _motionLabel(S l, MotionState m) {
     switch (m) {
       case MotionState.moving:
-        return '移動中';
+        return l.motionMoving;
       case MotionState.stationary:
-        return '靜止';
+        return l.motionStationary;
       case MotionState.unknown:
-        return '尚未啟用';
+        return l.motionUnknown;
     }
   }
 
-  Widget _recentCard(IgniPalette p) {
+  Widget _recentCard(IgniPalette p, S l) {
     return IgniCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('最近足跡', style: IgniTypography.titleMedium(p.text0)),
+          Text(l.safetyRecentTitle, style: IgniTypography.titleMedium(p.text0)),
           const SizedBox(height: IgniSpacing.sm),
           if (_footprints.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: IgniSpacing.sm),
-              child: Text('尚無足跡', style: IgniTypography.bodySmall(p.text2)),
+              child:
+                  Text(l.safetyNoFootprint, style: IgniTypography.bodySmall(p.text2)),
             )
           else
-            ..._footprints.map((f) => _footprintRow(p, f)),
+            ..._footprints.map((f) => _footprintRow(p, l, f)),
         ],
       ),
     );
   }
 
-  Widget _footprintRow(IgniPalette p, PresenceUpdate f) {
+  Widget _footprintRow(IgniPalette p, S l, PresenceUpdate f) {
     final when = f.observedAt.toIso8601String().substring(11, 19);
     final where = (f.lat != null && f.lng != null)
         ? '${f.lat!.toStringAsFixed(5)}, ${f.lng!.toStringAsFixed(5)}'
-        : '無座標';
+        : l.noCoordinate;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(children: [

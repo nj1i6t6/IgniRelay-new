@@ -15,6 +15,8 @@ import 'package:provider/provider.dart';
 
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/services/event_store.dart';
+import 'package:ignirelay_app/l10n/generated/app_localizations.dart';
+import 'package:ignirelay_app/l10n/l10n_ext.dart';
 import 'package:ignirelay_app/ui/shell/admin_broadcast_banner.dart';
 import 'package:ignirelay_app/ui/shell/checkpoint_card.dart';
 import 'package:ignirelay_app/ui/shell/hazard_card.dart';
@@ -65,10 +67,11 @@ class _EventsTabState extends State<EventsTab> {
   @override
   Widget build(BuildContext context) {
     final p = context.igni;
+    final l = context.l10n;
     return ListView(
       padding: const EdgeInsets.only(bottom: IgniSpacing.xl3),
       children: [
-        const IgniSubPageHeader(title: '事件', subtitle: '危害、廣播、定點與系統事件'),
+        IgniSubPageHeader(title: l.eventsTitle, subtitle: l.eventsSubtitle),
         // ADMIN_BROADCAST 置頂橫幅（無有效公告時收合）。
         const AdminBroadcastBanner(),
         Padding(
@@ -81,7 +84,7 @@ class _EventsTabState extends State<EventsTab> {
               const SizedBox(height: IgniSpacing.md),
               const CheckpointCard(),
               const SizedBox(height: IgniSpacing.md),
-              _recentCard(p),
+              _recentCard(p, l),
             ],
           ),
         ),
@@ -89,33 +92,33 @@ class _EventsTabState extends State<EventsTab> {
     );
   }
 
-  Widget _recentCard(IgniPalette p) {
+  Widget _recentCard(IgniPalette p, S l) {
     return IgniCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            Text('最近事件', style: IgniTypography.titleMedium(p.text0)),
+            Text(l.eventsRecentTitle, style: IgniTypography.titleMedium(p.text0)),
             const Spacer(),
             IconButton(
               onPressed: _refresh,
               icon: Icon(Icons.refresh, size: 18, color: p.text2),
-              tooltip: '重新整理',
+              tooltip: l.eventsRefresh,
             ),
           ]),
           if (_recent.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: IgniSpacing.sm),
-              child: Text('尚無事件', style: IgniTypography.bodySmall(p.text2)),
+              child: Text(l.eventsEmpty, style: IgniTypography.bodySmall(p.text2)),
             )
           else
-            ..._recent.take(50).map((r) => _eventRow(p, r)),
+            ..._recent.take(50).map((r) => _eventRow(p, l, r)),
         ],
       ),
     );
   }
 
-  Widget _eventRow(IgniPalette p, Map<String, dynamic> row) {
+  Widget _eventRow(IgniPalette p, S l, Map<String, dynamic> row) {
     final id = (row['event_id'] as String?) ?? '';
     final shortId = id.length <= 8 ? id : id.substring(0, 8);
     final type = row['event_type'];
@@ -135,7 +138,8 @@ class _EventsTabState extends State<EventsTab> {
         ),
         const SizedBox(width: IgniSpacing.sm),
         Expanded(
-            child: Text('類型 $type', style: IgniTypography.bodySmall(p.text1))),
+            child: Text(l.eventsRowType('$type'),
+                style: IgniTypography.bodySmall(p.text1))),
         MonoText(when, fontSize: 11, color: p.text2),
       ]),
     );

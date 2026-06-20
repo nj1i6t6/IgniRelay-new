@@ -3852,4 +3852,500 @@ class SZh extends S {
 
   @override
   String get previewCheckpointAgo => '12 分鐘前';
+
+  @override
+  String get commonSend => '送出';
+
+  @override
+  String get noCoordinate => '無座標';
+
+  @override
+  String get noCoordinateParen => '（無座標）';
+
+  @override
+  String get timeJustNow => '剛剛';
+
+  @override
+  String timeAgoSeconds(int seconds) {
+    return '$seconds 秒前';
+  }
+
+  @override
+  String timeAgoMinutes(int minutes) {
+    return '$minutes 分鐘前';
+  }
+
+  @override
+  String timeAgoHours(int hours) {
+    return '$hours 小時前';
+  }
+
+  @override
+  String timeAgoDays(int days) {
+    return '$days 天前';
+  }
+
+  @override
+  String get safetyTitle => '我的安全';
+
+  @override
+  String get safetySubtitle => '通訊與足跡';
+
+  @override
+  String safetyToggleFailed(String error) {
+    return '通訊切換失敗：$error';
+  }
+
+  @override
+  String get safetyUpdateNoField => '尚未加入場域 — 請先到「我的」加入或建立場域';
+
+  @override
+  String safetyUpdateSent(int count) {
+    return '已更新足跡（$count 個鄰近裝置）';
+  }
+
+  @override
+  String get safetyUpdateQueued => '足跡已排入佇列，待鄰近裝置上線後送出';
+
+  @override
+  String get safetyUpdateAttempted => '已嘗試更新足跡';
+
+  @override
+  String safetyUpdateFailed(String error) {
+    return '更新足跡失敗：$error';
+  }
+
+  @override
+  String get safetyCommsOn => '近距離通訊：開啟';
+
+  @override
+  String get safetyCommsOff => '近距離通訊：關閉';
+
+  @override
+  String get safetyTurnOn => '開啟';
+
+  @override
+  String get safetyTurnOff => '關閉';
+
+  @override
+  String safetyCurrentPath(String path) {
+    return '目前路徑：$path';
+  }
+
+  @override
+  String get safetyStatPeers => '鄰近裝置';
+
+  @override
+  String get safetyStatSent => '已送';
+
+  @override
+  String get safetyStatReceived => '已收';
+
+  @override
+  String get safetyStatQueued => '待送';
+
+  @override
+  String safetyLastFootprint(String time) {
+    return '最後足跡：$time';
+  }
+
+  @override
+  String get safetyFootprintTitle => '足跡';
+
+  @override
+  String get safetyFootprintBody => '讓附近的人看見你最後可信的位置。';
+
+  @override
+  String get safetyUpdateNow => '立即更新足跡';
+
+  @override
+  String get safetyAutoBeacon => '自動足跡信標';
+
+  @override
+  String safetyMotion(String state) {
+    return '動作偵測：$state';
+  }
+
+  @override
+  String safetyGpsFix(String age) {
+    return 'GPS 定位：$age';
+  }
+
+  @override
+  String safetyGpsPolicy(String reason) {
+    return '定位策略：$reason';
+  }
+
+  @override
+  String get safetyRecentTitle => '最近足跡';
+
+  @override
+  String get safetyNoFootprint => '尚無足跡';
+
+  @override
+  String get commsPathNoField => '尚未加入場域';
+
+  @override
+  String get commsPathOffline => '離線（近距離通訊未開啟）';
+
+  @override
+  String get commsPathWaiting => '等待鄰近裝置…';
+
+  @override
+  String get commsPathMesh => '近距離網狀傳遞';
+
+  @override
+  String get cloudOffline => '雲端：離線';
+
+  @override
+  String get cloudConfigured => '雲端：已設定（尚未啟用）';
+
+  @override
+  String get gpsNoFix => '尚無定位';
+
+  @override
+  String get gpsReasonMovingRefresh => '移動時更新';
+
+  @override
+  String get gpsReasonMovingReuse => '移動中沿用新定位';
+
+  @override
+  String get gpsReasonStationary => '靜止沿用上次';
+
+  @override
+  String get gpsReasonUnknown => '沿用上次';
+
+  @override
+  String get gpsReasonManual => '手動更新';
+
+  @override
+  String get gpsReasonUnavailable => '定位不可用';
+
+  @override
+  String get beaconOff => '已關閉';
+
+  @override
+  String beaconStatus(int secs, int count, String low) {
+    return '每 $secs 秒 · 已更新 $count 次$low';
+  }
+
+  @override
+  String get beaconLowSuffix => '（低電量降頻）';
+
+  @override
+  String get motionMoving => '移動中';
+
+  @override
+  String get motionStationary => '靜止';
+
+  @override
+  String get motionUnknown => '尚未啟用';
+
+  @override
+  String get eventsTitle => '事件';
+
+  @override
+  String get eventsSubtitle => '危害、廣播、定點與系統事件';
+
+  @override
+  String get eventsRecentTitle => '最近事件';
+
+  @override
+  String get eventsRefresh => '重新整理';
+
+  @override
+  String get eventsEmpty => '尚無事件';
+
+  @override
+  String eventsRowType(String type) {
+    return '類型 $type';
+  }
+
+  @override
+  String get assistTitle => '協助';
+
+  @override
+  String get assistSubtitle => '離線協助與求助資源';
+
+  @override
+  String get assistOfflineTitle => '離線協助';
+
+  @override
+  String get assistOfflineBody => '離線求助資源與求救後續引導即將提供。需要緊急求救時，可隨時使用畫面上的全域求救鍵。';
+
+  @override
+  String get hazardCardTitleFormal => '危害回報';
+
+  @override
+  String get hazardCardTitleDebug => '危害（HAZARD）';
+
+  @override
+  String get hazardCardReport => '回報危害';
+
+  @override
+  String get hazardCardManualDebug => '手動 HAZARD';
+
+  @override
+  String get hazardCardManualDebugTitle => '手動 HAZARD（debug）';
+
+  @override
+  String get hazardCardDebugSampleDesc => '測試危害（debug）';
+
+  @override
+  String get hazardCardBodyFormal => '附近的危害事件。回報時座標取自本機定位；無定位時無法回報，請先取得位置。';
+
+  @override
+  String get hazardCardBodyDebug =>
+      '收到的 typed HAZARD 事件（A3 接收側）。手動送出為 debug 占位（座標取本機 GPS，無定位則不送）。';
+
+  @override
+  String get hazardCardDescLabel => '描述（≤800B）';
+
+  @override
+  String get hazardCardNoLocation => '目前沒有位置，請取得位置後再回報';
+
+  @override
+  String hazardCardSentFormal(String type) {
+    return '已回報危害「$type」· 需已加入場域才會廣播';
+  }
+
+  @override
+  String hazardCardSentDebug(String type, String id) {
+    return 'HAZARD「$type」已送出（id $id） · 需已加入場域才會實際廣播';
+  }
+
+  @override
+  String hazardCardSendFailed(String error) {
+    return 'HAZARD 送出失敗: $error';
+  }
+
+  @override
+  String get hazardCardEmpty => '（尚無 HAZARD）';
+
+  @override
+  String get hazardCardTypeFire => '火災 FIRE';
+
+  @override
+  String get hazardCardTypeFlood => '淹水 FLOOD';
+
+  @override
+  String get hazardCardTypeCollapse => '倒塌 COLLAPSE';
+
+  @override
+  String get hazardCardTypeChemical => '化學 CHEMICAL';
+
+  @override
+  String get hazardCardTypeRoadblock => '路阻 ROADBLOCK';
+
+  @override
+  String get hazardCardTypeOther => '其他 OTHER';
+
+  @override
+  String get checkpointCardTitle => 'CHECKPOINT（點名通過）';
+
+  @override
+  String get checkpointCardManual => '手動 CHECKPOINT';
+
+  @override
+  String get checkpointCardIdHint => '點名點 / Field Node 錨點 id';
+
+  @override
+  String get checkpointCardBody => '收到的點名通過事件（非 LWW，每次通過皆獨立保留）。';
+
+  @override
+  String get checkpointCardEmpty => '（尚無 CHECKPOINT）';
+
+  @override
+  String get checkpointCardNoField => '尚未加入場域 — 請先在「場域」卡片加入或產生一個場域';
+
+  @override
+  String checkpointCardSent(String id, int count) {
+    return 'CHECKPOINT「$id」已送出（$count peer）';
+  }
+
+  @override
+  String checkpointCardQueued(String id, int depth) {
+    return 'CHECKPOINT「$id」已排入佇列（無在線 peer，深度 $depth）';
+  }
+
+  @override
+  String checkpointCardAttempted(String id, int count) {
+    return 'CHECKPOINT「$id」已嘗試送出（$count peer，無人接受）';
+  }
+
+  @override
+  String checkpointCardSendFailed(String error) {
+    return 'CHECKPOINT 送出失敗: $error';
+  }
+
+  @override
+  String get adminScopeField => '本場域公告';
+
+  @override
+  String get adminScopeAll => '全網公告';
+
+  @override
+  String get adminScopeDefault => '公告';
+
+  @override
+  String adminExpiry(String time) {
+    return '至 $time';
+  }
+
+  @override
+  String get adminPublishTest => '發測試 ADMIN 廣播';
+
+  @override
+  String adminTestMessage(String time) {
+    return '測試管理廣播 $time';
+  }
+
+  @override
+  String get adminNoField => '尚未加入場域 — 請先加入或產生一個場域';
+
+  @override
+  String adminSent(int count) {
+    return 'ADMIN 廣播已送出（$count peer）';
+  }
+
+  @override
+  String adminQueued(int depth) {
+    return 'ADMIN 廣播已排入佇列（深度 $depth）';
+  }
+
+  @override
+  String adminAttempted(int count) {
+    return 'ADMIN 廣播已嘗試送出（$count peer）';
+  }
+
+  @override
+  String adminSendFailed(String error) {
+    return 'ADMIN 廣播送出失敗: $error';
+  }
+
+  @override
+  String get sosTitle => '緊急求救';
+
+  @override
+  String get sosSubtitle => '長按求救鈕 1.5 秒，選擇狀態後 5 秒內可取消';
+
+  @override
+  String sosNearbyHeader(int count) {
+    return '附近求救（$count）';
+  }
+
+  @override
+  String get sosNoneNearby => '目前沒有收到求救訊號。';
+
+  @override
+  String get sosSending => '求救傳送中…';
+
+  @override
+  String get sosTriggerTitle => '發出求救';
+
+  @override
+  String get sosTriggerBody => '長按下方按鈕 1.5 秒，再選擇你的狀態。送出前還有 5 秒可取消。';
+
+  @override
+  String get sosHoldButton => '按住求救';
+
+  @override
+  String get sosCountdownTrapped => '受困求救';
+
+  @override
+  String get sosCountdownInjured => '受傷求救';
+
+  @override
+  String get sosCountdownHint => '秒後送出 — 仍可取消';
+
+  @override
+  String get sosActiveTitle => '你已發出求救';
+
+  @override
+  String get sosChipTrapped => '受困';
+
+  @override
+  String get sosChipInjured => '受傷';
+
+  @override
+  String get sosMarkSafe => '我安全了';
+
+  @override
+  String get sosChooseStatus => '選擇你的狀態';
+
+  @override
+  String get sosSeverityTrapped => '受困（最高優先）';
+
+  @override
+  String get sosMarkSafeNoField => '尚未加入場域 — 無法送出狀態更新';
+
+  @override
+  String get sosMarkSafeSent => '已送出「我安全了」';
+
+  @override
+  String get sosResolvedChip => '已解除';
+
+  @override
+  String get sosOutcomeSent => '已送出。';
+
+  @override
+  String get sosOutcomeNoField => '尚未加入場域 — 求救未送出，請先加入場域。';
+
+  @override
+  String sosOutcomeAccepted(int count) {
+    return '已送達 $count 個鄰近裝置。';
+  }
+
+  @override
+  String sosOutcomeQueued(int depth) {
+    return '已排入佇列（無在線鄰近裝置，深度 $depth）。';
+  }
+
+  @override
+  String sosOutcomeAttempted(int count) {
+    return '已嘗試送出（$count 個，暫無人接收）。';
+  }
+
+  @override
+  String get lastSeenTitle => '最後可信位置';
+
+  @override
+  String get lastSeenSubtitle => '依足跡 / 點名通過推估，非即時定位';
+
+  @override
+  String get lastSeenNeedLocalPosition => '需要本機位置才能顯示相對方位';
+
+  @override
+  String get lastSeenToggleList => '列表';
+
+  @override
+  String get lastSeenToggleRadar => '雷達';
+
+  @override
+  String get lastSeenEmpty =>
+      '尚無位置證據 — 收到足跡（PRESENCE）或點名通過（CHECKPOINT）後，這裡會列出每人的最後可信位置。';
+
+  @override
+  String lastSeenUncertainty(int meters) {
+    return '誤差 ~$meters m';
+  }
+
+  @override
+  String lastSeenAnchor(String id) {
+    return '錨點 $id';
+  }
+
+  @override
+  String get confidenceHigh => '可信度 高';
+
+  @override
+  String get confidenceMedium => '可信度 中';
+
+  @override
+  String get confidenceLow => '可信度 低';
+
+  @override
+  String radarCaption(String range) {
+    return '北朝上 · 外環 $range · 圓心為本機（最後可信位置投影）';
+  }
 }

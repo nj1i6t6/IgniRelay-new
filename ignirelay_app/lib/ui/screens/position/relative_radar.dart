@@ -23,6 +23,7 @@ import 'package:flutter/material.dart';
 
 import 'package:ignirelay_app/app/services/position_estimator.dart';
 import 'package:ignirelay_app/app/services/relative_position.dart';
+import 'package:ignirelay_app/l10n/l10n_ext.dart';
 import 'package:ignirelay_app/ui/theme/igni_colors.dart';
 import 'package:ignirelay_app/ui/theme/igni_tokens.dart';
 import 'package:ignirelay_app/ui/theme/igni_typography.dart';
@@ -207,7 +208,7 @@ class RelativeRadar extends StatelessWidget {
             vertical: IgniSpacing.sm,
           ),
           child: Text(
-            '北朝上 · 外環 ${_fmtRange(maxRange)} · 圓心為本機（最後可信位置投影）',
+            context.l10n.radarCaption(_fmtRange(maxRange)),
             style: IgniTypography.bodySmall(p.text2),
             textAlign: TextAlign.center,
           ),

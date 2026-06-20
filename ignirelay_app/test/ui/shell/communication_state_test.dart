@@ -1,10 +1,16 @@
-// UI-F4 — CommunicationState pure-builder + presence-counts predicate tests.
+// UI-F4 / UI-H2c — CommunicationState pure-builder + presence-counts predicate
+// tests.
 //
-// communication_state.dart is pure (no widgets / no app imports) so the
-// best-path derivation, the honest cloud copy, and Owner req 1's
-// "only a real send stamps presence" rule are all unit-testable directly.
+// communication_state.dart is pure (no widgets / no app / no l10n imports) so
+// the best-path derivation and Owner req 1's "only a real send stamps presence"
+// rule are unit-testable directly. UI-H2c moved the best-path / cloud *display
+// copy* out of this pure file to the SafetyTab render seam (enum/bool → l10n);
+// the Stage A "cloud is never reachable" honesty invariant is now asserted at the
+// l10n layer (both locales) below.
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ignirelay_app/l10n/generated/app_localizations.dart';
 import 'package:ignirelay_app/ui/shell/tabs/communication_state.dart';
 
 CommunicationState _state({
@@ -29,42 +35,56 @@ CommunicationState _state({
     );
 
 void main() {
-  group('best-path matrix', () {
+  group('best-path matrix (enum derivation; copy lives at the SafetyTab seam)',
+      () {
     test('no field → noField', () {
       final s = _state(hasField: false, meshRunning: true, peers: 3);
       expect(s.bestPath, CommsPath.noField);
-      expect(s.bestPathLabel, '尚未加入場域');
     });
 
     test('field but mesh off → offline (regardless of stale peers)', () {
       final s = _state(meshRunning: false, peers: 5);
       expect(s.bestPath, CommsPath.offline);
-      expect(s.bestPathLabel, '離線（近距離通訊未開啟）');
     });
 
     test('mesh on, no peers → waitingPeers', () {
       final s = _state(meshRunning: true, peers: 0);
       expect(s.bestPath, CommsPath.waitingPeers);
-      expect(s.bestPathLabel, '等待鄰近裝置…');
     });
 
     test('mesh on, peers > 0 → meshRelay', () {
       final s = _state(meshRunning: true, peers: 2);
       expect(s.bestPath, CommsPath.meshRelay);
-      expect(s.bestPathLabel, '近距離網狀傳遞');
+    });
+
+    test('cloudConfigured passes through unchanged', () {
+      expect(_state(cloudConfigured: false).cloudConfigured, isFalse);
+      expect(_state(cloudConfigured: true).cloudConfigured, isTrue);
     });
   });
 
-  group('cloud copy is honest (Stage A never reachable)', () {
-    test('not configured → 離線', () {
-      expect(_state(cloudConfigured: false).cloudLabel, '雲端：離線');
-    });
+  // UI-H2c — the Stage A "cloud is configured-only, never reachable/connected"
+  // honesty rule moved from the pure getter to the ARB; assert it at the l10n
+  // layer in BOTH locales so neither cloud string can ever claim connectivity.
+  group('cloud copy is honest in every locale (Stage A never reachable)', () {
+    for (final loc in const [Locale('zh'), Locale('en')]) {
+      test('${loc.languageCode}: neither cloud string claims reachable/connected',
+          () {
+        final l = lookupS(loc);
+        for (final s in [l.cloudOffline, l.cloudConfigured]) {
+          expect(s.contains('已連線'), isFalse, reason: s);
+          expect(s.contains('可達'), isFalse, reason: s);
+          expect(s.toLowerCase().contains('connected'), isFalse, reason: s);
+          expect(s.toLowerCase().contains('reachable'), isFalse, reason: s);
+        }
+      });
+    }
 
-    test('configured → 已設定（尚未啟用）, never "已連線"/"可達"', () {
-      final label = _state(cloudConfigured: true).cloudLabel;
-      expect(label, '雲端：已設定（尚未啟用）');
-      expect(label.contains('已連線'), isFalse);
-      expect(label.contains('可達'), isFalse);
+    test('configured copy still signals "not active yet"', () {
+      expect(lookupS(const Locale('zh')).cloudConfigured, contains('尚未啟用'));
+      expect(
+          lookupS(const Locale('en')).cloudConfigured.toLowerCase(),
+          contains('not active'));
     });
   });
 

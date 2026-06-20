@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/controllers/sos_controller.dart';
+import 'package:ignirelay_app/l10n/l10n_ext.dart';
 import 'package:ignirelay_app/ui/screens/sos/sos_hold_button.dart';
 import 'package:ignirelay_app/ui/theme/igni_colors.dart';
 import 'package:ignirelay_app/ui/theme/igni_tokens.dart';
@@ -74,6 +75,7 @@ class _SosScreenState extends State<SosScreen> {
   @override
   Widget build(BuildContext context) {
     final p = context.igni;
+    final l = context.l10n;
     final sos = context.watch<SosController>();
     final alerts = _alerts.values.toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
@@ -83,9 +85,9 @@ class _SosScreenState extends State<SosScreen> {
         child: ListView(
           padding: const EdgeInsets.only(bottom: IgniSpacing.xl3),
           children: [
-            const IgniSubPageHeader(
-              title: '緊急求救',
-              subtitle: '長按求救鈕 1.5 秒，選擇狀態後 5 秒內可取消',
+            IgniSubPageHeader(
+              title: l.sosTitle,
+              subtitle: l.sosSubtitle,
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: IgniSpacing.lg),
@@ -94,11 +96,11 @@ class _SosScreenState extends State<SosScreen> {
                 children: [
                   _senderCard(p, sos),
                   const SizedBox(height: IgniSpacing.xl),
-                  Text('附近求救（${alerts.length}）',
+                  Text(l.sosNearbyHeader(alerts.length),
                       style: IgniTypography.sectionHeader(p.text2)),
                   const SizedBox(height: IgniSpacing.sm),
                   if (alerts.isEmpty)
-                    Text('目前沒有收到求救訊號。',
+                    Text(l.sosNoneNearby,
                         style: IgniTypography.bodySmall(p.text3))
                   else
                     for (final a in alerts)
@@ -127,7 +129,8 @@ class _SosScreenState extends State<SosScreen> {
             child: CircularProgressIndicator(strokeWidth: 2, color: p.sos),
           ),
           const SizedBox(width: IgniSpacing.md),
-          Text('求救傳送中…', style: IgniTypography.bodyMedium(p.text0)),
+          Text(context.l10n.sosSending,
+              style: IgniTypography.bodyMedium(p.text0)),
         ]),
       );
     }
@@ -136,18 +139,18 @@ class _SosScreenState extends State<SosScreen> {
   }
 
   Widget _triggerCard(IgniPalette p) {
+    final l = context.l10n;
     return IgniCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('發出求救', style: IgniTypography.titleMedium(p.text0)),
+          Text(l.sosTriggerTitle, style: IgniTypography.titleMedium(p.text0)),
           const SizedBox(height: IgniSpacing.xs),
-          Text('長按下方按鈕 1.5 秒，再選擇你的狀態。送出前還有 5 秒可取消。',
-              style: IgniTypography.bodySmall(p.text2)),
+          Text(l.sosTriggerBody, style: IgniTypography.bodySmall(p.text2)),
           const SizedBox(height: IgniSpacing.lg),
           Center(
             child: SosHoldButton(
-              label: '按住求救',
+              label: l.sosHoldButton,
               color: p.sos,
               onHoldComplete: _chooseSeverity,
             ),
@@ -158,6 +161,7 @@ class _SosScreenState extends State<SosScreen> {
   }
 
   Widget _countdownCard(IgniPalette p, SosController sos) {
+    final l = context.l10n;
     final isTrapped = sos.armedSeverity == SosSeverity.trapped;
     final tone = isTrapped ? p.sos : p.warn;
     return IgniCard(
@@ -169,7 +173,7 @@ class _SosScreenState extends State<SosScreen> {
           Row(children: [
             Icon(Icons.warning_amber_rounded, color: tone, size: 20),
             const SizedBox(width: IgniSpacing.sm),
-            Text(isTrapped ? '受困求救' : '受傷求救',
+            Text(isTrapped ? l.sosCountdownTrapped : l.sosCountdownInjured,
                 style: IgniTypography.titleMedium(p.text0)),
           ]),
           const SizedBox(height: IgniSpacing.md),
@@ -179,7 +183,7 @@ class _SosScreenState extends State<SosScreen> {
                     .copyWith(fontSize: 56, fontWeight: FontWeight.w700)),
           ),
           Center(
-            child: Text('秒後送出 — 仍可取消',
+            child: Text(l.sosCountdownHint,
                 style: IgniTypography.bodySmall(p.text2)),
           ),
           const SizedBox(height: IgniSpacing.lg),
@@ -187,7 +191,7 @@ class _SosScreenState extends State<SosScreen> {
           SizedBox(
             height: 64,
             child: IgniButton(
-              label: '取消',
+              label: l.commonCancel,
               variant: IgniButtonVariant.ghost,
               size: IgniButtonSize.large,
               fullWidth: true,
@@ -200,6 +204,7 @@ class _SosScreenState extends State<SosScreen> {
   }
 
   Widget _activeSosCard(IgniPalette p, SosController sos) {
+    final l = context.l10n;
     final isTrapped = sos.activeSeverity == SosSeverity.trapped;
     final tone = isTrapped ? p.sos : p.warn;
     return IgniCard(
@@ -212,11 +217,11 @@ class _SosScreenState extends State<SosScreen> {
             Icon(Icons.sos_rounded, color: tone, size: 20),
             const SizedBox(width: IgniSpacing.sm),
             Expanded(
-              child: Text('你已發出求救',
+              child: Text(l.sosActiveTitle,
                   style: IgniTypography.titleMedium(p.text0)),
             ),
             IgniChip(
-              label: isTrapped ? '受困' : '受傷',
+              label: isTrapped ? l.sosChipTrapped : l.sosChipInjured,
               tone: isTrapped ? IgniChipTone.sos : IgniChipTone.warn,
             ),
           ]),
@@ -225,7 +230,7 @@ class _SosScreenState extends State<SosScreen> {
               style: IgniTypography.bodySmall(p.text2)),
           const SizedBox(height: IgniSpacing.lg),
           IgniButton(
-            label: '我安全了',
+            label: l.sosMarkSafe,
             variant: IgniButtonVariant.ghost,
             icon: Icons.check_circle_outline,
             fullWidth: true,
@@ -238,6 +243,7 @@ class _SosScreenState extends State<SosScreen> {
 
   Future<void> _chooseSeverity() async {
     final p = context.igni;
+    final l = context.l10n;
     final choice = await showModalBottomSheet<SosSeverity>(
       context: context,
       backgroundColor: p.bg1,
@@ -248,12 +254,12 @@ class _SosScreenState extends State<SosScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('選擇你的狀態',
+              Text(l.sosChooseStatus,
                   style: IgniTypography.titleMedium(p.text0),
                   textAlign: TextAlign.center),
               const SizedBox(height: IgniSpacing.lg),
               IgniButton(
-                label: '受困（最高優先）',
+                label: l.sosSeverityTrapped,
                 variant: IgniButtonVariant.sos,
                 size: IgniButtonSize.large,
                 fullWidth: true,
@@ -261,7 +267,7 @@ class _SosScreenState extends State<SosScreen> {
               ),
               const SizedBox(height: IgniSpacing.md),
               IgniButton(
-                label: '受傷',
+                label: l.sosChipInjured,
                 variant: IgniButtonVariant.warn,
                 size: IgniButtonSize.large,
                 fullWidth: true,
@@ -277,23 +283,25 @@ class _SosScreenState extends State<SosScreen> {
   }
 
   Future<void> _markSafe() async {
+    final l = context.l10n;
     final outcome = await _sos.markSafe();
     if (!mounted) return;
     if (outcome != null && outcome.noField) {
-      _snack('尚未加入場域 — 無法送出狀態更新');
+      _snack(l.sosMarkSafeNoField);
     } else {
-      _snack('已送出「我安全了」');
+      _snack(l.sosMarkSafeSent);
     }
   }
 
   // ── Receiver ───────────────────────────────────────────────────────────
   Widget _alertCard(IgniPalette p, SosAlert a) {
+    final l = context.l10n;
     final isResolved = _resolved.contains(_authorKey(a));
     final isTrapped = a.urgency >= 3;
     final tone = isResolved ? p.text3 : (isTrapped ? p.sos : p.warn);
     final where = (a.lat != null && a.lng != null)
         ? '${a.lat!.toStringAsFixed(5)}, ${a.lng!.toStringAsFixed(5)}'
-        : '無座標';
+        : l.noCoordinate;
     return IgniCard(
       borderColor: tone,
       background: isResolved
@@ -314,10 +322,10 @@ class _SosScreenState extends State<SosScreen> {
               ),
             ),
             if (isResolved)
-              const IgniChip(label: '已解除', tone: IgniChipTone.ok)
+              IgniChip(label: l.sosResolvedChip, tone: IgniChipTone.ok)
             else
               IgniChip(
-                label: isTrapped ? '受困' : '受傷',
+                label: isTrapped ? l.sosChipTrapped : l.sosChipInjured,
                 tone: isTrapped ? IgniChipTone.sos : IgniChipTone.warn,
               ),
           ]),
@@ -336,12 +344,13 @@ class _SosScreenState extends State<SosScreen> {
   }
 
   String _outcomeText(SosController sos) {
+    final l = context.l10n;
     final o = sos.lastOutcome;
-    if (o == null) return '已送出。';
-    if (o.noField) return '尚未加入場域 — 求救未送出，請先加入場域。';
-    if (o.anyAccepted) return '已送達 ${o.attempted} 個鄰近裝置。';
-    if (o.queued) return '已排入佇列（無在線鄰近裝置，深度 ${o.pendingDepth}）。';
-    return '已嘗試送出（${o.attempted} 個，暫無人接收）。';
+    if (o == null) return l.sosOutcomeSent;
+    if (o.noField) return l.sosOutcomeNoField;
+    if (o.anyAccepted) return l.sosOutcomeAccepted(o.attempted);
+    if (o.queued) return l.sosOutcomeQueued(o.pendingDepth);
+    return l.sosOutcomeAttempted(o.attempted);
   }
 
   static String _authorKey(SosAlert a) {
@@ -358,11 +367,12 @@ class _SosScreenState extends State<SosScreen> {
     return sb.toString();
   }
 
-  static String _relTime(DateTime t) {
+  String _relTime(DateTime t) {
+    final l = context.l10n;
     final d = DateTime.now().difference(t);
-    if (d.inSeconds < 60) return '剛剛';
-    if (d.inMinutes < 60) return '${d.inMinutes} 分鐘前';
-    if (d.inHours < 24) return '${d.inHours} 小時前';
-    return '${d.inDays} 天前';
+    if (d.inSeconds < 60) return l.timeJustNow;
+    if (d.inMinutes < 60) return l.timeAgoMinutes(d.inMinutes);
+    if (d.inHours < 24) return l.timeAgoHours(d.inHours);
+    return l.timeAgoDays(d.inDays);
   }
 }

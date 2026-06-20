@@ -15,6 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/services/position_estimator.dart';
+import 'package:ignirelay_app/l10n/generated/app_localizations.dart';
 import 'package:ignirelay_app/ui/shell/hazard_card.dart';
 
 void main() {
@@ -64,7 +65,13 @@ void main() {
     ageSeconds: 0,
   );
 
-  Widget card({PositionEstimate? Function()? localEstimate}) => MaterialApp(
+  Widget card(
+          {PositionEstimate? Function()? localEstimate,
+          Locale locale = const Locale('zh')}) =>
+      MaterialApp(
+        locale: locale,
+        supportedLocales: S.supportedLocales,
+        localizationsDelegates: S.localizationsDelegates,
         home: Scaffold(
           body: HazardCard(
             hazardSource: hz.stream,
@@ -146,8 +153,12 @@ void main() {
   Widget formalCard({
     PositionEstimate? Function()? localEstimate,
     Future<void> Function()? ensureFreshLocation,
+    Locale locale = const Locale('zh'),
   }) =>
       MaterialApp(
+        locale: locale,
+        supportedLocales: S.supportedLocales,
+        localizationsDelegates: S.localizationsDelegates,
         home: Scaffold(
           body: HazardCard(
             hazardSource: hz.stream,
@@ -206,5 +217,15 @@ void main() {
     expect(publishCalls, 1, reason: 'fresh fix obtained before reading origin');
     expect(capturedLat, 25.0);
     expect(capturedLng, 121.0);
+  });
+
+  testWidgets('en: formal card renders English report entry (UI-H2c)',
+      (tester) async {
+    await tester.pumpWidget(formalCard(locale: const Locale('en')));
+    await tester.pump();
+
+    expect(find.text('Hazard report'), findsOneWidget); // card title
+    expect(find.text('Report hazard'), findsOneWidget); // formal button
+    expect(find.text('危害回報'), findsNothing);
   });
 }

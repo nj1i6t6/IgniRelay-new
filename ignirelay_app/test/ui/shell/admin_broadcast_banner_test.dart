@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
+import 'package:ignirelay_app/l10n/generated/app_localizations.dart';
 import 'package:ignirelay_app/ui/shell/admin_broadcast_banner.dart';
 
 void main() {
@@ -35,6 +36,9 @@ void main() {
     addTearDown(ctrl.close);
 
     await tester.pumpWidget(MaterialApp(
+      locale: const Locale('zh'),
+      supportedLocales: S.supportedLocales,
+      localizationsDelegates: S.localizationsDelegates,
       home: Scaffold(body: AdminBroadcastBanner(source: ctrl.stream)),
     ));
     await tester.pump();
@@ -52,12 +56,40 @@ void main() {
     expect(find.text('全網公告'), findsOneWidget);
   });
 
+  testWidgets('en: scope label is localized (UI-H2c)', (tester) async {
+    final ctrl = StreamController<AdminBroadcast>.broadcast();
+    addTearDown(ctrl.close);
+
+    await tester.pumpWidget(MaterialApp(
+      locale: const Locale('en'),
+      supportedLocales: S.supportedLocales,
+      localizationsDelegates: S.localizationsDelegates,
+      home: Scaffold(body: AdminBroadcastBanner(source: ctrl.stream)),
+    ));
+    await tester.pump();
+
+    ctrl.add(AdminBroadcast(
+      eventId: 'x',
+      scope: 2,
+      message: 'Evacuate to high ground',
+      receivedAt: DateTime.now(),
+    ));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Network-wide announcement'), findsOneWidget);
+    expect(find.text('全網公告'), findsNothing);
+  });
+
   testWidgets('auto-dismisses a directive after its expires_at', (tester) async {
     var now = DateTime(2026, 6, 15, 12, 0, 0);
     final ctrl = StreamController<AdminBroadcast>.broadcast();
     addTearDown(ctrl.close);
 
     await tester.pumpWidget(MaterialApp(
+      locale: const Locale('zh'),
+      supportedLocales: S.supportedLocales,
+      localizationsDelegates: S.localizationsDelegates,
       home: Scaffold(
         body: AdminBroadcastBanner(
           source: ctrl.stream,

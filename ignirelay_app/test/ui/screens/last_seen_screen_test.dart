@@ -13,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/services/position_estimator.dart';
+import 'package:ignirelay_app/l10n/generated/app_localizations.dart';
 import 'package:ignirelay_app/ui/screens/position/last_seen_screen.dart';
 import 'package:ignirelay_app/ui/screens/position/relative_radar.dart';
 import 'package:ignirelay_app/ui/widgets/status_chip.dart';
@@ -37,8 +38,12 @@ void main() {
   Widget screen({
     DateTime Function()? now,
     PositionEstimate? Function()? localEstimate,
+    Locale locale = const Locale('zh'),
   }) =>
       MaterialApp(
+        locale: locale,
+        supportedLocales: S.supportedLocales,
+        localizationsDelegates: S.localizationsDelegates,
         home: LastSeenScreen(
           presenceSource: pres.stream,
           checkpointSource: cp.stream,
@@ -225,6 +230,9 @@ void main() {
       ageSeconds: 0,
     );
     await tester.pumpWidget(MaterialApp(
+      locale: const Locale('zh'),
+      supportedLocales: S.supportedLocales,
+      localizationsDelegates: S.localizationsDelegates,
       home: LastSeenScreen(
         presenceSource: pres.stream,
         checkpointSource: cp.stream,
@@ -266,5 +274,15 @@ void main() {
 
     expect(find.byType(RelativeRadar), findsNothing);
     expect(find.textContaining('需要本機位置才能顯示相對方位'), findsOneWidget);
+  });
+
+  testWidgets('en: empty state renders English copy (UI-H2c)', (tester) async {
+    await tester.pumpWidget(screen(locale: const Locale('en')));
+    await tester.pump();
+
+    expect(find.text('Last trusted position'), findsOneWidget); // header
+    expect(find.textContaining('No position evidence yet'), findsOneWidget);
+    expect(find.textContaining('目前位置'), findsNothing);
+    expect(find.text('最後可信位置'), findsNothing);
   });
 }

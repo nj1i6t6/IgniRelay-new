@@ -8,6 +8,7 @@
 
 import 'package:flutter/material.dart';
 
+import 'package:ignirelay_app/l10n/l10n_ext.dart';
 import 'package:ignirelay_app/ui/theme/igni_colors.dart';
 import 'package:ignirelay_app/ui/theme/igni_tokens.dart';
 import 'package:ignirelay_app/ui/theme/igni_typography.dart';
@@ -20,21 +21,22 @@ class AssistTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.igni;
+    final l = context.l10n;
     return ListView(
       padding: const EdgeInsets.only(bottom: IgniSpacing.xl3),
       children: [
-        const IgniSubPageHeader(title: '協助', subtitle: '離線協助與求助資源'),
+        IgniSubPageHeader(title: l.assistTitle, subtitle: l.assistSubtitle),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: IgniSpacing.lg),
           child: IgniCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('離線協助', style: IgniTypography.titleMedium(p.text0)),
+                Text(l.assistOfflineTitle,
+                    style: IgniTypography.titleMedium(p.text0)),
                 const SizedBox(height: IgniSpacing.xs),
                 Text(
-                  '離線求助資源與求救後續引導即將提供。需要緊急求救時，'
-                  '可隨時使用畫面上的全域求救鍵。',
+                  l.assistOfflineBody,
                   style: IgniTypography.bodySmall(p.text2),
                 ),
               ],

@@ -5,8 +5,10 @@
 // 零 app/ui import，沿用 A10/A10b（position_estimator / relative_position）的純函式風格，
 // 可獨立單元測試。
 //
-// Stage A 誠實邊界：cloud 永遠 stub/off（雲端串接留 Stage E），best path 與 cloud 文案
-// 一律不宣稱「可達/已連線」。不上 wire/DB——這裡只讀別人算好的數字。
+// Stage A 誠實邊界：cloud 永遠 stub/off（雲端串接留 Stage E）。本檔維持**純 Dart**、
+// 不 import l10n——best path / cloud 的使用者文案（含 Stage A「不宣稱可達/已連線」的誠實
+// 措辭）改由 [SafetyTab] 的 render seam 以 `bestPath` enum / `cloudConfigured` → l10n 產生
+// （UI-H2c）。不上 wire/DB——這裡只讀別人算好的數字。
 
 /// 訊息目前最可能的送出路徑。Stage A 只有近距離網狀；雲端待 Stage E，故不在此列。
 enum CommsPath {
@@ -87,24 +89,6 @@ class CommunicationState {
       bestPath: path,
     );
   }
-
-  /// 一行最佳路徑文案（產品語，無工程/階段名）。
-  String get bestPathLabel {
-    switch (bestPath) {
-      case CommsPath.noField:
-        return '尚未加入場域';
-      case CommsPath.offline:
-        return '離線（近距離通訊未開啟）';
-      case CommsPath.waitingPeers:
-        return '等待鄰近裝置…';
-      case CommsPath.meshRelay:
-        return '近距離網狀傳遞';
-    }
-  }
-
-  /// Cloud 狀態一行 —— Stage A 永不宣稱可達/已連線。
-  String get cloudLabel =>
-      cloudConfigured ? '雲端：已設定（尚未啟用）' : '雲端：離線';
 }
 
 /// 一次足跡發佈是否算「真的送出」——只有被接受或排入佇列才算（UI-F4 / Owner req 1）。

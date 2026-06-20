@@ -7351,6 +7351,858 @@ abstract class S {
   /// In zh, this message translates to:
   /// **'12 分鐘前'**
   String get previewCheckpointAgo;
+
+  /// No description provided for @commonSend.
+  ///
+  /// In zh, this message translates to:
+  /// **'送出'**
+  String get commonSend;
+
+  /// No description provided for @noCoordinate.
+  ///
+  /// In zh, this message translates to:
+  /// **'無座標'**
+  String get noCoordinate;
+
+  /// No description provided for @noCoordinateParen.
+  ///
+  /// In zh, this message translates to:
+  /// **'（無座標）'**
+  String get noCoordinateParen;
+
+  /// No description provided for @timeJustNow.
+  ///
+  /// In zh, this message translates to:
+  /// **'剛剛'**
+  String get timeJustNow;
+
+  /// No description provided for @timeAgoSeconds.
+  ///
+  /// In zh, this message translates to:
+  /// **'{seconds} 秒前'**
+  String timeAgoSeconds(int seconds);
+
+  /// No description provided for @timeAgoMinutes.
+  ///
+  /// In zh, this message translates to:
+  /// **'{minutes} 分鐘前'**
+  String timeAgoMinutes(int minutes);
+
+  /// No description provided for @timeAgoHours.
+  ///
+  /// In zh, this message translates to:
+  /// **'{hours} 小時前'**
+  String timeAgoHours(int hours);
+
+  /// No description provided for @timeAgoDays.
+  ///
+  /// In zh, this message translates to:
+  /// **'{days} 天前'**
+  String timeAgoDays(int days);
+
+  /// No description provided for @safetyTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'我的安全'**
+  String get safetyTitle;
+
+  /// No description provided for @safetySubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'通訊與足跡'**
+  String get safetySubtitle;
+
+  /// No description provided for @safetyToggleFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'通訊切換失敗：{error}'**
+  String safetyToggleFailed(String error);
+
+  /// No description provided for @safetyUpdateNoField.
+  ///
+  /// In zh, this message translates to:
+  /// **'尚未加入場域 — 請先到「我的」加入或建立場域'**
+  String get safetyUpdateNoField;
+
+  /// No description provided for @safetyUpdateSent.
+  ///
+  /// In zh, this message translates to:
+  /// **'已更新足跡（{count} 個鄰近裝置）'**
+  String safetyUpdateSent(int count);
+
+  /// No description provided for @safetyUpdateQueued.
+  ///
+  /// In zh, this message translates to:
+  /// **'足跡已排入佇列，待鄰近裝置上線後送出'**
+  String get safetyUpdateQueued;
+
+  /// No description provided for @safetyUpdateAttempted.
+  ///
+  /// In zh, this message translates to:
+  /// **'已嘗試更新足跡'**
+  String get safetyUpdateAttempted;
+
+  /// No description provided for @safetyUpdateFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'更新足跡失敗：{error}'**
+  String safetyUpdateFailed(String error);
+
+  /// No description provided for @safetyCommsOn.
+  ///
+  /// In zh, this message translates to:
+  /// **'近距離通訊：開啟'**
+  String get safetyCommsOn;
+
+  /// No description provided for @safetyCommsOff.
+  ///
+  /// In zh, this message translates to:
+  /// **'近距離通訊：關閉'**
+  String get safetyCommsOff;
+
+  /// No description provided for @safetyTurnOn.
+  ///
+  /// In zh, this message translates to:
+  /// **'開啟'**
+  String get safetyTurnOn;
+
+  /// No description provided for @safetyTurnOff.
+  ///
+  /// In zh, this message translates to:
+  /// **'關閉'**
+  String get safetyTurnOff;
+
+  /// No description provided for @safetyCurrentPath.
+  ///
+  /// In zh, this message translates to:
+  /// **'目前路徑：{path}'**
+  String safetyCurrentPath(String path);
+
+  /// No description provided for @safetyStatPeers.
+  ///
+  /// In zh, this message translates to:
+  /// **'鄰近裝置'**
+  String get safetyStatPeers;
+
+  /// No description provided for @safetyStatSent.
+  ///
+  /// In zh, this message translates to:
+  /// **'已送'**
+  String get safetyStatSent;
+
+  /// No description provided for @safetyStatReceived.
+  ///
+  /// In zh, this message translates to:
+  /// **'已收'**
+  String get safetyStatReceived;
+
+  /// No description provided for @safetyStatQueued.
+  ///
+  /// In zh, this message translates to:
+  /// **'待送'**
+  String get safetyStatQueued;
+
+  /// No description provided for @safetyLastFootprint.
+  ///
+  /// In zh, this message translates to:
+  /// **'最後足跡：{time}'**
+  String safetyLastFootprint(String time);
+
+  /// No description provided for @safetyFootprintTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'足跡'**
+  String get safetyFootprintTitle;
+
+  /// No description provided for @safetyFootprintBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'讓附近的人看見你最後可信的位置。'**
+  String get safetyFootprintBody;
+
+  /// No description provided for @safetyUpdateNow.
+  ///
+  /// In zh, this message translates to:
+  /// **'立即更新足跡'**
+  String get safetyUpdateNow;
+
+  /// No description provided for @safetyAutoBeacon.
+  ///
+  /// In zh, this message translates to:
+  /// **'自動足跡信標'**
+  String get safetyAutoBeacon;
+
+  /// No description provided for @safetyMotion.
+  ///
+  /// In zh, this message translates to:
+  /// **'動作偵測：{state}'**
+  String safetyMotion(String state);
+
+  /// No description provided for @safetyGpsFix.
+  ///
+  /// In zh, this message translates to:
+  /// **'GPS 定位：{age}'**
+  String safetyGpsFix(String age);
+
+  /// No description provided for @safetyGpsPolicy.
+  ///
+  /// In zh, this message translates to:
+  /// **'定位策略：{reason}'**
+  String safetyGpsPolicy(String reason);
+
+  /// No description provided for @safetyRecentTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'最近足跡'**
+  String get safetyRecentTitle;
+
+  /// No description provided for @safetyNoFootprint.
+  ///
+  /// In zh, this message translates to:
+  /// **'尚無足跡'**
+  String get safetyNoFootprint;
+
+  /// No description provided for @commsPathNoField.
+  ///
+  /// In zh, this message translates to:
+  /// **'尚未加入場域'**
+  String get commsPathNoField;
+
+  /// No description provided for @commsPathOffline.
+  ///
+  /// In zh, this message translates to:
+  /// **'離線（近距離通訊未開啟）'**
+  String get commsPathOffline;
+
+  /// No description provided for @commsPathWaiting.
+  ///
+  /// In zh, this message translates to:
+  /// **'等待鄰近裝置…'**
+  String get commsPathWaiting;
+
+  /// No description provided for @commsPathMesh.
+  ///
+  /// In zh, this message translates to:
+  /// **'近距離網狀傳遞'**
+  String get commsPathMesh;
+
+  /// No description provided for @cloudOffline.
+  ///
+  /// In zh, this message translates to:
+  /// **'雲端：離線'**
+  String get cloudOffline;
+
+  /// No description provided for @cloudConfigured.
+  ///
+  /// In zh, this message translates to:
+  /// **'雲端：已設定（尚未啟用）'**
+  String get cloudConfigured;
+
+  /// No description provided for @gpsNoFix.
+  ///
+  /// In zh, this message translates to:
+  /// **'尚無定位'**
+  String get gpsNoFix;
+
+  /// No description provided for @gpsReasonMovingRefresh.
+  ///
+  /// In zh, this message translates to:
+  /// **'移動時更新'**
+  String get gpsReasonMovingRefresh;
+
+  /// No description provided for @gpsReasonMovingReuse.
+  ///
+  /// In zh, this message translates to:
+  /// **'移動中沿用新定位'**
+  String get gpsReasonMovingReuse;
+
+  /// No description provided for @gpsReasonStationary.
+  ///
+  /// In zh, this message translates to:
+  /// **'靜止沿用上次'**
+  String get gpsReasonStationary;
+
+  /// No description provided for @gpsReasonUnknown.
+  ///
+  /// In zh, this message translates to:
+  /// **'沿用上次'**
+  String get gpsReasonUnknown;
+
+  /// No description provided for @gpsReasonManual.
+  ///
+  /// In zh, this message translates to:
+  /// **'手動更新'**
+  String get gpsReasonManual;
+
+  /// No description provided for @gpsReasonUnavailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'定位不可用'**
+  String get gpsReasonUnavailable;
+
+  /// No description provided for @beaconOff.
+  ///
+  /// In zh, this message translates to:
+  /// **'已關閉'**
+  String get beaconOff;
+
+  /// No description provided for @beaconStatus.
+  ///
+  /// In zh, this message translates to:
+  /// **'每 {secs} 秒 · 已更新 {count} 次{low}'**
+  String beaconStatus(int secs, int count, String low);
+
+  /// No description provided for @beaconLowSuffix.
+  ///
+  /// In zh, this message translates to:
+  /// **'（低電量降頻）'**
+  String get beaconLowSuffix;
+
+  /// No description provided for @motionMoving.
+  ///
+  /// In zh, this message translates to:
+  /// **'移動中'**
+  String get motionMoving;
+
+  /// No description provided for @motionStationary.
+  ///
+  /// In zh, this message translates to:
+  /// **'靜止'**
+  String get motionStationary;
+
+  /// No description provided for @motionUnknown.
+  ///
+  /// In zh, this message translates to:
+  /// **'尚未啟用'**
+  String get motionUnknown;
+
+  /// No description provided for @eventsTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'事件'**
+  String get eventsTitle;
+
+  /// No description provided for @eventsSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'危害、廣播、定點與系統事件'**
+  String get eventsSubtitle;
+
+  /// No description provided for @eventsRecentTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'最近事件'**
+  String get eventsRecentTitle;
+
+  /// No description provided for @eventsRefresh.
+  ///
+  /// In zh, this message translates to:
+  /// **'重新整理'**
+  String get eventsRefresh;
+
+  /// No description provided for @eventsEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'尚無事件'**
+  String get eventsEmpty;
+
+  /// No description provided for @eventsRowType.
+  ///
+  /// In zh, this message translates to:
+  /// **'類型 {type}'**
+  String eventsRowType(String type);
+
+  /// No description provided for @assistTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'協助'**
+  String get assistTitle;
+
+  /// No description provided for @assistSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'離線協助與求助資源'**
+  String get assistSubtitle;
+
+  /// No description provided for @assistOfflineTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'離線協助'**
+  String get assistOfflineTitle;
+
+  /// No description provided for @assistOfflineBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'離線求助資源與求救後續引導即將提供。需要緊急求救時，可隨時使用畫面上的全域求救鍵。'**
+  String get assistOfflineBody;
+
+  /// No description provided for @hazardCardTitleFormal.
+  ///
+  /// In zh, this message translates to:
+  /// **'危害回報'**
+  String get hazardCardTitleFormal;
+
+  /// No description provided for @hazardCardTitleDebug.
+  ///
+  /// In zh, this message translates to:
+  /// **'危害（HAZARD）'**
+  String get hazardCardTitleDebug;
+
+  /// No description provided for @hazardCardReport.
+  ///
+  /// In zh, this message translates to:
+  /// **'回報危害'**
+  String get hazardCardReport;
+
+  /// No description provided for @hazardCardManualDebug.
+  ///
+  /// In zh, this message translates to:
+  /// **'手動 HAZARD'**
+  String get hazardCardManualDebug;
+
+  /// No description provided for @hazardCardManualDebugTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'手動 HAZARD（debug）'**
+  String get hazardCardManualDebugTitle;
+
+  /// No description provided for @hazardCardDebugSampleDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'測試危害（debug）'**
+  String get hazardCardDebugSampleDesc;
+
+  /// No description provided for @hazardCardBodyFormal.
+  ///
+  /// In zh, this message translates to:
+  /// **'附近的危害事件。回報時座標取自本機定位；無定位時無法回報，請先取得位置。'**
+  String get hazardCardBodyFormal;
+
+  /// No description provided for @hazardCardBodyDebug.
+  ///
+  /// In zh, this message translates to:
+  /// **'收到的 typed HAZARD 事件（A3 接收側）。手動送出為 debug 占位（座標取本機 GPS，無定位則不送）。'**
+  String get hazardCardBodyDebug;
+
+  /// No description provided for @hazardCardDescLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'描述（≤800B）'**
+  String get hazardCardDescLabel;
+
+  /// No description provided for @hazardCardNoLocation.
+  ///
+  /// In zh, this message translates to:
+  /// **'目前沒有位置，請取得位置後再回報'**
+  String get hazardCardNoLocation;
+
+  /// No description provided for @hazardCardSentFormal.
+  ///
+  /// In zh, this message translates to:
+  /// **'已回報危害「{type}」· 需已加入場域才會廣播'**
+  String hazardCardSentFormal(String type);
+
+  /// No description provided for @hazardCardSentDebug.
+  ///
+  /// In zh, this message translates to:
+  /// **'HAZARD「{type}」已送出（id {id}） · 需已加入場域才會實際廣播'**
+  String hazardCardSentDebug(String type, String id);
+
+  /// No description provided for @hazardCardSendFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'HAZARD 送出失敗: {error}'**
+  String hazardCardSendFailed(String error);
+
+  /// No description provided for @hazardCardEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'（尚無 HAZARD）'**
+  String get hazardCardEmpty;
+
+  /// No description provided for @hazardCardTypeFire.
+  ///
+  /// In zh, this message translates to:
+  /// **'火災 FIRE'**
+  String get hazardCardTypeFire;
+
+  /// No description provided for @hazardCardTypeFlood.
+  ///
+  /// In zh, this message translates to:
+  /// **'淹水 FLOOD'**
+  String get hazardCardTypeFlood;
+
+  /// No description provided for @hazardCardTypeCollapse.
+  ///
+  /// In zh, this message translates to:
+  /// **'倒塌 COLLAPSE'**
+  String get hazardCardTypeCollapse;
+
+  /// No description provided for @hazardCardTypeChemical.
+  ///
+  /// In zh, this message translates to:
+  /// **'化學 CHEMICAL'**
+  String get hazardCardTypeChemical;
+
+  /// No description provided for @hazardCardTypeRoadblock.
+  ///
+  /// In zh, this message translates to:
+  /// **'路阻 ROADBLOCK'**
+  String get hazardCardTypeRoadblock;
+
+  /// No description provided for @hazardCardTypeOther.
+  ///
+  /// In zh, this message translates to:
+  /// **'其他 OTHER'**
+  String get hazardCardTypeOther;
+
+  /// No description provided for @checkpointCardTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'CHECKPOINT（點名通過）'**
+  String get checkpointCardTitle;
+
+  /// No description provided for @checkpointCardManual.
+  ///
+  /// In zh, this message translates to:
+  /// **'手動 CHECKPOINT'**
+  String get checkpointCardManual;
+
+  /// No description provided for @checkpointCardIdHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'點名點 / Field Node 錨點 id'**
+  String get checkpointCardIdHint;
+
+  /// No description provided for @checkpointCardBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'收到的點名通過事件（非 LWW，每次通過皆獨立保留）。'**
+  String get checkpointCardBody;
+
+  /// No description provided for @checkpointCardEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'（尚無 CHECKPOINT）'**
+  String get checkpointCardEmpty;
+
+  /// No description provided for @checkpointCardNoField.
+  ///
+  /// In zh, this message translates to:
+  /// **'尚未加入場域 — 請先在「場域」卡片加入或產生一個場域'**
+  String get checkpointCardNoField;
+
+  /// No description provided for @checkpointCardSent.
+  ///
+  /// In zh, this message translates to:
+  /// **'CHECKPOINT「{id}」已送出（{count} peer）'**
+  String checkpointCardSent(String id, int count);
+
+  /// No description provided for @checkpointCardQueued.
+  ///
+  /// In zh, this message translates to:
+  /// **'CHECKPOINT「{id}」已排入佇列（無在線 peer，深度 {depth}）'**
+  String checkpointCardQueued(String id, int depth);
+
+  /// No description provided for @checkpointCardAttempted.
+  ///
+  /// In zh, this message translates to:
+  /// **'CHECKPOINT「{id}」已嘗試送出（{count} peer，無人接受）'**
+  String checkpointCardAttempted(String id, int count);
+
+  /// No description provided for @checkpointCardSendFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'CHECKPOINT 送出失敗: {error}'**
+  String checkpointCardSendFailed(String error);
+
+  /// No description provided for @adminScopeField.
+  ///
+  /// In zh, this message translates to:
+  /// **'本場域公告'**
+  String get adminScopeField;
+
+  /// No description provided for @adminScopeAll.
+  ///
+  /// In zh, this message translates to:
+  /// **'全網公告'**
+  String get adminScopeAll;
+
+  /// No description provided for @adminScopeDefault.
+  ///
+  /// In zh, this message translates to:
+  /// **'公告'**
+  String get adminScopeDefault;
+
+  /// No description provided for @adminExpiry.
+  ///
+  /// In zh, this message translates to:
+  /// **'至 {time}'**
+  String adminExpiry(String time);
+
+  /// No description provided for @adminPublishTest.
+  ///
+  /// In zh, this message translates to:
+  /// **'發測試 ADMIN 廣播'**
+  String get adminPublishTest;
+
+  /// No description provided for @adminTestMessage.
+  ///
+  /// In zh, this message translates to:
+  /// **'測試管理廣播 {time}'**
+  String adminTestMessage(String time);
+
+  /// No description provided for @adminNoField.
+  ///
+  /// In zh, this message translates to:
+  /// **'尚未加入場域 — 請先加入或產生一個場域'**
+  String get adminNoField;
+
+  /// No description provided for @adminSent.
+  ///
+  /// In zh, this message translates to:
+  /// **'ADMIN 廣播已送出（{count} peer）'**
+  String adminSent(int count);
+
+  /// No description provided for @adminQueued.
+  ///
+  /// In zh, this message translates to:
+  /// **'ADMIN 廣播已排入佇列（深度 {depth}）'**
+  String adminQueued(int depth);
+
+  /// No description provided for @adminAttempted.
+  ///
+  /// In zh, this message translates to:
+  /// **'ADMIN 廣播已嘗試送出（{count} peer）'**
+  String adminAttempted(int count);
+
+  /// No description provided for @adminSendFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'ADMIN 廣播送出失敗: {error}'**
+  String adminSendFailed(String error);
+
+  /// No description provided for @sosTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'緊急求救'**
+  String get sosTitle;
+
+  /// No description provided for @sosSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'長按求救鈕 1.5 秒，選擇狀態後 5 秒內可取消'**
+  String get sosSubtitle;
+
+  /// No description provided for @sosNearbyHeader.
+  ///
+  /// In zh, this message translates to:
+  /// **'附近求救（{count}）'**
+  String sosNearbyHeader(int count);
+
+  /// No description provided for @sosNoneNearby.
+  ///
+  /// In zh, this message translates to:
+  /// **'目前沒有收到求救訊號。'**
+  String get sosNoneNearby;
+
+  /// No description provided for @sosSending.
+  ///
+  /// In zh, this message translates to:
+  /// **'求救傳送中…'**
+  String get sosSending;
+
+  /// No description provided for @sosTriggerTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'發出求救'**
+  String get sosTriggerTitle;
+
+  /// No description provided for @sosTriggerBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'長按下方按鈕 1.5 秒，再選擇你的狀態。送出前還有 5 秒可取消。'**
+  String get sosTriggerBody;
+
+  /// No description provided for @sosHoldButton.
+  ///
+  /// In zh, this message translates to:
+  /// **'按住求救'**
+  String get sosHoldButton;
+
+  /// No description provided for @sosCountdownTrapped.
+  ///
+  /// In zh, this message translates to:
+  /// **'受困求救'**
+  String get sosCountdownTrapped;
+
+  /// No description provided for @sosCountdownInjured.
+  ///
+  /// In zh, this message translates to:
+  /// **'受傷求救'**
+  String get sosCountdownInjured;
+
+  /// No description provided for @sosCountdownHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'秒後送出 — 仍可取消'**
+  String get sosCountdownHint;
+
+  /// No description provided for @sosActiveTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'你已發出求救'**
+  String get sosActiveTitle;
+
+  /// No description provided for @sosChipTrapped.
+  ///
+  /// In zh, this message translates to:
+  /// **'受困'**
+  String get sosChipTrapped;
+
+  /// No description provided for @sosChipInjured.
+  ///
+  /// In zh, this message translates to:
+  /// **'受傷'**
+  String get sosChipInjured;
+
+  /// No description provided for @sosMarkSafe.
+  ///
+  /// In zh, this message translates to:
+  /// **'我安全了'**
+  String get sosMarkSafe;
+
+  /// No description provided for @sosChooseStatus.
+  ///
+  /// In zh, this message translates to:
+  /// **'選擇你的狀態'**
+  String get sosChooseStatus;
+
+  /// No description provided for @sosSeverityTrapped.
+  ///
+  /// In zh, this message translates to:
+  /// **'受困（最高優先）'**
+  String get sosSeverityTrapped;
+
+  /// No description provided for @sosMarkSafeNoField.
+  ///
+  /// In zh, this message translates to:
+  /// **'尚未加入場域 — 無法送出狀態更新'**
+  String get sosMarkSafeNoField;
+
+  /// No description provided for @sosMarkSafeSent.
+  ///
+  /// In zh, this message translates to:
+  /// **'已送出「我安全了」'**
+  String get sosMarkSafeSent;
+
+  /// No description provided for @sosResolvedChip.
+  ///
+  /// In zh, this message translates to:
+  /// **'已解除'**
+  String get sosResolvedChip;
+
+  /// No description provided for @sosOutcomeSent.
+  ///
+  /// In zh, this message translates to:
+  /// **'已送出。'**
+  String get sosOutcomeSent;
+
+  /// No description provided for @sosOutcomeNoField.
+  ///
+  /// In zh, this message translates to:
+  /// **'尚未加入場域 — 求救未送出，請先加入場域。'**
+  String get sosOutcomeNoField;
+
+  /// No description provided for @sosOutcomeAccepted.
+  ///
+  /// In zh, this message translates to:
+  /// **'已送達 {count} 個鄰近裝置。'**
+  String sosOutcomeAccepted(int count);
+
+  /// No description provided for @sosOutcomeQueued.
+  ///
+  /// In zh, this message translates to:
+  /// **'已排入佇列（無在線鄰近裝置，深度 {depth}）。'**
+  String sosOutcomeQueued(int depth);
+
+  /// No description provided for @sosOutcomeAttempted.
+  ///
+  /// In zh, this message translates to:
+  /// **'已嘗試送出（{count} 個，暫無人接收）。'**
+  String sosOutcomeAttempted(int count);
+
+  /// No description provided for @lastSeenTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'最後可信位置'**
+  String get lastSeenTitle;
+
+  /// No description provided for @lastSeenSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'依足跡 / 點名通過推估，非即時定位'**
+  String get lastSeenSubtitle;
+
+  /// No description provided for @lastSeenNeedLocalPosition.
+  ///
+  /// In zh, this message translates to:
+  /// **'需要本機位置才能顯示相對方位'**
+  String get lastSeenNeedLocalPosition;
+
+  /// No description provided for @lastSeenToggleList.
+  ///
+  /// In zh, this message translates to:
+  /// **'列表'**
+  String get lastSeenToggleList;
+
+  /// No description provided for @lastSeenToggleRadar.
+  ///
+  /// In zh, this message translates to:
+  /// **'雷達'**
+  String get lastSeenToggleRadar;
+
+  /// No description provided for @lastSeenEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'尚無位置證據 — 收到足跡（PRESENCE）或點名通過（CHECKPOINT）後，這裡會列出每人的最後可信位置。'**
+  String get lastSeenEmpty;
+
+  /// No description provided for @lastSeenUncertainty.
+  ///
+  /// In zh, this message translates to:
+  /// **'誤差 ~{meters} m'**
+  String lastSeenUncertainty(int meters);
+
+  /// No description provided for @lastSeenAnchor.
+  ///
+  /// In zh, this message translates to:
+  /// **'錨點 {id}'**
+  String lastSeenAnchor(String id);
+
+  /// No description provided for @confidenceHigh.
+  ///
+  /// In zh, this message translates to:
+  /// **'可信度 高'**
+  String get confidenceHigh;
+
+  /// No description provided for @confidenceMedium.
+  ///
+  /// In zh, this message translates to:
+  /// **'可信度 中'**
+  String get confidenceMedium;
+
+  /// No description provided for @confidenceLow.
+  ///
+  /// In zh, this message translates to:
+  /// **'可信度 低'**
+  String get confidenceLow;
+
+  /// No description provided for @radarCaption.
+  ///
+  /// In zh, this message translates to:
+  /// **'北朝上 · 外環 {range} · 圓心為本機（最後可信位置投影）'**
+  String radarCaption(String range);
 }
 
 class _SDelegate extends LocalizationsDelegate<S> {

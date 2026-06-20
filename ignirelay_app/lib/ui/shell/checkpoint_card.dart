@@ -20,6 +20,7 @@ import 'package:provider/provider.dart';
 
 import 'package:ignirelay_app/app/controllers/checkpoint_controller.dart';
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
+import 'package:ignirelay_app/l10n/l10n_ext.dart';
 
 class CheckpointCard extends StatefulWidget {
   const CheckpointCard({super.key});
@@ -61,28 +62,29 @@ class _CheckpointCardState extends State<CheckpointCard> {
   }
 
   Future<void> _promptAndPublish() async {
+    final l = context.l10n;
     final controller = TextEditingController(text: 'CP-');
     final id = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('手動 CHECKPOINT'),
+        title: Text(l.checkpointCardManual),
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'checkpoint_id',
-            hintText: '點名點 / Field Node 錨點 id',
+            hintText: l.checkpointCardIdHint,
           ),
           onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
+            child: Text(l.commonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: const Text('送出'),
+            child: Text(l.commonSend),
           ),
         ],
       ),
@@ -95,20 +97,20 @@ class _CheckpointCardState extends State<CheckpointCard> {
       if (!mounted) return;
       final String msg;
       if (outcome.noField) {
-        msg = '尚未加入場域 — 請先在「場域」卡片加入或產生一個場域';
+        msg = l.checkpointCardNoField;
       } else if (outcome.anyAccepted) {
-        msg = 'CHECKPOINT「$id」已送出（${outcome.attempted} peer）';
+        msg = l.checkpointCardSent(id, outcome.attempted);
       } else if (outcome.queued) {
-        msg = 'CHECKPOINT「$id」已排入佇列（無在線 peer，深度 ${outcome.pendingDepth}）';
+        msg = l.checkpointCardQueued(id, outcome.pendingDepth);
       } else {
-        msg = 'CHECKPOINT「$id」已嘗試送出（${outcome.attempted} peer，無人接受）';
+        msg = l.checkpointCardAttempted(id, outcome.attempted);
       }
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(msg)));
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('CHECKPOINT 送出失敗: $e')));
+            .showSnackBar(SnackBar(content: Text(l.checkpointCardSendFailed('$e'))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -117,6 +119,7 @@ class _CheckpointCardState extends State<CheckpointCard> {
 
   @override
   Widget build(BuildContext context) {
+    final l = context.l10n;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -124,28 +127,28 @@ class _CheckpointCardState extends State<CheckpointCard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              const Text('CHECKPOINT（點名通過）',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(l.checkpointCardTitle,
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
               const Spacer(),
               // 手動按鈕：debug-only 占位（真實流程綁 Node QR/接觸 → Stage D）。
               if (kDebugMode)
                 FilledButton.tonalIcon(
                   onPressed: _busy ? null : _promptAndPublish,
                   icon: const Icon(Icons.how_to_reg, size: 18),
-                  label: const Text('手動 CHECKPOINT'),
+                  label: Text(l.checkpointCardManual),
                 ),
             ]),
             const SizedBox(height: 4),
-            const Text(
-              '收到的點名通過事件（非 LWW，每次通過皆獨立保留）。',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+            Text(
+              l.checkpointCardBody,
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
             const SizedBox(height: 8),
             if (_crossings.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child:
-                    Text('（尚無 CHECKPOINT）', style: TextStyle(color: Colors.grey)),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(l.checkpointCardEmpty,
+                    style: const TextStyle(color: Colors.grey)),
               )
             else
               ..._crossings.map(_crossingRow),
@@ -159,7 +162,7 @@ class _CheckpointCardState extends State<CheckpointCard> {
     final when = c.observedAt.toIso8601String().substring(11, 19);
     final where = (c.lat != null && c.lng != null)
         ? '${c.lat!.toStringAsFixed(5)}, ${c.lng!.toStringAsFixed(5)}'
-        : '（無座標）';
+        : context.l10n.noCoordinateParen;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(children: [

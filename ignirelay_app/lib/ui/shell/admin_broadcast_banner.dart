@@ -29,6 +29,8 @@ import 'package:provider/provider.dart';
 
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/services/event_publisher_v2_facade.dart';
+import 'package:ignirelay_app/l10n/generated/app_localizations.dart';
+import 'package:ignirelay_app/l10n/l10n_ext.dart';
 
 class AdminBroadcastBanner extends StatefulWidget {
   const AdminBroadcastBanner({
@@ -103,24 +105,26 @@ class _AdminBroadcastBannerState extends State<AdminBroadcastBanner> {
   Future<void> _publishTest() async {
     final facade = context.read<EventPublisherV2Facade>();
     final messenger = ScaffoldMessenger.of(context);
+    final l = context.l10n;
     try {
       final outcome = await facade.publishAdminBroadcast(
-        message: '測試管理廣播 ${DateTime.now().toIso8601String().substring(11, 19)}',
+        message: l.adminTestMessage(
+            DateTime.now().toIso8601String().substring(11, 19)),
         ttl: const Duration(minutes: 10),
       );
       final String msg;
       if (outcome.noField) {
-        msg = '尚未加入場域 — 請先加入或產生一個場域';
+        msg = l.adminNoField;
       } else if (outcome.anyAccepted) {
-        msg = 'ADMIN 廣播已送出（${outcome.attempted} peer）';
+        msg = l.adminSent(outcome.attempted);
       } else if (outcome.queued) {
-        msg = 'ADMIN 廣播已排入佇列（深度 ${outcome.pendingDepth}）';
+        msg = l.adminQueued(outcome.pendingDepth);
       } else {
-        msg = 'ADMIN 廣播已嘗試送出（${outcome.attempted} peer）';
+        msg = l.adminAttempted(outcome.attempted);
       }
       messenger.showSnackBar(SnackBar(content: Text(msg)));
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('ADMIN 廣播送出失敗: $e')));
+      messenger.showSnackBar(SnackBar(content: Text(l.adminSendFailed('$e'))));
     }
   }
 
@@ -143,7 +147,7 @@ class _AdminBroadcastBannerState extends State<AdminBroadcastBanner> {
               child: TextButton.icon(
                 onPressed: _publishTest,
                 icon: const Icon(Icons.campaign, size: 18),
-                label: const Text('發測試 ADMIN 廣播'),
+                label: Text(context.l10n.adminPublishTest),
               ),
             ),
         ],
@@ -152,6 +156,7 @@ class _AdminBroadcastBannerState extends State<AdminBroadcastBanner> {
   }
 
   Widget _bannerCard(AdminBroadcast b) {
+    final l = context.l10n;
     return Card(
       color: Colors.amber.shade100,
       margin: const EdgeInsets.only(bottom: 6),
@@ -167,14 +172,16 @@ class _AdminBroadcastBannerState extends State<AdminBroadcastBanner> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(children: [
-                    Text(_scopeLabel(b.scope),
+                    Text(_scopeLabel(l, b.scope),
                         style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
                             color: Colors.amber.shade900)),
                     if (b.expiresAt != null) ...[
                       const Spacer(),
-                      Text('至 ${b.expiresAt!.toIso8601String().substring(11, 16)}',
+                      Text(
+                          l.adminExpiry(
+                              b.expiresAt!.toIso8601String().substring(11, 16)),
                           style:
                               const TextStyle(fontSize: 11, color: Colors.black54)),
                     ],
@@ -192,15 +199,15 @@ class _AdminBroadcastBannerState extends State<AdminBroadcastBanner> {
     );
   }
 
-  // AdminScope.* → label。UI 不 import app/proto，故以本地數值對照。
-  static String _scopeLabel(int scope) {
+  // AdminScope.* → label（UI-H2c 經 l10n）。UI 不 import app/proto，故以本地數值對照。
+  static String _scopeLabel(S l, int scope) {
     switch (scope) {
       case 1:
-        return '本場域公告';
+        return l.adminScopeField;
       case 2:
-        return '全網公告';
+        return l.adminScopeAll;
       default:
-        return '公告';
+        return l.adminScopeDefault;
     }
   }
 }

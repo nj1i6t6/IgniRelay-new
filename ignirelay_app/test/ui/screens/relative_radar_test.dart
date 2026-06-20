@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ignirelay_app/app/services/position_estimator.dart';
+import 'package:ignirelay_app/l10n/generated/app_localizations.dart';
 import 'package:ignirelay_app/ui/screens/position/relative_radar.dart';
 import 'package:ignirelay_app/ui/widgets/status_chip.dart';
 
@@ -28,8 +29,12 @@ PositionEstimate _at(double lat, double lng,
       ageSeconds: 30,
     );
 
-Future<void> _pump(WidgetTester tester, List<RadarSubject> subjects) async {
+Future<void> _pump(WidgetTester tester, List<RadarSubject> subjects,
+    {Locale locale = const Locale('zh')}) async {
   await tester.pumpWidget(MaterialApp(
+    locale: locale,
+    supportedLocales: S.supportedLocales,
+    localizationsDelegates: S.localizationsDelegates,
     home: Scaffold(
       body: SizedBox(
         width: 400,
@@ -113,5 +118,11 @@ void main() {
       RadarSubject(key: 'p-far', label: 'far', estimate: _at(27.5, 121.0)),
     ]);
     expect(find.textContaining('>'), findsWidgets);
+  });
+
+  testWidgets('en: caption renders English (UI-H2c)', (tester) async {
+    await _pump(tester, const [], locale: const Locale('en'));
+    expect(find.textContaining('North up'), findsOneWidget);
+    expect(find.textContaining('北朝上'), findsNothing);
   });
 }

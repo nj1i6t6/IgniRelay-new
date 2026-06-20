@@ -34,6 +34,7 @@ import 'package:provider/provider.dart';
 import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/services/local_position_source.dart';
 import 'package:ignirelay_app/app/services/position_estimator.dart';
+import 'package:ignirelay_app/l10n/l10n_ext.dart';
 import 'package:ignirelay_app/ui/screens/position/relative_radar.dart';
 import 'package:ignirelay_app/ui/theme/igni_colors.dart';
 import 'package:ignirelay_app/ui/theme/igni_tokens.dart';
@@ -266,9 +267,9 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const IgniSubPageHeader(
-              title: '最後可信位置',
-              subtitle: '依足跡 / 點名通過推估，非即時定位',
+            IgniSubPageHeader(
+              title: context.l10n.lastSeenTitle,
+              subtitle: context.l10n.lastSeenSubtitle,
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: IgniSpacing.lg),
@@ -278,7 +279,7 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(
                     IgniSpacing.lg, IgniSpacing.md, IgniSpacing.lg, 0),
-                child: _hintBanner(p, '需要本機位置才能顯示相對方位'),
+                child: _hintBanner(p, context.l10n.lastSeenNeedLocalPosition),
               ),
             const SizedBox(height: IgniSpacing.md),
             Expanded(
@@ -309,11 +310,12 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
   }
 
   Widget _viewToggle(IgniPalette p, {required bool radarActive}) {
+    final l = context.l10n;
     return Row(
       children: [
-        _togglePill(p, '列表', !radarActive, _selectList),
+        _togglePill(p, l.lastSeenToggleList, !radarActive, _selectList),
         const SizedBox(width: IgniSpacing.sm),
-        _togglePill(p, '雷達', radarActive, _selectRadar),
+        _togglePill(p, l.lastSeenToggleRadar, radarActive, _selectRadar),
       ],
     );
   }
@@ -383,7 +385,7 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: IgniSpacing.xl2),
       child: Text(
-        '尚無位置證據 — 收到足跡（PRESENCE）或點名通過（CHECKPOINT）後，這裡會列出每人的最後可信位置。',
+        context.l10n.lastSeenEmpty,
         style: IgniTypography.bodySmall(p.text2),
       ),
     );
@@ -408,7 +410,8 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
             ],
           ),
           const SizedBox(height: IgniSpacing.sm),
-          Text('最後可信位置', style: IgniTypography.sectionHeader(p.text2)),
+          Text(context.l10n.lastSeenTitle,
+              style: IgniTypography.sectionHeader(p.text2)),
           const SizedBox(height: 2),
           MonoText(_whereText(est), fontSize: 13, color: p.text1),
           const SizedBox(height: IgniSpacing.sm),
@@ -416,7 +419,7 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
             children: [
               _meta(p, _ageText(est.ageSeconds)),
               const SizedBox(width: IgniSpacing.md),
-              _meta(p, '誤差 ~${est.uncertaintyM.round()} m'),
+              _meta(p, context.l10n.lastSeenUncertainty(est.uncertaintyM.round())),
             ],
           ),
         ],
@@ -428,15 +431,17 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
       Text(text, style: IgniTypography.bodySmall(p.text2));
 
   Widget _confidenceChip(PositionConfidence c) {
+    final l = context.l10n;
     switch (c) {
       case PositionConfidence.high:
-        return const StatusChip(label: '可信度 高', tone: StatusTone.ok, dense: true);
+        return StatusChip(
+            label: l.confidenceHigh, tone: StatusTone.ok, dense: true);
       case PositionConfidence.medium:
-        return const StatusChip(
-            label: '可信度 中', tone: StatusTone.warn, dense: true);
+        return StatusChip(
+            label: l.confidenceMedium, tone: StatusTone.warn, dense: true);
       case PositionConfidence.low:
-        return const StatusChip(
-            label: '可信度 低', tone: StatusTone.neutral, dense: true);
+        return StatusChip(
+            label: l.confidenceLow, tone: StatusTone.neutral, dense: true);
     }
   }
 
@@ -446,17 +451,18 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
     }
     if (est.anchorNodeId != null) {
       final dist = est.distanceM != null ? ' · ~${est.distanceM!.round()} m' : '';
-      return '錨點 ${est.anchorNodeId}$dist';
+      return '${context.l10n.lastSeenAnchor(est.anchorNodeId!)}$dist';
     }
-    return '（無座標）';
+    return context.l10n.noCoordinateParen;
   }
 
   String _ageText(int seconds) {
-    if (seconds < 60) return '$seconds 秒前';
+    final l = context.l10n;
+    if (seconds < 60) return l.timeAgoSeconds(seconds);
     final mins = seconds ~/ 60;
-    if (mins < 60) return '$mins 分鐘前';
+    if (mins < 60) return l.timeAgoMinutes(mins);
     final hours = mins ~/ 60;
-    return '$hours 小時前';
+    return l.timeAgoHours(hours);
   }
 
   static String _hex(List<int> bytes) {

@@ -1594,5 +1594,403 @@
   "previewBroadcastDetail": "集合點改至北側出口",
   "previewBroadcastAgo": "10 分鐘前",
   "previewCheckpointTitle": "打卡 · 平安",
-  "previewCheckpointAgo": "12 分鐘前"
+  "previewCheckpointAgo": "12 分鐘前",
+  "commonSend": "送出",
+  "noCoordinate": "無座標",
+  "noCoordinateParen": "（無座標）",
+  "timeJustNow": "剛剛",
+  "timeAgoSeconds": "{seconds} 秒前",
+  "@timeAgoSeconds": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "timeAgoMinutes": "{minutes} 分鐘前",
+  "@timeAgoMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "timeAgoHours": "{hours} 小時前",
+  "@timeAgoHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "timeAgoDays": "{days} 天前",
+  "@timeAgoDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "safetyTitle": "我的安全",
+  "safetySubtitle": "通訊與足跡",
+  "safetyToggleFailed": "通訊切換失敗：{error}",
+  "@safetyToggleFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "safetyUpdateNoField": "尚未加入場域 — 請先到「我的」加入或建立場域",
+  "safetyUpdateSent": "已更新足跡（{count} 個鄰近裝置）",
+  "@safetyUpdateSent": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "safetyUpdateQueued": "足跡已排入佇列，待鄰近裝置上線後送出",
+  "safetyUpdateAttempted": "已嘗試更新足跡",
+  "safetyUpdateFailed": "更新足跡失敗：{error}",
+  "@safetyUpdateFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "safetyCommsOn": "近距離通訊：開啟",
+  "safetyCommsOff": "近距離通訊：關閉",
+  "safetyTurnOn": "開啟",
+  "safetyTurnOff": "關閉",
+  "safetyCurrentPath": "目前路徑：{path}",
+  "@safetyCurrentPath": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "safetyStatPeers": "鄰近裝置",
+  "safetyStatSent": "已送",
+  "safetyStatReceived": "已收",
+  "safetyStatQueued": "待送",
+  "safetyLastFootprint": "最後足跡：{time}",
+  "@safetyLastFootprint": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "safetyFootprintTitle": "足跡",
+  "safetyFootprintBody": "讓附近的人看見你最後可信的位置。",
+  "safetyUpdateNow": "立即更新足跡",
+  "safetyAutoBeacon": "自動足跡信標",
+  "safetyMotion": "動作偵測：{state}",
+  "@safetyMotion": {
+    "placeholders": {
+      "state": {
+        "type": "String"
+      }
+    }
+  },
+  "safetyGpsFix": "GPS 定位：{age}",
+  "@safetyGpsFix": {
+    "placeholders": {
+      "age": {
+        "type": "String"
+      }
+    }
+  },
+  "safetyGpsPolicy": "定位策略：{reason}",
+  "@safetyGpsPolicy": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "safetyRecentTitle": "最近足跡",
+  "safetyNoFootprint": "尚無足跡",
+  "commsPathNoField": "尚未加入場域",
+  "commsPathOffline": "離線（近距離通訊未開啟）",
+  "commsPathWaiting": "等待鄰近裝置…",
+  "commsPathMesh": "近距離網狀傳遞",
+  "cloudOffline": "雲端：離線",
+  "cloudConfigured": "雲端：已設定（尚未啟用）",
+  "gpsNoFix": "尚無定位",
+  "gpsReasonMovingRefresh": "移動時更新",
+  "gpsReasonMovingReuse": "移動中沿用新定位",
+  "gpsReasonStationary": "靜止沿用上次",
+  "gpsReasonUnknown": "沿用上次",
+  "gpsReasonManual": "手動更新",
+  "gpsReasonUnavailable": "定位不可用",
+  "beaconOff": "已關閉",
+  "beaconStatus": "每 {secs} 秒 · 已更新 {count} 次{low}",
+  "@beaconStatus": {
+    "placeholders": {
+      "secs": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      },
+      "low": {
+        "type": "String"
+      }
+    }
+  },
+  "beaconLowSuffix": "（低電量降頻）",
+  "motionMoving": "移動中",
+  "motionStationary": "靜止",
+  "motionUnknown": "尚未啟用",
+  "eventsTitle": "事件",
+  "eventsSubtitle": "危害、廣播、定點與系統事件",
+  "eventsRecentTitle": "最近事件",
+  "eventsRefresh": "重新整理",
+  "eventsEmpty": "尚無事件",
+  "eventsRowType": "類型 {type}",
+  "@eventsRowType": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "assistTitle": "協助",
+  "assistSubtitle": "離線協助與求助資源",
+  "assistOfflineTitle": "離線協助",
+  "assistOfflineBody": "離線求助資源與求救後續引導即將提供。需要緊急求救時，可隨時使用畫面上的全域求救鍵。",
+  "hazardCardTitleFormal": "危害回報",
+  "hazardCardTitleDebug": "危害（HAZARD）",
+  "hazardCardReport": "回報危害",
+  "hazardCardManualDebug": "手動 HAZARD",
+  "hazardCardManualDebugTitle": "手動 HAZARD（debug）",
+  "hazardCardDebugSampleDesc": "測試危害（debug）",
+  "hazardCardBodyFormal": "附近的危害事件。回報時座標取自本機定位；無定位時無法回報，請先取得位置。",
+  "hazardCardBodyDebug": "收到的 typed HAZARD 事件（A3 接收側）。手動送出為 debug 占位（座標取本機 GPS，無定位則不送）。",
+  "hazardCardDescLabel": "描述（≤800B）",
+  "hazardCardNoLocation": "目前沒有位置，請取得位置後再回報",
+  "hazardCardSentFormal": "已回報危害「{type}」· 需已加入場域才會廣播",
+  "@hazardCardSentFormal": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "hazardCardSentDebug": "HAZARD「{type}」已送出（id {id}） · 需已加入場域才會實際廣播",
+  "@hazardCardSentDebug": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      },
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "hazardCardSendFailed": "HAZARD 送出失敗: {error}",
+  "@hazardCardSendFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "hazardCardEmpty": "（尚無 HAZARD）",
+  "hazardCardTypeFire": "火災 FIRE",
+  "hazardCardTypeFlood": "淹水 FLOOD",
+  "hazardCardTypeCollapse": "倒塌 COLLAPSE",
+  "hazardCardTypeChemical": "化學 CHEMICAL",
+  "hazardCardTypeRoadblock": "路阻 ROADBLOCK",
+  "hazardCardTypeOther": "其他 OTHER",
+  "checkpointCardTitle": "CHECKPOINT（點名通過）",
+  "checkpointCardManual": "手動 CHECKPOINT",
+  "checkpointCardIdHint": "點名點 / Field Node 錨點 id",
+  "checkpointCardBody": "收到的點名通過事件（非 LWW，每次通過皆獨立保留）。",
+  "checkpointCardEmpty": "（尚無 CHECKPOINT）",
+  "checkpointCardNoField": "尚未加入場域 — 請先在「場域」卡片加入或產生一個場域",
+  "checkpointCardSent": "CHECKPOINT「{id}」已送出（{count} peer）",
+  "@checkpointCardSent": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "checkpointCardQueued": "CHECKPOINT「{id}」已排入佇列（無在線 peer，深度 {depth}）",
+  "@checkpointCardQueued": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      },
+      "depth": {
+        "type": "int"
+      }
+    }
+  },
+  "checkpointCardAttempted": "CHECKPOINT「{id}」已嘗試送出（{count} peer，無人接受）",
+  "@checkpointCardAttempted": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "checkpointCardSendFailed": "CHECKPOINT 送出失敗: {error}",
+  "@checkpointCardSendFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "adminScopeField": "本場域公告",
+  "adminScopeAll": "全網公告",
+  "adminScopeDefault": "公告",
+  "adminExpiry": "至 {time}",
+  "@adminExpiry": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "adminPublishTest": "發測試 ADMIN 廣播",
+  "adminTestMessage": "測試管理廣播 {time}",
+  "@adminTestMessage": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "adminNoField": "尚未加入場域 — 請先加入或產生一個場域",
+  "adminSent": "ADMIN 廣播已送出（{count} peer）",
+  "@adminSent": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "adminQueued": "ADMIN 廣播已排入佇列（深度 {depth}）",
+  "@adminQueued": {
+    "placeholders": {
+      "depth": {
+        "type": "int"
+      }
+    }
+  },
+  "adminAttempted": "ADMIN 廣播已嘗試送出（{count} peer）",
+  "@adminAttempted": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "adminSendFailed": "ADMIN 廣播送出失敗: {error}",
+  "@adminSendFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "sosTitle": "緊急求救",
+  "sosSubtitle": "長按求救鈕 1.5 秒，選擇狀態後 5 秒內可取消",
+  "sosNearbyHeader": "附近求救（{count}）",
+  "@sosNearbyHeader": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sosNoneNearby": "目前沒有收到求救訊號。",
+  "sosSending": "求救傳送中…",
+  "sosTriggerTitle": "發出求救",
+  "sosTriggerBody": "長按下方按鈕 1.5 秒，再選擇你的狀態。送出前還有 5 秒可取消。",
+  "sosHoldButton": "按住求救",
+  "sosCountdownTrapped": "受困求救",
+  "sosCountdownInjured": "受傷求救",
+  "sosCountdownHint": "秒後送出 — 仍可取消",
+  "sosActiveTitle": "你已發出求救",
+  "sosChipTrapped": "受困",
+  "sosChipInjured": "受傷",
+  "sosMarkSafe": "我安全了",
+  "sosChooseStatus": "選擇你的狀態",
+  "sosSeverityTrapped": "受困（最高優先）",
+  "sosMarkSafeNoField": "尚未加入場域 — 無法送出狀態更新",
+  "sosMarkSafeSent": "已送出「我安全了」",
+  "sosResolvedChip": "已解除",
+  "sosOutcomeSent": "已送出。",
+  "sosOutcomeNoField": "尚未加入場域 — 求救未送出，請先加入場域。",
+  "sosOutcomeAccepted": "已送達 {count} 個鄰近裝置。",
+  "@sosOutcomeAccepted": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sosOutcomeQueued": "已排入佇列（無在線鄰近裝置，深度 {depth}）。",
+  "@sosOutcomeQueued": {
+    "placeholders": {
+      "depth": {
+        "type": "int"
+      }
+    }
+  },
+  "sosOutcomeAttempted": "已嘗試送出（{count} 個，暫無人接收）。",
+  "@sosOutcomeAttempted": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lastSeenTitle": "最後可信位置",
+  "lastSeenSubtitle": "依足跡 / 點名通過推估，非即時定位",
+  "lastSeenNeedLocalPosition": "需要本機位置才能顯示相對方位",
+  "lastSeenToggleList": "列表",
+  "lastSeenToggleRadar": "雷達",
+  "lastSeenEmpty": "尚無位置證據 — 收到足跡（PRESENCE）或點名通過（CHECKPOINT）後，這裡會列出每人的最後可信位置。",
+  "lastSeenUncertainty": "誤差 ~{meters} m",
+  "@lastSeenUncertainty": {
+    "placeholders": {
+      "meters": {
+        "type": "int"
+      }
+    }
+  },
+  "lastSeenAnchor": "錨點 {id}",
+  "@lastSeenAnchor": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "confidenceHigh": "可信度 高",
+  "confidenceMedium": "可信度 中",
+  "confidenceLow": "可信度 低",
+  "radarCaption": "北朝上 · 外環 {range} · 圓心為本機（最後可信位置投影）",
+  "@radarCaption": {
+    "placeholders": {
+      "range": {
+        "type": "String"
+      }
+    }
+  }
 }

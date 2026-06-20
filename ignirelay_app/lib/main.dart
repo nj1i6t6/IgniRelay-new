@@ -8,10 +8,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ignirelay_app/l10n/generated/app_localizations.dart';
 import 'package:ignirelay_app/app/emergency/emergency_mode_controller.dart';
-import 'package:ignirelay_app/ui/secondary/battery_optimization_guide.dart';
 import 'package:ignirelay_app/ui/theme/app_theme.dart';
 import 'package:ignirelay_app/ui/theme/igni_text_scale.dart';
-import 'package:ignirelay_app/ui/secondary/onboarding_screen.dart';
 import 'package:ignirelay_app/ui/screens/design_showcase_screen.dart';
 import 'package:ignirelay_app/ui/shell/app_shell.dart';
 import 'package:ignirelay_app/ui/shell/debug_shell.dart';
@@ -683,7 +681,6 @@ class _StartupRouter extends StatefulWidget {
 
 class _StartupRouterState extends State<_StartupRouter> {
   bool _initialized = false;
-  bool _showOnboarding = false;
 
   late final MeshTransport _transport;
 
@@ -701,26 +698,19 @@ class _StartupRouterState extends State<_StartupRouter> {
       await IdentityManager().initialize();
       await VillageGeofence.init();
 
-      // ── 階段 2：先確定 onboarding 狀態（不依賴後續服務）──
-      final prefs = await SharedPreferences.getInstance();
-      final done = prefs.getBool('onboarding_done') ?? false;
-      if (mounted) {
-        setState(() {
-          _showOnboarding = !done;
-          _initialized = true;
-        });
-      }
-
-      // ── 階段 3：位置服務（延後到 onboarding 完成 + 首幀後才啟動）──
-      // 已 onboarded 的舊使用者：MainShell 首幀畫完後才開始 GPS。
-      // 新使用者：等 _onOnboardingComplete() 觸發。
-
-      // ── 階段 4：權限（必須在 LocationService.init 之前完成）──
+      // ── 階段 2：權限（必須在 LocationService.init 之前完成）──
+      // A11-preflight-fix：移除舊 onboarding gate。fresh install 在權限請求完成後
+      // 直接進正式 [AppShell] / no-field entry（加入場域 / 建立場域 / 先看功能）——
+      // 不再先經舊版 OnboardingScreen，也不在首次進殼前自動跳 BatteryOptimizationGuide。
       await _requestPermissions();
 
-      if (done) {
-        _deferLocationInit();
+      // ── 階段 3：權限就緒 → 顯示正式 AppShell ──
+      if (mounted) {
+        setState(() => _initialized = true);
       }
+
+      // ── 階段 4：位置服務 — 首幀畫完後才啟動 GPS，避免與殼初始化並發操作平台層 ──
+      _deferLocationInit();
 
       // ── 階段 5：（已移除）Mesh 服務啟動清理 ──
       // Phase 0b #3B-2：原本在此呼叫 EventPublisher.expireStaleMatches() 清過期
@@ -763,11 +753,9 @@ class _StartupRouterState extends State<_StartupRouter> {
       }
     } catch (e) {
       debugPrint('[Init] Startup error: $e');
+      // A11-preflight-fix：啟動失敗也落在正式殼（不再退回 OnboardingScreen）。
       if (mounted && !_initialized) {
-        setState(() {
-          _initialized = true;
-          _showOnboarding = true;
-        });
+        setState(() => _initialized = true);
       }
     }
   }
@@ -866,19 +854,6 @@ class _StartupRouterState extends State<_StartupRouter> {
     }
   }
 
-  void _onOnboardingComplete() {
-    setState(() => _showOnboarding = false);
-    // GPS 延後到 onboarding 動畫結束 + MainShell 首幀畫完後才啟動
-    _deferLocationInit();
-    if (Platform.isAndroid) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          BatteryOptimizationGuide.checkAndGuide(context);
-        }
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     if (!_initialized) {
@@ -900,16 +875,11 @@ class _StartupRouterState extends State<_StartupRouter> {
       );
     }
 
-    if (_showOnboarding) {
-      return OnboardingScreen(
-        onComplete: _onOnboardingComplete,
-      );
-    }
-
-    // UI-F1：production home = 正式 [AppShell]（無 active field → no-field entry；
-    // 有 active field → 五分頁殼 + 全域 SOS）。舊 mapless `DebugShell` 降級為
-    // 開發者診斷，僅經 [kDeveloperDiagnosticsRoute]（上方 routes，kDebugMode/
-    // kProfileMode 才註冊）進入。模組搬遷/角色/motion 留 UI-F2..UI-F5。
+    // UI-F1 / A11-preflight-fix：production home = 正式 [AppShell]（無 active field
+    // → no-field entry：加入場域 / 建立場域 / 先看功能；有 active field → 五分頁殼 +
+    // 全域 SOS）。fresh install 不再先經舊 OnboardingScreen——權限完成即進此殼。舊
+    // mapless `DebugShell` 降級為開發者診斷，僅經 [kDeveloperDiagnosticsRoute]
+    //（上方 routes，kDebugMode/kProfileMode 才註冊）進入。
     return const AppShell();
   }
 }

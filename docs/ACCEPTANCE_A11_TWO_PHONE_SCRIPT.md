@@ -150,11 +150,14 @@ function LogStop([string]$tag) {
 
 操作：
 1. A/B fresh install 後首次啟動。
-2. 依 App 引導授權位置、Nearby/Bluetooth、通知、相機。
-3. 停在 no-field entry。
+2. 依系統權限對話框授權位置、Nearby/Bluetooth、通知、相機。
+3. 權限完成後**直接**停在 no-field entry。
 
 預期：
+- 流程為 **Android 權限 → no-field 三入口**。
 - 顯示 `加入場域`、`建立場域`、`先看功能`。
+- **不再**出現舊版「開始使用烽傳 / Start Using IgniRelay」引導頁，也**不再**在首次進入前自動跳出
+  背景執行 / 電池最佳化（Background Execution）設定（A11-preflight-fix：移除舊 onboarding gate）。
 - 相機拒絕時仍可看到「輸入密鑰」路徑。
 - 不進 `DebugShell`。
 

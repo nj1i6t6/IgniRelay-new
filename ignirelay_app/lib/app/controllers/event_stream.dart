@@ -235,6 +235,34 @@ class EventStream {
 
   List<String> get debugLogs => _handler.debugLogs;
 
+  /// 讀回已落地（已投影 / 先前已收到）的 HAZARD read-model，newest-first。
+  ///
+  /// [hazardEvents] 是 broadcast stream、**不重播**：在某個 UI（如「事件」分頁的
+  /// HazardCard）mount 之前就抵達的 HAZARD，不會再經 stream 推一次。這個一次性
+  /// query 讓 UI 在 mount 時把 `Event_Logs` 中既有的 `hazardMarker` 補齊，之後仍
+  /// 用 live [hazardEvents] 即時追加（UI 以 eventId 去重，HAZARD 非 LWW、每筆獨立）。
+  /// 解析失敗的列略過（壞資料不致命）。
+  Future<List<HazardEvent>> recentHazards({int limit = 20}) async {
+    final rows = await _store.queryByType(EventType.hazardMarker, limit: limit);
+    final out = <HazardEvent>[];
+    for (final row in rows) {
+      final payload = row['payload'] as Uint8List?;
+      if (payload == null) continue;
+      final data = _decoder.decodeHazardData(payload);
+      if (data == null) continue;
+      out.add(HazardEvent(
+        eventId: (row['event_id'] as String?) ?? '',
+        type: data.hazardType,
+        severity: data.severity,
+        lat: data.centerLat,
+        lng: data.centerLng,
+        radiusMeters: data.radiusMeters,
+        description: data.description,
+      ));
+    }
+    return out;
+  }
+
   void start() {
     _subscription ??= _handler.events.listen((_) {
       unawaited(_dispatchRecentEvents());

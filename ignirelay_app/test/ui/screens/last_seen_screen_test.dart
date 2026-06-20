@@ -4,9 +4,11 @@
 //
 // Covers: the empty state + §3.6 copy rule (A10, NEVER 「目前位置」); a rendered
 // estimate card (A10); the 列表⇄雷達 toggle (A10b D2); the "no local position"
-// degrade path (A10b D3); and an SOS alert surfacing as a card.
+// degrade path (A10b D3); an SOS alert surfacing as a card; and the SOS-resolve
+// (SAFE) path clearing that author's SOS (A11 fix).
 
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,20 +21,23 @@ import 'package:ignirelay_app/ui/screens/position/relative_radar.dart';
 import 'package:ignirelay_app/ui/widgets/status_chip.dart';
 
 void main() {
-  // Shared stream controllers + helper so each test wires all three seams.
+  // Shared stream controllers + helper so each test wires all four seams.
   late StreamController<PresenceUpdate> pres;
   late StreamController<CheckpointCrossing> cp;
   late StreamController<SosAlert> sos;
+  late StreamController<SosResolved> sosRes;
 
   setUp(() {
     pres = StreamController<PresenceUpdate>.broadcast();
     cp = StreamController<CheckpointCrossing>.broadcast();
     sos = StreamController<SosAlert>.broadcast();
+    sosRes = StreamController<SosResolved>.broadcast();
   });
   tearDown(() {
     pres.close();
     cp.close();
     sos.close();
+    sosRes.close();
   });
 
   Widget screen({
@@ -48,11 +53,17 @@ void main() {
           presenceSource: pres.stream,
           checkpointSource: cp.stream,
           sosSource: sos.stream,
+          sosResolvedSource: sosRes.stream,
           now: now,
           localEstimate: localEstimate,
           refreshInterval: Duration.zero, // no timer
         ),
       );
+
+  // Helper hex of a fake sender_pub_key (the key both SosAlert and SosResolved
+  // share). LastSeenScreen pads each byte to two hex chars.
+  String hexOf(List<int> bytes) =>
+      bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 
   testWidgets('empty state renders the 推估 hint (no 目前位置 copy)',
       (tester) async {
@@ -185,6 +196,68 @@ void main() {
     expect(find.textContaining('目前位置'), findsNothing);
   });
 
+  testWidgets('A11 fix: SAFE (SosResolved) clears that author\'s SOS',
+      (tester) async {
+    final now = DateTime(2026, 6, 15, 12, 0, 0);
+    await tester.pumpWidget(screen(now: () => now));
+    await tester.pump();
+
+    // SOS keyed by sender_pub_key — the SAME identity SosResolved carries.
+    final pubKey = Uint8List.fromList(const [0xAB, 0xCD, 0xEF, 0x01, 0x23]);
+    sos.add(SosAlert(
+      eventId: 'sos-9',
+      urgency: 3,
+      description: '受困',
+      lat: 25.02,
+      lng: 121.01,
+      senderPubKey: pubKey,
+      timestamp: now.subtract(const Duration(seconds: 20)),
+    ));
+    await tester.pump();
+    await tester.pump();
+    expect(find.widgetWithText(StatusChip, 'SOS'), findsOneWidget);
+
+    // The author reports SAFE → its SOS leaves the position view.
+    sosRes.add(SosResolved(
+      authorKeyHex: hexOf(pubKey),
+      timestamp: now.subtract(const Duration(seconds: 5)),
+    ));
+    await tester.pump();
+    await tester.pump();
+    expect(find.widgetWithText(StatusChip, 'SOS'), findsNothing,
+        reason: 'resolved SOS must no longer show on the position screen');
+  });
+
+  testWidgets('A11 fix: a SAFE for a DIFFERENT author leaves the SOS standing',
+      (tester) async {
+    final now = DateTime(2026, 6, 15, 12, 0, 0);
+    await tester.pumpWidget(screen(now: () => now));
+    await tester.pump();
+
+    final pubKey = Uint8List.fromList(const [0x11, 0x22, 0x33, 0x44]);
+    sos.add(SosAlert(
+      eventId: 'sos-7',
+      urgency: 3,
+      description: '受困',
+      lat: 25.02,
+      lng: 121.01,
+      senderPubKey: pubKey,
+      timestamp: now.subtract(const Duration(seconds: 20)),
+    ));
+    await tester.pump();
+    await tester.pump();
+    expect(find.widgetWithText(StatusChip, 'SOS'), findsOneWidget);
+
+    // A resolve for someone else must not clear this SOS.
+    sosRes.add(SosResolved(
+      authorKeyHex: hexOf(Uint8List.fromList(const [0x99, 0x88])),
+      timestamp: now,
+    ));
+    await tester.pump();
+    await tester.pump();
+    expect(find.widgetWithText(StatusChip, 'SOS'), findsOneWidget);
+  });
+
   testWidgets('a CHECKPOINT (anchor) subject draws as a node on the radar',
       (tester) async {
     final now = DateTime(2026, 6, 15, 12, 0, 0);
@@ -237,6 +310,7 @@ void main() {
         presenceSource: pres.stream,
         checkpointSource: cp.stream,
         sosSource: sos.stream,
+        sosResolvedSource: sosRes.stream,
         now: () => now,
         localEstimate: () => originVal,
         refreshInterval: Duration.zero,
@@ -311,6 +385,7 @@ void main() {
               presenceSource: pres.stream,
               checkpointSource: cp.stream,
               sosSource: sos.stream,
+              sosResolvedSource: sosRes.stream,
               now: () => now,
               refreshInterval: Duration.zero,
             ),

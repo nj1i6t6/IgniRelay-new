@@ -52,6 +52,7 @@ class LastSeenScreen extends StatefulWidget {
     this.presenceSource,
     this.checkpointSource,
     this.sosSource,
+    this.sosResolvedSource,
     this.localEstimate,
     this.now,
     this.refreshInterval = const Duration(seconds: 30),
@@ -63,6 +64,10 @@ class LastSeenScreen extends StatefulWidget {
   final Stream<PresenceUpdate>? presenceSource;
   final Stream<CheckpointCrossing>? checkpointSource;
   final Stream<SosAlert>? sosSource;
+
+  /// SOS 解除 stream（A8；投影自 STATUS_UPDATE safetyState=SAFE）。收到後把對應
+  /// author（`sender_pub_key` hex）的 SOS entry 移除，位置頁不再顯示其 SOS 標籤。
+  final Stream<SosResolved>? sosResolvedSource;
 
   /// The device's own [PositionEstimate] (radar origin). When omitted it is read
   /// from the DI'd [LocalPositionSource]. Returning null = "no local position".
@@ -81,6 +86,7 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
   StreamSubscription<PresenceUpdate>? _presenceSub;
   StreamSubscription<CheckpointCrossing>? _checkpointSub;
   StreamSubscription<SosAlert>? _sosSub;
+  StreamSubscription<SosResolved>? _sosResolvedSub;
   Timer? _refresh;
 
   /// The view the user picked. The radar only *shows* while a local origin
@@ -104,13 +110,16 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
     // injected (tests inject all three and never touch the provider tree).
     final needEvents = widget.presenceSource == null ||
         widget.checkpointSource == null ||
-        widget.sosSource == null;
+        widget.sosSource == null ||
+        widget.sosResolvedSource == null;
     final events = needEvents ? context.read<EventStream>() : null;
     _presenceSub =
         (widget.presenceSource ?? events!.presenceUpdates).listen(_onPresence);
     _checkpointSub = (widget.checkpointSource ?? events!.checkpointCrossings)
         .listen(_onCheckpoint);
     _sosSub = (widget.sosSource ?? events!.sosAlerts).listen(_onSos);
+    _sosResolvedSub = (widget.sosResolvedSource ?? events!.sosResolutions)
+        .listen(_onSosResolved);
     if (widget.refreshInterval > Duration.zero) {
       // Ages / confidence drift with wall time; refresh so the view stays honest.
       _refresh = Timer.periodic(widget.refreshInterval, (_) {
@@ -124,6 +133,7 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
     _presenceSub?.cancel();
     _checkpointSub?.cancel();
     _sosSub?.cancel();
+    _sosResolvedSub?.cancel();
     _refresh?.cancel();
     super.dispose();
   }
@@ -171,6 +181,18 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
         observedAt: a.timestamp,
       ));
       _cap(list);
+    });
+  }
+
+  /// SOS 解除（A8 / OD-8）：該 author 已回報「我安全了」。`authorKeyHex` 對應
+  /// [_onSos] 以 `sender_pub_key` hex 建立的同一把 key，故直接移除其 SOS entry，
+  /// 位置頁的列表 / 雷達不再顯示該 SOS。未知 author（空 hex）不動任何項。
+  void _onSosResolved(SosResolved r) {
+    if (!mounted || r.authorKeyHex.isEmpty) return;
+    if (!_sos.containsKey(r.authorKeyHex)) return;
+    setState(() {
+      _sos.remove(r.authorKeyHex);
+      _sosLabel.remove(r.authorKeyHex);
     });
   }
 

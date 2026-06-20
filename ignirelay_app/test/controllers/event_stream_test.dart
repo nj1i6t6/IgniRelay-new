@@ -130,6 +130,37 @@ void main() {
       ).writeToBuffer();
       expect(decoder.decodeHazardData(raw), isA<HazardDataDecoded>());
     });
+
+    test('recentHazards backfills already-stored HAZARD rows (A11 fix)',
+        () async {
+      // A HAZARD already in Event_Logs (received earlier / projected) must be
+      // readable on demand — the broadcast stream alone won't replay it.
+      final raw = pb.HazardData(
+        hazardType: 'FLOOD',
+        severity: 2,
+        centerLat: 24.5,
+        centerLng: 120.5,
+        radiusMeters: 150,
+        description: '淹水',
+      ).writeToBuffer();
+      final eventId = 'hz-${DateTime.now().microsecondsSinceEpoch}';
+      await MeshEventHandler().ingestVerifiedEvent(
+        eventId: eventId,
+        eventType: EventType.hazardMarker,
+        urgency: 0,
+        payload: raw,
+        senderPubKey: List<int>.generate(8, (i) => i),
+        hlcTimestamp: DateTime.now().millisecondsSinceEpoch,
+      );
+
+      final hazards = await stream.recentHazards();
+      final h = hazards.firstWhere((e) => e.eventId == eventId);
+      expect(h.type, 'FLOOD');
+      expect(h.severity, 2);
+      expect(h.description, '淹水');
+      expect(h.lat, closeTo(24.5, 1e-9));
+      expect(h.lng, closeTo(120.5, 1e-9));
+    });
   });
 
   group('EventStream — anyEventChanges plain Dart notification', () {

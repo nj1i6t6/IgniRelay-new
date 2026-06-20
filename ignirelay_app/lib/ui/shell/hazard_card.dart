@@ -1,11 +1,17 @@
 // HazardCard — A11-prep. Debug-shell surface for typed HAZARD send + receive.
 //
 // Mirrors `CheckpointCard` (A9-2): self-contained, reads its own providers
-// (`EventPublisher` to send, the typed `EventStream.hazardEvents` to receive)
-// and owns its subscription, so the mapless `DebugShell` stays under the
+// (`EventPublisher` to send, the typed `EventStream.hazardEvents` to receive
+// live, and `EventStream.recentHazards` to backfill already-received markers on
+// mount) and owns its subscription, so the mapless `DebugShell` stays under the
 // 500-line facade cap. A3 only wired the typed RECEIVE side; the send UI
 // retired with the old map screen, which blocked the two-phone acceptance
 // (A11 step 5). This card restores a send entry behind `kDebugMode`.
+//
+// A11 fix — the live `hazardEvents` broadcast stream does NOT replay, so a HAZARD
+// received before this card mounts (user on another tab / earlier in the session)
+// would not show. On mount we load the read-model backfill once, then the live
+// stream keeps appending (deduped by eventId).
 //
 // The MANUAL publish button: `formalSend` shows it in production (participant +
 // owner); otherwise it is a `kDebugMode`-only debug stand-in. Coordinates come
@@ -22,8 +28,9 @@
 //
 // Layer rules: lives in lib/ui/shell/, imports only app/controllers +
 // app/services facades (no app/proto/mesh/db). `HazardEvent` is a plain Dart
-// type. Test seams (`hazardSource` / `onPublish` / `localEstimate`) mirror the
-// `LastSeenScreen` injection pattern so no providers are needed under test.
+// type. Test seams (`hazardSource` / `hazardBackfill` / `onPublish` /
+// `localEstimate`) mirror the `LastSeenScreen` injection pattern so no providers
+// are needed under test.
 
 import 'dart:async';
 
@@ -54,6 +61,7 @@ class HazardCard extends StatefulWidget {
   const HazardCard({
     super.key,
     this.hazardSource,
+    this.hazardBackfill,
     this.onPublish,
     this.localEstimate,
     this.ensureFreshLocation,
@@ -69,6 +77,12 @@ class HazardCard extends StatefulWidget {
 
   /// Typed received-HAZARD stream. Defaults to `EventStream.hazardEvents`.
   final Stream<HazardEvent>? hazardSource;
+
+  /// One-shot read-model backfill of already-received HAZARDs, loaded on mount so
+  /// the list is not empty just because the live broadcast stream does not replay
+  /// (A11 fix). Defaults to `EventStream.recentHazards`. The live [hazardSource]
+  /// still appends new arrivals; duplicates are coalesced by eventId.
+  final Future<List<HazardEvent>> Function()? hazardBackfill;
 
   /// Publish seam. Defaults to `EventPublisher.publishHazard`.
   final HazardPublisher? onPublish;
@@ -89,6 +103,7 @@ class HazardCard extends StatefulWidget {
 
 class _HazardCardState extends State<HazardCard> {
   late final Stream<HazardEvent> _hazardStream;
+  late final Future<List<HazardEvent>> Function() _loadBackfill;
   late final HazardPublisher _publish;
   late final PositionEstimate? Function() _origin;
   StreamSubscription<HazardEvent>? _sub;
@@ -99,22 +114,54 @@ class _HazardCardState extends State<HazardCard> {
   @override
   void initState() {
     super.initState();
-    _hazardStream =
-        widget.hazardSource ?? context.read<EventStream>().hazardEvents;
+    // Read the DI'd EventStream once when either the live stream or the backfill
+    // is not injected (tests inject both and never touch the provider tree).
+    final needEvents =
+        widget.hazardSource == null || widget.hazardBackfill == null;
+    final events = needEvents ? context.read<EventStream>() : null;
+    _hazardStream = widget.hazardSource ?? events!.hazardEvents;
+    _loadBackfill = widget.hazardBackfill ?? () => events!.recentHazards();
     _publish = widget.onPublish ?? context.read<EventPublisher>().publishHazard;
     final seam = widget.localEstimate;
     _origin = seam ?? context.read<LocalPositionSource>().currentEstimate;
     _sub = _hazardStream.listen((h) {
       if (!mounted) return;
+      setState(() => _mergeHazard(h, atFront: true));
+    });
+    // Backfill already-received HAZARDs (broadcast streams don't replay).
+    unawaited(_runBackfill());
+  }
+
+  /// Insert/refresh one hazard, deduping by eventId (HAZARD is not LWW; each row
+  /// is kept independently). Live arrivals go to the front; backfilled history is
+  /// appended after. Caller wraps in setState.
+  void _mergeHazard(HazardEvent h, {required bool atFront}) {
+    _hazards.removeWhere((e) => e.eventId == h.eventId);
+    if (atFront) {
+      _hazards.insert(0, h);
+    } else {
+      _hazards.add(h);
+    }
+    if (_hazards.length > 20) {
+      _hazards.removeRange(20, _hazards.length);
+    }
+  }
+
+  /// One-shot load of already-received HAZARDs from the read-model so the list
+  /// is populated on mount even when nothing arrives live (A11 fix). Best-effort:
+  /// a read failure leaves the live stream to feed the list.
+  Future<void> _runBackfill() async {
+    try {
+      final past = await _loadBackfill();
+      if (!mounted || past.isEmpty) return;
       setState(() {
-        // 最近在前；以 eventId 去重重送（HAZARD 非 LWW，每筆獨立保留）。
-        _hazards.removeWhere((e) => e.eventId == h.eventId);
-        _hazards.insert(0, h);
-        if (_hazards.length > 20) {
-          _hazards.removeRange(20, _hazards.length);
+        for (final h in past) {
+          _mergeHazard(h, atFront: false);
         }
       });
-    });
+    } catch (_) {
+      // read-model backfill is best-effort; the live stream still works.
+    }
   }
 
   @override

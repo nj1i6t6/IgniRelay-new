@@ -67,6 +67,7 @@ void main() {
 
   Widget card(
           {PositionEstimate? Function()? localEstimate,
+          Future<List<HazardEvent>> Function()? hazardBackfill,
           Locale locale = const Locale('zh')}) =>
       MaterialApp(
         locale: locale,
@@ -75,6 +76,9 @@ void main() {
         home: Scaffold(
           body: HazardCard(
             hazardSource: hz.stream,
+            // Inject the backfill seam too so no EventStream provider is needed
+            // (default = empty: existing tests keep their original behaviour).
+            hazardBackfill: hazardBackfill ?? () async => <HazardEvent>[],
             onPublish: spy,
             localEstimate: localEstimate ?? () => origin,
           ),
@@ -108,6 +112,46 @@ void main() {
     expect(find.text('FIRE'), findsOneWidget);
     expect(find.textContaining('sev 3'), findsOneWidget);
     expect(find.textContaining('25.03390'), findsOneWidget);
+  });
+
+  testWidgets(
+      'A11 fix: a HAZARD that already exists before mount is backfilled, and a '
+      'live HAZARD still appends', (tester) async {
+    // The 事件 tab opens AFTER a hazard was already received — the broadcast
+    // stream won't replay it, so the card must backfill from the read-model.
+    await tester.pumpWidget(card(hazardBackfill: () async => [
+          HazardEvent(
+            eventId: 'pre-1',
+            type: 'FLOOD',
+            severity: 2,
+            lat: 24.5,
+            lng: 120.5,
+            radiusMeters: 200,
+            description: '既有淹水',
+          ),
+        ]));
+    await tester.pump(); // mount + subscribe
+    await tester.pump(); // backfill future resolves + setState
+
+    expect(find.text('FLOOD'), findsOneWidget,
+        reason: 'pre-existing HAZARD must show on mount via backfill');
+
+    // A live HAZARD arriving after mount still appends (deduped by eventId).
+    hz.add(HazardEvent(
+      eventId: 'live-1',
+      type: 'FIRE',
+      severity: 3,
+      lat: 25.0,
+      lng: 121.0,
+      radiusMeters: 200,
+      description: '即時火災',
+    ));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('FIRE'), findsOneWidget);
+    expect(find.text('FLOOD'), findsOneWidget,
+        reason: 'backfilled HAZARD remains after a live one arrives');
   });
 
   testWidgets('the kDebugMode send button publishes via the seam (default FIRE)',
@@ -153,6 +197,7 @@ void main() {
   Widget formalCard({
     PositionEstimate? Function()? localEstimate,
     Future<void> Function()? ensureFreshLocation,
+    Future<List<HazardEvent>> Function()? hazardBackfill,
     Locale locale = const Locale('zh'),
   }) =>
       MaterialApp(
@@ -162,6 +207,7 @@ void main() {
         home: Scaffold(
           body: HazardCard(
             hazardSource: hz.stream,
+            hazardBackfill: hazardBackfill ?? () async => <HazardEvent>[],
             onPublish: spy,
             localEstimate: localEstimate ?? () => origin,
             ensureFreshLocation: ensureFreshLocation ?? () async {},

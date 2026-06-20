@@ -164,4 +164,51 @@ void main() {
     expect(find.textContaining('No SOS signals received'), findsOneWidget);
     expect(find.text('緊急求救'), findsNothing);
   });
+
+  // ── UI-H3 — large-text / text-scale stress ─────────────────────────────────
+  // SOS is the highest-stakes screen: it must stay legible and unbroken at the
+  // 1.45 app factor AND an effective ~2.0 composite (system × app), on a narrow
+  // phone width where horizontal overflow bites first. Drives the trigger card
+  // and the countdown card (big number + title row + ≥64dp cancel).
+  Widget wrapScaled(SosController sos, EventStream events, double scale) =>
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SosController>.value(value: sos),
+          Provider<EventStream>.value(value: events),
+        ],
+        child: MaterialApp(
+          locale: const Locale('zh'),
+          supportedLocales: S.supportedLocales,
+          localizationsDelegates: S.localizationsDelegates,
+          home: Builder(
+            builder: (ctx) => MediaQuery(
+              data: MediaQuery.of(ctx)
+                  .copyWith(textScaler: TextScaler.linear(scale)),
+              child: const SosScreen(),
+            ),
+          ),
+        ),
+      );
+
+  testWidgets('large text (UI-H3): trigger + countdown survive 1.45 / 2.0',
+      (tester) async {
+    tester.view.physicalSize = const Size(360, 820);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final h = await harness(countdown: const Duration(seconds: 5));
+    for (final scale in const [1.45, 2.0]) {
+      await tester.pumpWidget(wrapScaled(h.sos, h.events, scale));
+      await tester.pump();
+      expect(tester.takeException(), isNull, reason: 'SOS trigger @ $scale');
+
+      h.sos.arm(SosSeverity.trapped); // → countdown card
+      await tester.pump();
+      expect(tester.takeException(), isNull, reason: 'SOS countdown @ $scale');
+
+      h.sos.cancelCountdown();
+      await tester.pump();
+    }
+  });
 }

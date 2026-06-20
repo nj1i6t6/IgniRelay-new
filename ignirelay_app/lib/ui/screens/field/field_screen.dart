@@ -125,7 +125,15 @@ class _FieldScreenState extends State<FieldScreen> {
           Row(children: [
             Text('field_id', style: IgniTypography.labelSmall(p.text2)),
             const SizedBox(width: IgniSpacing.sm),
-            MonoText('${active.shortId}…', color: p.text1, fontSize: 12),
+            // UI-H3: bound the mono id so it ellipsizes under large text instead
+            // of overflowing this row.
+            Expanded(
+              child: MonoText('${active.shortId}…',
+                  color: p.text1,
+                  fontSize: 12,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+            ),
           ]),
           if (active.cloudBaseUrl != null) ...[
             const SizedBox(height: IgniSpacing.sm),

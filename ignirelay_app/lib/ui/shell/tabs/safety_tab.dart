@@ -224,9 +224,15 @@ class _SafetyTabState extends State<SafetyTab> {
             Icon(active ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
                 size: 18, color: active ? p.ok : p.text2),
             const SizedBox(width: IgniSpacing.sm),
-            Text(active ? l.safetyCommsOn : l.safetyCommsOff,
-                style: IgniTypography.titleMedium(p.text0)),
-            const Spacer(),
+            // UI-H3: bound the status title so large text wraps/ellipsizes here
+            // instead of shoving the toggle button off the right edge.
+            Expanded(
+              child: Text(active ? l.safetyCommsOn : l.safetyCommsOff,
+                  style: IgniTypography.titleMedium(p.text0),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis),
+            ),
+            const SizedBox(width: IgniSpacing.sm),
             IgniButton(
               label: active ? l.safetyTurnOff : l.safetyTurnOn,
               variant:

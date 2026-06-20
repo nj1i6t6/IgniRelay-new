@@ -285,4 +285,60 @@ void main() {
     expect(find.textContaining('目前位置'), findsNothing);
     expect(find.text('最後可信位置'), findsNothing);
   });
+
+  // ── UI-H3 — large-text / text-scale stress ─────────────────────────────────
+  // The estimate card crams a mono label + an SOS chip + a confidence chip into
+  // one Row, plus an age/uncertainty meta Row and the 列表/雷達 toggle — all
+  // overflow candidates under 1.45 / effective 2.0 on a narrow phone width.
+  testWidgets('large text (UI-H3): estimate cards survive 1.45 / 2.0',
+      (tester) async {
+    tester.view.physicalSize = const Size(360, 820);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final now = DateTime(2026, 6, 15, 12, 0, 0);
+    for (final scale in const [1.45, 2.0]) {
+      await tester.pumpWidget(MaterialApp(
+        locale: const Locale('zh'),
+        supportedLocales: S.supportedLocales,
+        localizationsDelegates: S.localizationsDelegates,
+        home: Builder(
+          builder: (ctx) => MediaQuery(
+            data: MediaQuery.of(ctx)
+                .copyWith(textScaler: TextScaler.linear(scale)),
+            child: LastSeenScreen(
+              presenceSource: pres.stream,
+              checkpointSource: cp.stream,
+              sosSource: sos.stream,
+              now: () => now,
+              refreshInterval: Duration.zero,
+            ),
+          ),
+        ),
+      ));
+      await tester.pump();
+
+      pres.add(PresenceUpdate(
+        eventId: 'v2-1',
+        anon8: 'a0a1a2a3',
+        source: 1,
+        lat: 25.0339805,
+        lng: 121.5654177,
+        accuracyM: 12,
+        observedAt: now.subtract(const Duration(seconds: 30)),
+      ));
+      sos.add(SosAlert(
+        eventId: 'sos-1',
+        urgency: 3,
+        description: '受困待援的較長描述以製造壓力',
+        lat: 25.02,
+        lng: 121.01,
+        timestamp: now.subtract(const Duration(seconds: 20)),
+      ));
+      await tester.pump();
+      await tester.pump();
+      expect(tester.takeException(), isNull, reason: 'last-seen list @ $scale');
+    }
+  });
 }

@@ -86,6 +86,49 @@ void main() {
       expect(find.text('Next'), findsOneWidget);
       expect(find.text('示範資料'), findsNothing);
     });
+
+    // ── UI-H3 — large-text / text-scale stress ───────────────────────────────
+    // Walk all five tour pages (incl. the radar page + event/footprint rows) at
+    // 1.45 and effective 2.0 on a narrow phone width, asserting no overflow.
+    // Still zero-provider (the MediaQuery wrapper adds no provider).
+    testWidgets('large text (UI-H3): five pages survive 1.45 / 2.0',
+        (tester) async {
+      tester.view.physicalSize = const Size(360, 820);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      for (final scale in const [1.45, 2.0]) {
+        await tester.pumpWidget(MaterialApp(
+          locale: const Locale('zh'),
+          supportedLocales: S.supportedLocales,
+          localizationsDelegates: S.localizationsDelegates,
+          home: Builder(
+            builder: (ctx) => MediaQuery(
+              data: MediaQuery.of(ctx)
+                  .copyWith(textScaler: TextScaler.linear(scale)),
+              // Fresh State per scale so the PageController doesn't carry the
+              // previous run's page index into this one.
+              child: PreviewScreen(key: ValueKey('h3-$scale')),
+            ),
+          ),
+        ));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: 'preview p1 @ $scale');
+
+        // Advance until the last page (its nav-right becomes 加入場域, so 下一步
+        // disappears) — checking every page for overflow on the way.
+        var page = 1;
+        while (find.text('下一步').evaluate().isNotEmpty) {
+          await tester.tap(find.text('下一步'));
+          await tester.pumpAndSettle();
+          page++;
+          expect(tester.takeException(), isNull,
+              reason: 'preview p$page @ $scale');
+        }
+        expect(page, 5, reason: 'walked all five tour pages @ $scale');
+      }
+    });
   });
 
   // Owner boundary ④ — fixture-only means NO real controller imports at all.

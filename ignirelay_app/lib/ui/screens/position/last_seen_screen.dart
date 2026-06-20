@@ -399,13 +399,29 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
         children: [
           Row(
             children: [
-              MonoText(e.label,
-                  fontSize: 13, color: p.text0, fontWeight: FontWeight.w600),
-              if (e.baseTone == StatusTone.sos) ...[
-                const SizedBox(width: IgniSpacing.sm),
-                const StatusChip(label: 'SOS', tone: StatusTone.sos, dense: true),
-              ],
-              const Spacer(),
+              // UI-H3: bound the handle + SOS chip so the confidence chip never
+              // gets pushed off the right edge under large text (the handle
+              // ellipsizes instead).
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: MonoText(e.label,
+                          fontSize: 13,
+                          color: p.text0,
+                          fontWeight: FontWeight.w600,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                    if (e.baseTone == StatusTone.sos) ...[
+                      const SizedBox(width: IgniSpacing.sm),
+                      const StatusChip(
+                          label: 'SOS', tone: StatusTone.sos, dense: true),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: IgniSpacing.sm),
               _confidenceChip(est.confidence),
             ],
           ),
@@ -415,10 +431,13 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
           const SizedBox(height: 2),
           MonoText(_whereText(est), fontSize: 13, color: p.text1),
           const SizedBox(height: IgniSpacing.sm),
-          Row(
+          // UI-H3: age + uncertainty wrap to a second line at large text rather
+          // than overflowing the row.
+          Wrap(
+            spacing: IgniSpacing.md,
+            runSpacing: IgniSpacing.xs,
             children: [
               _meta(p, _ageText(est.ageSeconds)),
-              const SizedBox(width: IgniSpacing.md),
               _meta(p, context.l10n.lastSeenUncertainty(est.uncertaintyM.round())),
             ],
           ),

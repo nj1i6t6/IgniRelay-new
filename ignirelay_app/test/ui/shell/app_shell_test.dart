@@ -463,6 +463,51 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  // ── UI-H3 — large-text / text-scale stress on the 安全 tab ────────────────
+  // The comms card packs an icon + status title + a toggle button into one Row,
+  // and a stat Wrap — the kind of layout that overflows horizontally first under
+  // the 1.45 app factor and an effective ~2.0 composite on a narrow phone width.
+  testWidgets('large text (UI-H3): 安全 tab has no overflow at 1.45 / 2.0',
+      (tester) async {
+    tester.view.physicalSize = const Size(360, 820);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final registry = PeerCapabilityRegistry();
+    final facade = EventPublisherV2Facade(registry: registry);
+    final field = await _makeField(joined: true);
+    final presence = _makePresence(registry, facade);
+    final checkpoint = _makeCheckpoint(facade);
+    final beacon = _makeBeacon(presence, field);
+    addTearDown(() async {
+      beacon.dispose();
+      await facade.dispose();
+      await registry.dispose();
+      field.dispose();
+    });
+
+    for (final scale in const [1.45, 2.0]) {
+      await tester.pumpWidget(_wrap(
+        Builder(
+          builder: (ctx) => MediaQuery(
+            data: MediaQuery.of(ctx)
+                .copyWith(textScaler: TextScaler.linear(scale)),
+            child: const Scaffold(body: SafetyTab()),
+          ),
+        ),
+        field: field,
+        presence: presence,
+        checkpoint: checkpoint,
+        beacon: beacon,
+        facade: facade,
+      ));
+      await tester.pump();
+      expect(find.byType(SafetyTab), findsOneWidget);
+      expect(tester.takeException(), isNull, reason: '安全 overflow @ $scale');
+    }
+  });
+
   // ── UI-H2a English-locale smoke ──────────────────────────────────────────
 
   testWidgets('en: no-field entry shows English entries (no Chinese)',

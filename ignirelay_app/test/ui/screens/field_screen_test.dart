@@ -182,4 +182,44 @@ void main() {
     expect(find.text('主辦'), findsWidgets);
     expect(find.text('成員'), findsWidgets);
   });
+
+  // ── UI-H3 — large-text / text-scale stress ─────────────────────────────────
+  // A joined field renders the active card (name + role chip + 作用中 chip) and
+  // a joined-row (name + role chip + QR action) — name/chip rows that can
+  // overflow under 1.45 / effective 2.0 on a narrow phone width. A long field
+  // name pushes the worst case.
+  testWidgets('large text (UI-H3): active + joined rows survive 1.45 / 2.0',
+      (tester) async {
+    tester.view.physicalSize = const Size(360, 820);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final field = await _makeController();
+    addTearDown(field.dispose);
+    await field.createField(displayName: '中正紀念堂臨時避難收容場域站點'); // long name
+
+    for (final scale in const [1.45, 2.0]) {
+      await tester.pumpWidget(MultiProvider(
+        providers: [
+          ListenableProvider<ActiveFieldController>.value(value: field),
+        ],
+        child: MaterialApp(
+          locale: const Locale('zh'),
+          supportedLocales: S.supportedLocales,
+          localizationsDelegates: S.localizationsDelegates,
+          home: Builder(
+            builder: (ctx) => MediaQuery(
+              data: MediaQuery.of(ctx)
+                  .copyWith(textScaler: TextScaler.linear(scale)),
+              child: const FieldScreen(),
+            ),
+          ),
+        ),
+      ));
+      await tester.pump();
+      expect(find.byType(FieldScreen), findsOneWidget);
+      expect(tester.takeException(), isNull, reason: 'field overflow @ $scale');
+    }
+  });
 }

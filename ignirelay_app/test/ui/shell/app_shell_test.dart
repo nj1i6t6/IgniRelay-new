@@ -160,8 +160,15 @@ Future<ActiveFieldController> _makeField({bool joined = false}) async {
 }
 
 /// Pumps the full AppShell with the production-shaped provider graph.
+///
+/// When [textScale] is non-null the AppShell is wrapped in a MediaQuery applying
+/// `TextScaler.linear(textScale)`, so the UI-H3 large-text stress tests exercise
+/// the real shell (no-field entry / bottom nav / global SOS) at composite scales
+/// rather than an isolated tab.
 Future<void> _pumpShell(WidgetTester tester,
-    {required bool joined, Locale locale = const Locale('zh')}) async {
+    {required bool joined,
+    Locale locale = const Locale('zh'),
+    double? textScale}) async {
   final registry = PeerCapabilityRegistry();
   final facade = EventPublisherV2Facade(registry: registry);
   final field = await _makeField(joined: joined);
@@ -175,8 +182,17 @@ Future<void> _pumpShell(WidgetTester tester,
     field.dispose();
   });
 
+  const shell = AppShell();
   await tester.pumpWidget(_wrap(
-    const AppShell(),
+    textScale == null
+        ? shell
+        : Builder(
+            builder: (ctx) => MediaQuery(
+              data: MediaQuery.of(ctx)
+                  .copyWith(textScaler: TextScaler.linear(textScale)),
+              child: shell,
+            ),
+          ),
     field: field,
     presence: presence,
     checkpoint: checkpoint,
@@ -506,6 +522,119 @@ void main() {
       expect(find.byType(SafetyTab), findsOneWidget);
       expect(tester.takeException(), isNull, reason: '安全 overflow @ $scale');
     }
+  });
+
+  // ── UI-H3-polish — plan §UI-H3 "Required Screens" coverage that the first
+  // UI-H3 cut left to the SafetyTab/Field/Preview/LastSeen/SOS set. These close
+  // the remaining named surfaces: the no-field entry, the full AppShell bottom
+  // navigation, and the MyTab settings — all under the effective ~2.0 composite
+  // on a narrow phone width.
+
+  // no-field entry (plan §Required Screens + DoD "No-field entry still presents
+  // all three actions"): the three actions survive 1.45 AND ~2.0 without
+  // overflow and all three stay present.
+  testWidgets('large text (UI-H3-polish): no-field entry survives 1.45 / 2.0',
+      (tester) async {
+    tester.view.physicalSize = const Size(360, 820);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    for (final scale in const [1.45, 2.0]) {
+      await _pumpShell(tester, joined: false, textScale: scale);
+      expect(find.byType(NoFieldEntry), findsOneWidget,
+          reason: 'no-field @ $scale');
+      expect(find.text('加入場域'), findsOneWidget, reason: '加入場域 @ $scale');
+      expect(find.text('建立場域'), findsOneWidget, reason: '建立場域 @ $scale');
+      expect(find.text('先看功能'), findsOneWidget, reason: '先看功能 @ $scale');
+      expect(tester.takeException(), isNull,
+          reason: 'no-field overflow @ $scale');
+    }
+  });
+
+  // full AppShell bottom navigation + global SOS reachability (plan §Required
+  // Screens "AppShell bottom navigation" + §Tests "global SOS reachability under
+  // the composite stress scale" + DoD "Global SOS remains reachable"). The
+  // IndexedStack builds all five tab bodies at once, so a single 2.0 pump
+  // stresses every tab; switching tabs must keep SOS reachable and never
+  // overflow.
+  testWidgets('large text (UI-H3-polish): joined AppShell bottom nav + SOS @ 2.0',
+      (tester) async {
+    tester.view.physicalSize = const Size(360, 820);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpShell(tester, joined: true, textScale: 2.0);
+    expect(tester.takeException(), isNull, reason: 'initial joined shell @ 2.0');
+
+    // All five tab labels render in the bottom bar at 2.0.
+    for (final label in const ['安全', '位置', '事件', '協助', '我的']) {
+      expect(find.text(label), findsOneWidget, reason: 'tab "$label" @ 2.0');
+    }
+    // Global SOS stays reachable through every tab switch, and no tab body
+    // (all live in the IndexedStack) overflows at 2.0.
+    for (final label in const ['安全', '位置', '事件', '協助', '我的']) {
+      await tester.tap(find.text(label));
+      await tester.pump();
+      expect(find.byKey(kGlobalSosButtonKey), findsOneWidget,
+          reason: 'global SOS missing on "$label" tab @ 2.0');
+      expect(tester.takeException(), isNull, reason: '$label tab overflow @ 2.0');
+    }
+  });
+
+  // MyTab formal settings (plan §Required Screens "MyTab settings"). MyTab is a
+  // ListView so vertical growth scrolls; this guards the SettingsSection chips +
+  // header rows horizontally and proves every language / text-size choice stays
+  // reachable (visible or scrollable-to), never hidden by the large scale.
+  testWidgets('large text (UI-H3-polish): MyTab settings reachable @ 2.0',
+      (tester) async {
+    tester.view.physicalSize = const Size(360, 820);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final registry = PeerCapabilityRegistry();
+    final facade = EventPublisherV2Facade(registry: registry);
+    final field = await _makeField(joined: true);
+    final presence = _makePresence(registry, facade);
+    final checkpoint = _makeCheckpoint(facade);
+    final beacon = _makeBeacon(presence, field);
+    addTearDown(() async {
+      beacon.dispose();
+      await facade.dispose();
+      await registry.dispose();
+      field.dispose();
+    });
+
+    await tester.pumpWidget(_wrap(
+      Builder(
+        builder: (ctx) => MediaQuery(
+          data: MediaQuery.of(ctx)
+              .copyWith(textScaler: const TextScaler.linear(2.0)),
+          child: const Scaffold(body: MyTab()),
+        ),
+      ),
+      field: field,
+      presence: presence,
+      checkpoint: checkpoint,
+      beacon: beacon,
+      facade: facade,
+    ));
+    await tester.pump();
+
+    expect(find.byType(MyTab), findsOneWidget);
+    expect(tester.takeException(), isNull, reason: 'MyTab overflow @ 2.0');
+
+    // The settings section + every language / text-size choice is in the tree
+    // and the lowest chip can be scrolled into view (reachable, not clipped).
+    expect(find.byType(SettingsSection), findsOneWidget);
+    for (final label in const ['設定', '語言', '字體大小', '中文', 'English', '超大字']) {
+      expect(find.text(label), findsWidgets, reason: 'settings "$label" @ 2.0');
+    }
+    await tester.ensureVisible(find.text('超大字').first);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull, reason: 'settings scroll @ 2.0');
   });
 
   // ── UI-H2a English-locale smoke ──────────────────────────────────────────

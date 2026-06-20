@@ -251,22 +251,36 @@ class _HazardCardState extends State<HazardCard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              Text(
-                  widget.formalSend
-                      ? l.hazardCardTitleFormal
-                      : l.hazardCardTitleDebug,
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-              const Spacer(),
+              // UI-H3-polish: bound the title (ellipsizes) and make the action a
+              // Flexible button with an ellipsizing label, so a long title + a
+              // button whose padding scales with text size cannot overflow under
+              // the ~2.0 composite (the action icon + tap target stay reachable).
+              Expanded(
+                child: Text(
+                    widget.formalSend
+                        ? l.hazardCardTitleFormal
+                        : l.hazardCardTitleDebug,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis),
+              ),
               // formalSend → 正式回報入口（production，participant+owner）。
               // 否則 kDebugMode-only debug 占位（DebugShell 沿用）。
-              if (widget.formalSend || kDebugMode)
-                FilledButton.tonalIcon(
-                  onPressed: _busy ? null : _promptAndPublish,
-                  icon: const Icon(Icons.warning_amber, size: 18),
-                  label: Text(widget.formalSend
-                      ? l.hazardCardReport
-                      : l.hazardCardManualDebug),
+              if (widget.formalSend || kDebugMode) ...[
+                const SizedBox(width: 8),
+                Flexible(
+                  child: FilledButton.tonalIcon(
+                    onPressed: _busy ? null : _promptAndPublish,
+                    icon: const Icon(Icons.warning_amber, size: 18),
+                    label: Text(
+                        widget.formalSend
+                            ? l.hazardCardReport
+                            : l.hazardCardManualDebug,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                  ),
                 ),
+              ],
             ]),
             const SizedBox(height: 4),
             Text(

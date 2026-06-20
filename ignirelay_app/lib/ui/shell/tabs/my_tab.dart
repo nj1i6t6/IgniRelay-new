@@ -117,12 +117,19 @@ class MyTab extends StatelessWidget {
               style: IgniTypography.bodyMedium(p.text0),
             ),
             const SizedBox(height: 2),
-            Row(children: [
-              MonoText('${active.shortId}…', fontSize: 11, color: p.text2),
-              const SizedBox(width: IgniSpacing.sm),
-              Text(l.myFieldJoinedCount(joined),
-                  style: IgniTypography.bodySmall(p.text2)),
-            ]),
+            // UI-H3-polish: the short-id + joined-count metadata can exceed one
+            // line under the ~2.0 composite (the mono id does not break), so let
+            // the two items flow onto a second line instead of overflowing.
+            Wrap(
+              spacing: IgniSpacing.sm,
+              runSpacing: IgniSpacing.xs,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                MonoText('${active.shortId}…', fontSize: 11, color: p.text2),
+                Text(l.myFieldJoinedCount(joined),
+                    style: IgniTypography.bodySmall(p.text2)),
+              ],
+            ),
           ] else
             Text(l.myNoField, style: IgniTypography.bodySmall(p.text2)),
         ],

@@ -127,16 +127,30 @@ class _CheckpointCardState extends State<CheckpointCard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              Text(l.checkpointCardTitle,
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-              const Spacer(),
+              // UI-H3-polish: the title carries the literal "CHECKPOINT" token
+              // (non-breaking) and the action button's content padding scales
+              // with the text size, so under the ~2.0 composite the button alone
+              // exceeds the card width. Bound BOTH: the title ellipsizes, and the
+              // button is Flexible with an ellipsizing label so the action (icon +
+              // tap target) stays reachable instead of overflowing.
+              Expanded(
+                child: Text(l.checkpointCardTitle,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis),
+              ),
               // 手動按鈕：debug-only 占位（真實流程綁 Node QR/接觸 → Stage D）。
-              if (kDebugMode)
-                FilledButton.tonalIcon(
-                  onPressed: _busy ? null : _promptAndPublish,
-                  icon: const Icon(Icons.how_to_reg, size: 18),
-                  label: Text(l.checkpointCardManual),
+              if (kDebugMode) ...[
+                const SizedBox(width: 8),
+                Flexible(
+                  child: FilledButton.tonalIcon(
+                    onPressed: _busy ? null : _promptAndPublish,
+                    icon: const Icon(Icons.how_to_reg, size: 18),
+                    label: Text(l.checkpointCardManual,
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ),
                 ),
+              ],
             ]),
             const SizedBox(height: 4),
             Text(

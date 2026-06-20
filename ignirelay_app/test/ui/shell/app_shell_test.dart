@@ -50,6 +50,7 @@ import 'package:ignirelay_app/ui/shell/debug_shell.dart';
 import 'package:ignirelay_app/ui/shell/tabs/events_tab.dart';
 import 'package:ignirelay_app/ui/shell/tabs/my_tab.dart';
 import 'package:ignirelay_app/ui/shell/tabs/safety_tab.dart';
+import 'package:ignirelay_app/ui/shell/tabs/settings_section.dart';
 import 'package:ignirelay_app/ui/widgets/igni_button.dart';
 
 class _FakeKvStore implements SecureKvStore {
@@ -392,5 +393,61 @@ void main() {
     expect(find.text('成員'), findsOneWidget);
     // kDebugMode is true under flutter test → the developer entry renders.
     expect(find.text('開發者診斷'), findsOneWidget);
+  });
+
+  testWidgets('UI-H1: 我的 tab shows the 設定 section (語言 / 字體大小)',
+      (tester) async {
+    await _pumpShell(tester, joined: true);
+
+    await tester.tap(find.text('我的'));
+    await tester.pump();
+
+    expect(find.byType(SettingsSection), findsOneWidget);
+    expect(find.text('設定'), findsOneWidget);
+    expect(find.text('語言'), findsOneWidget);
+    expect(find.text('字體大小'), findsOneWidget);
+    expect(find.text('中文'), findsOneWidget);
+    expect(find.text('English'), findsOneWidget);
+    expect(find.text('標準'), findsOneWidget);
+    expect(find.text('超大字'), findsOneWidget);
+  });
+
+  testWidgets('UI-H1: 我的 has no overflow at huge (1.45) text scale',
+      (tester) async {
+    final registry = PeerCapabilityRegistry();
+    final facade = EventPublisherV2Facade(registry: registry);
+    final field = await _makeField(joined: true);
+    final presence = _makePresence(registry, facade);
+    final checkpoint = _makeCheckpoint(facade);
+    final beacon = _makeBeacon(presence, field);
+    addTearDown(() async {
+      beacon.dispose();
+      await facade.dispose();
+      await registry.dispose();
+      field.dispose();
+    });
+
+    // MyTab in isolation under the huge effective scale. MyTab is a ListView, so
+    // vertical growth scrolls; this guards horizontal overflow in its rows +
+    // the new SettingsSection chips.
+    await tester.pumpWidget(_wrap(
+      Builder(
+        builder: (ctx) => MediaQuery(
+          data: MediaQuery.of(ctx)
+              .copyWith(textScaler: const TextScaler.linear(1.45)),
+          child: const Scaffold(body: MyTab()),
+        ),
+      ),
+      field: field,
+      presence: presence,
+      checkpoint: checkpoint,
+      beacon: beacon,
+      facade: facade,
+    ));
+    await tester.pump();
+
+    expect(find.byType(MyTab), findsOneWidget);
+    expect(find.text('設定'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

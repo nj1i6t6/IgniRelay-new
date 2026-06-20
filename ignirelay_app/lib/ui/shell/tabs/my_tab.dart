@@ -1,7 +1,8 @@
-// MyTab —「我的」分頁（UI-F2 模組搬遷；UI-F3 身分與角色實作）。
+// MyTab —「我的」分頁（UI-F2 模組搬遷；UI-F3 身分與角色實作；UI-H1 設定區）。
 //
 // 作用場域摘要 + 場域管理入口（導向既有 A7 FieldScreen）+ 身分與角色（UI-F3：
-// owner「主辦」/ participant「成員」，由本機建立 vs 加入推導）+ 權限狀態正式產品佔位
+// owner「主辦」/ participant「成員」，由本機建立 vs 加入推導）+ 設定（UI-H1：語言 /
+// 字體大小，接既有 IgniRelayApp.setLocale/setTextScale）+ 權限狀態正式產品佔位
 // （「即將提供」，OS 權限健康度與場域角色刻意分開，D10）+ 開發者診斷入口（僅 kDebugMode，
 // 從 app_shell 移來；經 debug-only 命名路由進 DebugShell）。
 //
@@ -12,9 +13,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:ignirelay_app/app/controllers/active_field_controller.dart';
+import 'package:ignirelay_app/main.dart' show IgniRelayApp;
 import 'package:ignirelay_app/ui/screens/field/field_screen.dart';
 import 'package:ignirelay_app/ui/shell/app_shell.dart'
     show kDeveloperDiagnosticsRoute;
+import 'package:ignirelay_app/ui/shell/tabs/settings_section.dart';
 import 'package:ignirelay_app/ui/theme/igni_colors.dart';
 import 'package:ignirelay_app/ui/theme/igni_tokens.dart';
 import 'package:ignirelay_app/ui/theme/igni_typography.dart';
@@ -50,6 +53,18 @@ class MyTab extends StatelessWidget {
               _fieldCard(context, p, active, field.joinedFieldCount),
               const SizedBox(height: IgniSpacing.md),
               _roleCard(p, active),
+              const SizedBox(height: IgniSpacing.md),
+              // UI-H1：設定區（語言 / 字體大小）。目前值用 Localizations.localeOf /
+              // IgniRelayApp.textScaleOf 讀；選擇後交給既有 root API 持久化（無新 store /
+              // 無 locale getter）。SettingsSection 本身純展示、不 import main.dart。
+              SettingsSection(
+                languageCode: Localizations.localeOf(context).languageCode,
+                textScale: IgniRelayApp.textScaleOf(context),
+                onLanguageSelected: (locale) =>
+                    IgniRelayApp.setLocale(context, locale),
+                onTextScaleSelected: (scale) =>
+                    IgniRelayApp.setTextScale(context, scale),
+              ),
               const SizedBox(height: IgniSpacing.md),
               // 權限狀態 = OS permission health — kept SEPARATE from field role
               // above (UI-F3 / D10). Real status lands later (permission UX).

@@ -13,6 +13,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:ignirelay_app/app/controllers/active_field_controller.dart';
+import 'package:ignirelay_app/l10n/generated/app_localizations.dart';
+import 'package:ignirelay_app/l10n/l10n_ext.dart';
 import 'package:ignirelay_app/main.dart' show IgniRelayApp;
 import 'package:ignirelay_app/ui/screens/field/field_screen.dart';
 import 'package:ignirelay_app/ui/shell/app_shell.dart'
@@ -39,20 +41,21 @@ class MyTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.igni;
+    final l = context.l10n;
     final field = context.watch<ActiveFieldController>();
     final active = field.active;
     return ListView(
       padding: const EdgeInsets.only(bottom: IgniSpacing.xl3),
       children: [
-        const IgniSubPageHeader(title: '我的', subtitle: '場域、身分與設定'),
+        IgniSubPageHeader(title: l.myTitle, subtitle: l.mySubtitle),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: IgniSpacing.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _fieldCard(context, p, active, field.joinedFieldCount),
+              _fieldCard(context, p, l, active, field.joinedFieldCount),
               const SizedBox(height: IgniSpacing.md),
-              _roleCard(p, active),
+              _roleCard(p, l, active),
               const SizedBox(height: IgniSpacing.md),
               // UI-H1：設定區（語言 / 字體大小）。目前值用 Localizations.localeOf /
               // IgniRelayApp.textScaleOf 讀；選擇後交給既有 root API 持久化（無新 store /
@@ -68,11 +71,11 @@ class MyTab extends StatelessWidget {
               const SizedBox(height: IgniSpacing.md),
               // 權限狀態 = OS permission health — kept SEPARATE from field role
               // above (UI-F3 / D10). Real status lands later (permission UX).
-              _placeholderCard(p, '權限狀態', '即將提供'),
+              _placeholderCard(p, l.myPermissionSection, l.myComingSoon),
               if (kDebugMode) ...[
                 const SizedBox(height: IgniSpacing.xl),
                 IgniButton(
-                  label: '開發者診斷',
+                  label: l.myDeveloperDiagnostics,
                   icon: Icons.bug_report_outlined,
                   variant: IgniButtonVariant.ghost,
                   onPressed: () => Navigator.of(context)
@@ -86,8 +89,8 @@ class MyTab extends StatelessWidget {
     );
   }
 
-  Widget _fieldCard(
-      BuildContext context, IgniPalette p, ActiveField? active, int joined) {
+  Widget _fieldCard(BuildContext context, IgniPalette p, S l,
+      ActiveField? active, int joined) {
     return IgniCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,10 +99,10 @@ class MyTab extends StatelessWidget {
             Icon(active != null ? Icons.shield : Icons.shield_outlined,
                 size: 18, color: active != null ? p.ok : p.text2),
             const SizedBox(width: IgniSpacing.sm),
-            Text('場域', style: IgniTypography.titleMedium(p.text0)),
+            Text(l.myFieldSection, style: IgniTypography.titleMedium(p.text0)),
             const Spacer(),
             IgniButton(
-              label: '場域管理',
+              label: l.myFieldManage,
               icon: Icons.tune,
               variant: IgniButtonVariant.ghost,
               size: IgniButtonSize.small,
@@ -109,17 +112,19 @@ class MyTab extends StatelessWidget {
           const SizedBox(height: IgniSpacing.sm),
           if (active != null) ...[
             Text(
-              '目前場域：${active.displayName.isEmpty ? "（未命名）" : active.displayName}',
+              l.myCurrentField(
+                  active.displayName.isEmpty ? l.myFieldUnnamed : active.displayName),
               style: IgniTypography.bodyMedium(p.text0),
             ),
             const SizedBox(height: 2),
             Row(children: [
               MonoText('${active.shortId}…', fontSize: 11, color: p.text2),
               const SizedBox(width: IgniSpacing.sm),
-              Text('已加入 $joined 個', style: IgniTypography.bodySmall(p.text2)),
+              Text(l.myFieldJoinedCount(joined),
+                  style: IgniTypography.bodySmall(p.text2)),
             ]),
           ] else
-            Text('尚未加入場域。', style: IgniTypography.bodySmall(p.text2)),
+            Text(l.myNoField, style: IgniTypography.bodySmall(p.text2)),
         ],
       ),
     );
@@ -127,7 +132,7 @@ class MyTab extends StatelessWidget {
 
   // 身分與角色 — field membership role (UI-F3). owner「主辦」/ participant「成員」,
   // derived from local create-vs-join. Distinct from OS 權限狀態 (D10).
-  Widget _roleCard(IgniPalette p, ActiveField? active) {
+  Widget _roleCard(IgniPalette p, S l, ActiveField? active) {
     return IgniCard(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -136,14 +141,14 @@ class MyTab extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('身分與角色', style: IgniTypography.titleMedium(p.text0)),
+                Text(l.myRoleSection, style: IgniTypography.titleMedium(p.text0)),
                 const SizedBox(height: IgniSpacing.xs),
                 Text(
                   active == null
-                      ? '加入或建立場域後顯示。'
+                      ? l.myRoleEmptyHint
                       : active.isOwner
-                          ? '你建立了這個場域，可分享加入 QR。'
-                          : '你已加入這個場域。',
+                          ? l.myRoleOwnerDesc
+                          : l.myRoleParticipantDesc,
                   style: IgniTypography.bodySmall(p.text2),
                 ),
               ],
@@ -152,7 +157,7 @@ class MyTab extends StatelessWidget {
           if (active != null) ...[
             const SizedBox(width: IgniSpacing.sm),
             IgniChip(
-              label: active.isOwner ? '主辦' : '成員',
+              label: active.isOwner ? l.roleHost : l.roleMember,
               tone: active.isOwner ? IgniChipTone.ok : IgniChipTone.info,
             ),
           ],

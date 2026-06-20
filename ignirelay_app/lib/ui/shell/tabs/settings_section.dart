@@ -15,6 +15,7 @@
 
 import 'package:flutter/material.dart';
 
+import 'package:ignirelay_app/l10n/l10n_ext.dart';
 import 'package:ignirelay_app/ui/theme/igni_colors.dart';
 import 'package:ignirelay_app/ui/theme/igni_text_scale.dart';
 import 'package:ignirelay_app/ui/theme/igni_tokens.dart';
@@ -43,24 +44,26 @@ class SettingsSection extends StatelessWidget {
   /// 使用者點選字體大小時回呼。
   final ValueChanged<IgniTextScale> onTextScaleSelected;
 
-  static const List<(IgniTextScale, String)> _textScaleChoices = [
-    (IgniTextScale.standard, '標準'),
-    (IgniTextScale.large, '大字'),
-    (IgniTextScale.xLarge, '特大字'),
-    (IgniTextScale.huge, '超大字'),
-  ];
-
   @override
   Widget build(BuildContext context) {
     final p = context.igni;
+    final l = context.l10n;
     final isEnglish = languageCode == 'en';
+    // 字級標籤經 i18n（UI-H2a）；「中文」「English」是語言本名（endonym），兩語系皆
+    // 維持原樣、刻意不翻譯。
+    final textScaleChoices = <(IgniTextScale, String)>[
+      (IgniTextScale.standard, l.settingsTextSizeStandard),
+      (IgniTextScale.large, l.settingsTextSizeLarge),
+      (IgniTextScale.xLarge, l.settingsTextSizeXLarge),
+      (IgniTextScale.huge, l.settingsTextSizeHuge),
+    ];
     return IgniCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('設定', style: IgniTypography.titleMedium(p.text0)),
+          Text(l.settingsSection, style: IgniTypography.titleMedium(p.text0)),
           const SizedBox(height: IgniSpacing.md),
-          _fieldLabel(p, '語言'),
+          _fieldLabel(p, l.settingsLanguage),
           const SizedBox(height: IgniSpacing.xs),
           Wrap(
             spacing: IgniSpacing.sm,
@@ -79,13 +82,13 @@ class SettingsSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: IgniSpacing.md),
-          _fieldLabel(p, '字體大小'),
+          _fieldLabel(p, l.settingsTextSize),
           const SizedBox(height: IgniSpacing.xs),
           Wrap(
             spacing: IgniSpacing.sm,
             runSpacing: IgniSpacing.sm,
             children: [
-              for (final (scale, label) in _textScaleChoices)
+              for (final (scale, label) in textScaleChoices)
                 _choice(
                   label: label,
                   selected: textScale == scale,

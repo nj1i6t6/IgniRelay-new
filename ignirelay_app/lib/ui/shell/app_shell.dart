@@ -25,6 +25,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:ignirelay_app/app/controllers/active_field_controller.dart';
+import 'package:ignirelay_app/l10n/generated/app_localizations.dart';
+import 'package:ignirelay_app/l10n/l10n_ext.dart';
 import 'package:ignirelay_app/ui/screens/field/field_screen.dart';
 import 'package:ignirelay_app/ui/screens/position/last_seen_screen.dart';
 import 'package:ignirelay_app/ui/screens/preview/preview_screen.dart';
@@ -42,15 +44,16 @@ import 'package:ignirelay_app/ui/widgets/igni_button.dart';
 /// （與 `/design-showcase` 同模式），release build 完全不存在。
 const String kDeveloperDiagnosticsRoute = '/debug-shell';
 
-/// 五分頁 label——**單一真實來源**。UI-F1 DoD：精確為這五個、順序固定，
-/// 且不得出現「地圖」。tab 列與 smoke test 都引用本常數。
-const List<String> kAppShellTabLabels = <String>[
-  '安全',
-  '位置',
-  '事件',
-  '協助',
-  '我的',
-];
+/// 五分頁 label——**單一真實來源**（UI-H2a 起 i18n 化）。UI-F1 DoD：精確為這五個、
+/// 順序固定，且不得出現「地圖」。tab 列與 smoke test 都引用本函式（順序＝
+/// 安全 / 位置 / 事件 / 協助 / 我的，由 ARB 的 zh/en 值提供）。
+List<String> appShellTabLabels(S l10n) => <String>[
+      l10n.shellTabSafety,
+      l10n.shellTabPosition,
+      l10n.shellTabEvents,
+      l10n.shellTabAssist,
+      l10n.shellTabMine,
+    ];
 
 /// 全域 SOS 鈕的 key——讓 smoke test 能不靠文字（避免與分頁內容裡的「SOS」字面
 /// 衝突）就定位到「每個分頁都可達」的那顆求救鍵。
@@ -93,6 +96,7 @@ class NoFieldEntry extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.igni;
+    final l = context.l10n;
     return Scaffold(
       backgroundColor: p.bg0,
       body: SafeArea(
@@ -110,19 +114,19 @@ class NoFieldEntry extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    '烽傳 IgniRelay',
+                    l.noFieldTitle,
                     style: IgniTypography.titleLarge(p.text0),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: IgniSpacing.sm),
                   Text(
-                    '加入或建立一個場域，開始被看見、能求救、留下最後足跡。',
+                    l.noFieldSubtitle,
                     style: IgniTypography.bodyMedium(p.text2),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: IgniSpacing.xl3),
                   IgniButton(
-                    label: '加入場域',
+                    label: l.noFieldJoin,
                     icon: Icons.qr_code_scanner,
                     size: IgniButtonSize.large,
                     fullWidth: true,
@@ -130,7 +134,7 @@ class NoFieldEntry extends StatelessWidget {
                   ),
                   const SizedBox(height: IgniSpacing.md),
                   IgniButton(
-                    label: '建立場域',
+                    label: l.noFieldCreate,
                     icon: Icons.add_circle_outline,
                     variant: IgniButtonVariant.ghost,
                     size: IgniButtonSize.large,
@@ -139,7 +143,7 @@ class NoFieldEntry extends StatelessWidget {
                   ),
                   const SizedBox(height: IgniSpacing.md),
                   IgniButton(
-                    label: '先看功能',
+                    label: l.noFieldPreview,
                     icon: Icons.visibility_outlined,
                     variant: IgniButtonVariant.ghost,
                     size: IgniButtonSize.large,
@@ -167,7 +171,7 @@ class _AppShellTabs extends StatefulWidget {
 class _AppShellTabsState extends State<_AppShellTabs> {
   int _index = 0;
 
-  // 與 [kAppShellTabLabels] 平行對位的分頁圖示（Material 內建向量圖示，
+  // 與 [appShellTabLabels] 平行對位的分頁圖示（Material 內建向量圖示，
   // 非 icon-font 套件/emoji，符合 DESIGN §5）。
   static const List<IconData> _tabIcons = <IconData>[
     Icons.shield_outlined, // 安全
@@ -177,7 +181,7 @@ class _AppShellTabsState extends State<_AppShellTabs> {
     Icons.person_outline, // 我的
   ];
 
-  // 與 [kAppShellTabLabels] 平行對位的分頁內容（UI-F2 模組搬遷）。順序＝
+  // 與 [appShellTabLabels] 平行對位的分頁內容（UI-F2 模組搬遷）。順序＝
   // 安全 / 位置 / 事件 / 協助 / 我的。位置直接嵌入既有 LastSeenScreen（A10/A10b）。
   static const List<Widget> _tabBodies = <Widget>[
     SafetyTab(),
@@ -221,7 +225,7 @@ class _AppShellTabsState extends State<_AppShellTabs> {
       bottomNavigationBar: _BottomTabBar(
         index: _index,
         icons: _tabIcons,
-        labels: kAppShellTabLabels,
+        labels: appShellTabLabels(context.l10n),
         onTap: (i) => setState(() => _index = i),
       ),
     );

@@ -1423,5 +1423,49 @@
   "supplyItem_TOOL_SIGNAL_FLARE": "Signal Flare",
   "supplyItem_TOOL_SIGNAL_MIRROR": "Signal Mirror",
   "supplyItem_TOOL_SIGNAL_FLAG": "Distress Flag/Banner",
-  "supplyItem_TOOL_SIGNAL_STROBE": "Strobe Emergency Light"
+  "supplyItem_TOOL_SIGNAL_STROBE": "Strobe Emergency Light",
+
+  "shellTabSafety": "Safety",
+  "shellTabPosition": "Location",
+  "shellTabEvents": "Events",
+  "shellTabAssist": "Assist",
+  "shellTabMine": "Me",
+
+  "noFieldTitle": "IgniRelay",
+  "noFieldSubtitle": "Join or create a field to become visible, call for help, and leave a last known trail.",
+  "noFieldJoin": "Join field",
+  "noFieldCreate": "Create field",
+  "noFieldPreview": "Guided preview",
+
+  "myTitle": "Me",
+  "mySubtitle": "Field, identity & settings",
+  "myFieldSection": "Field",
+  "myFieldManage": "Manage field",
+  "myCurrentField": "Current field: {name}",
+  "@myCurrentField": {
+    "placeholders": { "name": {"type": "String"} }
+  },
+  "myFieldUnnamed": "(unnamed)",
+  "myFieldJoinedCount": "Joined {count}",
+  "@myFieldJoinedCount": {
+    "placeholders": { "count": {"type": "int"} }
+  },
+  "myNoField": "No field joined yet.",
+  "myRoleSection": "Identity & role",
+  "myRoleEmptyHint": "Shown after you join or create a field.",
+  "myRoleOwnerDesc": "You created this field; you can share the join QR.",
+  "myRoleParticipantDesc": "You have joined this field.",
+  "roleHost": "Host",
+  "roleMember": "Member",
+  "myPermissionSection": "Permission status",
+  "myComingSoon": "Coming soon",
+  "myDeveloperDiagnostics": "Developer diagnostics",
+
+  "settingsSection": "Settings",
+  "settingsLanguage": "Language",
+  "settingsTextSize": "Text size",
+  "settingsTextSizeStandard": "Standard",
+  "settingsTextSizeLarge": "Large",
+  "settingsTextSizeXLarge": "X-Large",
+  "settingsTextSizeHuge": "Huge"
 }

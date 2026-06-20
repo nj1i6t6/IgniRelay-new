@@ -42,6 +42,7 @@ import 'package:ignirelay_app/app/services/local_position_source.dart';
 import 'package:ignirelay_app/app/services/location_evidence_builder.dart';
 import 'package:ignirelay_app/app/services/location_refresh_coordinator.dart';
 import 'package:ignirelay_app/app/services/peer_capability_registry.dart';
+import 'package:ignirelay_app/l10n/generated/app_localizations.dart';
 import 'package:ignirelay_app/ui/screens/field/field_screen.dart';
 import 'package:ignirelay_app/ui/screens/position/last_seen_screen.dart';
 import 'package:ignirelay_app/ui/screens/preview/preview_screen.dart';
@@ -70,6 +71,7 @@ Widget _wrap(
   required CheckpointController checkpoint,
   required PresenceBeaconController beacon,
   required EventPublisherV2Facade facade,
+  Locale locale = const Locale('zh'),
 }) {
   return MultiProvider(
     providers: [
@@ -107,7 +109,12 @@ Widget _wrap(
       ListenableProvider<ActiveFieldController>.value(value: field),
       ChangeNotifierProvider<PresenceBeaconController>.value(value: beacon),
     ],
-    child: MaterialApp(home: child),
+    child: MaterialApp(
+      locale: locale,
+      supportedLocales: S.supportedLocales,
+      localizationsDelegates: S.localizationsDelegates,
+      home: child,
+    ),
   );
 }
 
@@ -153,7 +160,8 @@ Future<ActiveFieldController> _makeField({bool joined = false}) async {
 }
 
 /// Pumps the full AppShell with the production-shaped provider graph.
-Future<void> _pumpShell(WidgetTester tester, {required bool joined}) async {
+Future<void> _pumpShell(WidgetTester tester,
+    {required bool joined, Locale locale = const Locale('zh')}) async {
   final registry = PeerCapabilityRegistry();
   final facade = EventPublisherV2Facade(registry: registry);
   final field = await _makeField(joined: joined);
@@ -174,6 +182,7 @@ Future<void> _pumpShell(WidgetTester tester, {required bool joined}) async {
     checkpoint: checkpoint,
     beacon: beacon,
     facade: facade,
+    locale: locale,
   ));
   await tester.pump();
 }
@@ -258,8 +267,11 @@ void main() {
     await _pumpShell(tester, joined: true);
 
     expect(find.byType(NoFieldEntry), findsNothing);
-    expect(kAppShellTabLabels, <String>['安全', '位置', '事件', '協助', '我的']);
-    for (final label in kAppShellTabLabels) {
+    // UI-H2a: labels come from ARB. Order is fixed by appShellTabLabels(); zh
+    // values are the canonical 安全/位置/事件/協助/我的, never 地圖.
+    expect(appShellTabLabels(lookupS(const Locale('zh'))),
+        <String>['安全', '位置', '事件', '協助', '我的']);
+    for (final label in const ['安全', '位置', '事件', '協助', '我的']) {
       expect(find.text(label), findsOneWidget, reason: 'tab "$label"');
     }
     expect(find.text('地圖'), findsNothing);
@@ -270,7 +282,7 @@ void main() {
   testWidgets('global SOS is reachable from every tab', (tester) async {
     await _pumpShell(tester, joined: true);
 
-    for (final label in kAppShellTabLabels) {
+    for (final label in const ['安全', '位置', '事件', '協助', '我的']) {
       await tester.tap(find.text(label));
       await tester.pump();
       expect(find.byKey(kGlobalSosButtonKey), findsOneWidget,
@@ -449,5 +461,50 @@ void main() {
     expect(find.byType(MyTab), findsOneWidget);
     expect(find.text('設定'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  // ── UI-H2a English-locale smoke ──────────────────────────────────────────
+
+  testWidgets('en: no-field entry shows English entries (no Chinese)',
+      (tester) async {
+    await _pumpShell(tester, joined: false, locale: const Locale('en'));
+
+    expect(find.byType(NoFieldEntry), findsOneWidget);
+    expect(find.text('IgniRelay'), findsOneWidget);
+    expect(find.text('Join field'), findsOneWidget);
+    expect(find.text('Create field'), findsOneWidget);
+    expect(find.text('Guided preview'), findsOneWidget);
+    expect(find.text('加入場域'), findsNothing);
+    expect(find.text('先看功能'), findsNothing);
+  });
+
+  testWidgets('en: five tabs render English labels, no 安全 / 地圖',
+      (tester) async {
+    await _pumpShell(tester, joined: true, locale: const Locale('en'));
+
+    expect(appShellTabLabels(lookupS(const Locale('en'))),
+        <String>['Safety', 'Location', 'Events', 'Assist', 'Me']);
+    for (final label in const ['Safety', 'Location', 'Events', 'Assist', 'Me']) {
+      expect(find.text(label), findsOneWidget, reason: 'en tab "$label"');
+    }
+    expect(find.text('安全'), findsNothing);
+    expect(find.text('地圖'), findsNothing);
+    expect(find.text('Map'), findsNothing);
+  });
+
+  testWidgets('en: 我的 settings section is localized', (tester) async {
+    await _pumpShell(tester, joined: true, locale: const Locale('en'));
+
+    await tester.tap(find.text('Me'));
+    await tester.pump();
+
+    expect(find.byType(SettingsSection), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Language'), findsOneWidget);
+    expect(find.text('Text size'), findsOneWidget);
+    // role chip for a joined (not created) field → Member, not 成員.
+    expect(find.text('Member'), findsOneWidget);
+    expect(find.text('設定'), findsNothing);
+    expect(find.text('成員'), findsNothing);
   });
 }

@@ -3436,4 +3436,110 @@ class SZh extends S {
 
   @override
   String get supplyItem_TOOL_SIGNAL_STROBE => '閃光求救燈';
+
+  @override
+  String get shellTabSafety => '安全';
+
+  @override
+  String get shellTabPosition => '位置';
+
+  @override
+  String get shellTabEvents => '事件';
+
+  @override
+  String get shellTabAssist => '協助';
+
+  @override
+  String get shellTabMine => '我的';
+
+  @override
+  String get noFieldTitle => '烽傳 IgniRelay';
+
+  @override
+  String get noFieldSubtitle => '加入或建立一個場域，開始被看見、能求救、留下最後足跡。';
+
+  @override
+  String get noFieldJoin => '加入場域';
+
+  @override
+  String get noFieldCreate => '建立場域';
+
+  @override
+  String get noFieldPreview => '先看功能';
+
+  @override
+  String get myTitle => '我的';
+
+  @override
+  String get mySubtitle => '場域、身分與設定';
+
+  @override
+  String get myFieldSection => '場域';
+
+  @override
+  String get myFieldManage => '場域管理';
+
+  @override
+  String myCurrentField(String name) {
+    return '目前場域：$name';
+  }
+
+  @override
+  String get myFieldUnnamed => '（未命名）';
+
+  @override
+  String myFieldJoinedCount(int count) {
+    return '已加入 $count 個';
+  }
+
+  @override
+  String get myNoField => '尚未加入場域。';
+
+  @override
+  String get myRoleSection => '身分與角色';
+
+  @override
+  String get myRoleEmptyHint => '加入或建立場域後顯示。';
+
+  @override
+  String get myRoleOwnerDesc => '你建立了這個場域，可分享加入 QR。';
+
+  @override
+  String get myRoleParticipantDesc => '你已加入這個場域。';
+
+  @override
+  String get roleHost => '主辦';
+
+  @override
+  String get roleMember => '成員';
+
+  @override
+  String get myPermissionSection => '權限狀態';
+
+  @override
+  String get myComingSoon => '即將提供';
+
+  @override
+  String get myDeveloperDiagnostics => '開發者診斷';
+
+  @override
+  String get settingsSection => '設定';
+
+  @override
+  String get settingsLanguage => '語言';
+
+  @override
+  String get settingsTextSize => '字體大小';
+
+  @override
+  String get settingsTextSizeStandard => '標準';
+
+  @override
+  String get settingsTextSizeLarge => '大字';
+
+  @override
+  String get settingsTextSizeXLarge => '特大字';
+
+  @override
+  String get settingsTextSizeHuge => '超大字';
 }

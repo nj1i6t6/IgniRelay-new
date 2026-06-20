@@ -6577,6 +6577,210 @@ abstract class S {
   /// In zh, this message translates to:
   /// **'閃光求救燈'**
   String get supplyItem_TOOL_SIGNAL_STROBE;
+
+  /// No description provided for @shellTabSafety.
+  ///
+  /// In zh, this message translates to:
+  /// **'安全'**
+  String get shellTabSafety;
+
+  /// No description provided for @shellTabPosition.
+  ///
+  /// In zh, this message translates to:
+  /// **'位置'**
+  String get shellTabPosition;
+
+  /// No description provided for @shellTabEvents.
+  ///
+  /// In zh, this message translates to:
+  /// **'事件'**
+  String get shellTabEvents;
+
+  /// No description provided for @shellTabAssist.
+  ///
+  /// In zh, this message translates to:
+  /// **'協助'**
+  String get shellTabAssist;
+
+  /// No description provided for @shellTabMine.
+  ///
+  /// In zh, this message translates to:
+  /// **'我的'**
+  String get shellTabMine;
+
+  /// No description provided for @noFieldTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'烽傳 IgniRelay'**
+  String get noFieldTitle;
+
+  /// No description provided for @noFieldSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'加入或建立一個場域，開始被看見、能求救、留下最後足跡。'**
+  String get noFieldSubtitle;
+
+  /// No description provided for @noFieldJoin.
+  ///
+  /// In zh, this message translates to:
+  /// **'加入場域'**
+  String get noFieldJoin;
+
+  /// No description provided for @noFieldCreate.
+  ///
+  /// In zh, this message translates to:
+  /// **'建立場域'**
+  String get noFieldCreate;
+
+  /// No description provided for @noFieldPreview.
+  ///
+  /// In zh, this message translates to:
+  /// **'先看功能'**
+  String get noFieldPreview;
+
+  /// No description provided for @myTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'我的'**
+  String get myTitle;
+
+  /// No description provided for @mySubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'場域、身分與設定'**
+  String get mySubtitle;
+
+  /// No description provided for @myFieldSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'場域'**
+  String get myFieldSection;
+
+  /// No description provided for @myFieldManage.
+  ///
+  /// In zh, this message translates to:
+  /// **'場域管理'**
+  String get myFieldManage;
+
+  /// No description provided for @myCurrentField.
+  ///
+  /// In zh, this message translates to:
+  /// **'目前場域：{name}'**
+  String myCurrentField(String name);
+
+  /// No description provided for @myFieldUnnamed.
+  ///
+  /// In zh, this message translates to:
+  /// **'（未命名）'**
+  String get myFieldUnnamed;
+
+  /// No description provided for @myFieldJoinedCount.
+  ///
+  /// In zh, this message translates to:
+  /// **'已加入 {count} 個'**
+  String myFieldJoinedCount(int count);
+
+  /// No description provided for @myNoField.
+  ///
+  /// In zh, this message translates to:
+  /// **'尚未加入場域。'**
+  String get myNoField;
+
+  /// No description provided for @myRoleSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'身分與角色'**
+  String get myRoleSection;
+
+  /// No description provided for @myRoleEmptyHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'加入或建立場域後顯示。'**
+  String get myRoleEmptyHint;
+
+  /// No description provided for @myRoleOwnerDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'你建立了這個場域，可分享加入 QR。'**
+  String get myRoleOwnerDesc;
+
+  /// No description provided for @myRoleParticipantDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'你已加入這個場域。'**
+  String get myRoleParticipantDesc;
+
+  /// No description provided for @roleHost.
+  ///
+  /// In zh, this message translates to:
+  /// **'主辦'**
+  String get roleHost;
+
+  /// No description provided for @roleMember.
+  ///
+  /// In zh, this message translates to:
+  /// **'成員'**
+  String get roleMember;
+
+  /// No description provided for @myPermissionSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'權限狀態'**
+  String get myPermissionSection;
+
+  /// No description provided for @myComingSoon.
+  ///
+  /// In zh, this message translates to:
+  /// **'即將提供'**
+  String get myComingSoon;
+
+  /// No description provided for @myDeveloperDiagnostics.
+  ///
+  /// In zh, this message translates to:
+  /// **'開發者診斷'**
+  String get myDeveloperDiagnostics;
+
+  /// No description provided for @settingsSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'設定'**
+  String get settingsSection;
+
+  /// No description provided for @settingsLanguage.
+  ///
+  /// In zh, this message translates to:
+  /// **'語言'**
+  String get settingsLanguage;
+
+  /// No description provided for @settingsTextSize.
+  ///
+  /// In zh, this message translates to:
+  /// **'字體大小'**
+  String get settingsTextSize;
+
+  /// No description provided for @settingsTextSizeStandard.
+  ///
+  /// In zh, this message translates to:
+  /// **'標準'**
+  String get settingsTextSizeStandard;
+
+  /// No description provided for @settingsTextSizeLarge.
+  ///
+  /// In zh, this message translates to:
+  /// **'大字'**
+  String get settingsTextSizeLarge;
+
+  /// No description provided for @settingsTextSizeXLarge.
+  ///
+  /// In zh, this message translates to:
+  /// **'特大字'**
+  String get settingsTextSizeXLarge;
+
+  /// No description provided for @settingsTextSizeHuge.
+  ///
+  /// In zh, this message translates to:
+  /// **'超大字'**
+  String get settingsTextSizeHuge;
 }
 
 class _SDelegate extends LocalizationsDelegate<S> {

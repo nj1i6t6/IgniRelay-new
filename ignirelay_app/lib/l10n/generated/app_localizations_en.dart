@@ -3541,4 +3541,112 @@ class SEn extends S {
 
   @override
   String get supplyItem_TOOL_SIGNAL_STROBE => 'Strobe Emergency Light';
+
+  @override
+  String get shellTabSafety => 'Safety';
+
+  @override
+  String get shellTabPosition => 'Location';
+
+  @override
+  String get shellTabEvents => 'Events';
+
+  @override
+  String get shellTabAssist => 'Assist';
+
+  @override
+  String get shellTabMine => 'Me';
+
+  @override
+  String get noFieldTitle => 'IgniRelay';
+
+  @override
+  String get noFieldSubtitle =>
+      'Join or create a field to become visible, call for help, and leave a last known trail.';
+
+  @override
+  String get noFieldJoin => 'Join field';
+
+  @override
+  String get noFieldCreate => 'Create field';
+
+  @override
+  String get noFieldPreview => 'Guided preview';
+
+  @override
+  String get myTitle => 'Me';
+
+  @override
+  String get mySubtitle => 'Field, identity & settings';
+
+  @override
+  String get myFieldSection => 'Field';
+
+  @override
+  String get myFieldManage => 'Manage field';
+
+  @override
+  String myCurrentField(String name) {
+    return 'Current field: $name';
+  }
+
+  @override
+  String get myFieldUnnamed => '(unnamed)';
+
+  @override
+  String myFieldJoinedCount(int count) {
+    return 'Joined $count';
+  }
+
+  @override
+  String get myNoField => 'No field joined yet.';
+
+  @override
+  String get myRoleSection => 'Identity & role';
+
+  @override
+  String get myRoleEmptyHint => 'Shown after you join or create a field.';
+
+  @override
+  String get myRoleOwnerDesc =>
+      'You created this field; you can share the join QR.';
+
+  @override
+  String get myRoleParticipantDesc => 'You have joined this field.';
+
+  @override
+  String get roleHost => 'Host';
+
+  @override
+  String get roleMember => 'Member';
+
+  @override
+  String get myPermissionSection => 'Permission status';
+
+  @override
+  String get myComingSoon => 'Coming soon';
+
+  @override
+  String get myDeveloperDiagnostics => 'Developer diagnostics';
+
+  @override
+  String get settingsSection => 'Settings';
+
+  @override
+  String get settingsLanguage => 'Language';
+
+  @override
+  String get settingsTextSize => 'Text size';
+
+  @override
+  String get settingsTextSizeStandard => 'Standard';
+
+  @override
+  String get settingsTextSizeLarge => 'Large';
+
+  @override
+  String get settingsTextSizeXLarge => 'X-Large';
+
+  @override
+  String get settingsTextSizeHuge => 'Huge';
 }

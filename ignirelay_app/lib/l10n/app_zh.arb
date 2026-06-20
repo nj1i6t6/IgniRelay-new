@@ -1423,5 +1423,49 @@
   "supplyItem_TOOL_SIGNAL_FLARE": "信號彈",
   "supplyItem_TOOL_SIGNAL_MIRROR": "信號鏡 (反光求救)",
   "supplyItem_TOOL_SIGNAL_FLAG": "求救旗幟/布條",
-  "supplyItem_TOOL_SIGNAL_STROBE": "閃光求救燈"
+  "supplyItem_TOOL_SIGNAL_STROBE": "閃光求救燈",
+
+  "shellTabSafety": "安全",
+  "shellTabPosition": "位置",
+  "shellTabEvents": "事件",
+  "shellTabAssist": "協助",
+  "shellTabMine": "我的",
+
+  "noFieldTitle": "烽傳 IgniRelay",
+  "noFieldSubtitle": "加入或建立一個場域，開始被看見、能求救、留下最後足跡。",
+  "noFieldJoin": "加入場域",
+  "noFieldCreate": "建立場域",
+  "noFieldPreview": "先看功能",
+
+  "myTitle": "我的",
+  "mySubtitle": "場域、身分與設定",
+  "myFieldSection": "場域",
+  "myFieldManage": "場域管理",
+  "myCurrentField": "目前場域：{name}",
+  "@myCurrentField": {
+    "placeholders": { "name": {"type": "String"} }
+  },
+  "myFieldUnnamed": "（未命名）",
+  "myFieldJoinedCount": "已加入 {count} 個",
+  "@myFieldJoinedCount": {
+    "placeholders": { "count": {"type": "int"} }
+  },
+  "myNoField": "尚未加入場域。",
+  "myRoleSection": "身分與角色",
+  "myRoleEmptyHint": "加入或建立場域後顯示。",
+  "myRoleOwnerDesc": "你建立了這個場域，可分享加入 QR。",
+  "myRoleParticipantDesc": "你已加入這個場域。",
+  "roleHost": "主辦",
+  "roleMember": "成員",
+  "myPermissionSection": "權限狀態",
+  "myComingSoon": "即將提供",
+  "myDeveloperDiagnostics": "開發者診斷",
+
+  "settingsSection": "設定",
+  "settingsLanguage": "語言",
+  "settingsTextSize": "字體大小",
+  "settingsTextSizeStandard": "標準",
+  "settingsTextSizeLarge": "大字",
+  "settingsTextSizeXLarge": "特大字",
+  "settingsTextSizeHuge": "超大字"
 }

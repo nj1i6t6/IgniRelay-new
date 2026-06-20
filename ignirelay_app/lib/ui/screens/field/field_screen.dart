@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 
 import 'package:ignirelay_app/app/controllers/active_field_controller.dart';
 import 'package:ignirelay_app/app/services/field_qr_codec.dart';
+import 'package:ignirelay_app/l10n/generated/app_localizations.dart';
+import 'package:ignirelay_app/l10n/l10n_ext.dart';
 import 'package:ignirelay_app/ui/screens/field/field_qr_sheet.dart';
 import 'package:ignirelay_app/ui/screens/field/field_scan_screen.dart';
 import 'package:ignirelay_app/ui/theme/igni_colors.dart';
@@ -40,6 +42,7 @@ class _FieldScreenState extends State<FieldScreen> {
   @override
   Widget build(BuildContext context) {
     final p = context.igni;
+    final l = context.l10n;
     final field = context.watch<ActiveFieldController>();
     final active = field.active;
     return Scaffold(
@@ -48,27 +51,28 @@ class _FieldScreenState extends State<FieldScreen> {
         child: ListView(
           padding: const EdgeInsets.only(bottom: IgniSpacing.xl3),
           children: [
-            const IgniSubPageHeader(
-              title: '場域',
-              subtitle: '加入場域後才能收發事件',
+            IgniSubPageHeader(
+              title: l.fieldTitle,
+              subtitle: l.fieldSubtitle,
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: IgniSpacing.lg),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _activeCard(p, active),
+                  _activeCard(p, l, active),
                   const SizedBox(height: IgniSpacing.lg),
-                  _actions(p),
+                  _actions(p, l),
                   if (field.joinedFieldCount > 0) ...[
                     const SizedBox(height: IgniSpacing.xl),
-                    Text('已加入的場域（${field.joinedFieldCount}）',
+                    Text(l.fieldJoinedHeader(field.joinedFieldCount),
                         style: IgniTypography.sectionHeader(p.text2)),
                     const SizedBox(height: IgniSpacing.sm),
                     for (final f in field.joinedFields)
                       Padding(
                         padding: const EdgeInsets.only(bottom: IgniSpacing.sm),
-                        child: _fieldRow(p, f, active?.fieldIdHex == f.fieldIdHex),
+                        child: _fieldRow(
+                            p, l, f, active?.fieldIdHex == f.fieldIdHex),
                       ),
                   ],
                 ],
@@ -81,7 +85,7 @@ class _FieldScreenState extends State<FieldScreen> {
   }
 
   // ── Active field summary / empty state ─────────────────────────────────
-  Widget _activeCard(IgniPalette p, ActiveField? active) {
+  Widget _activeCard(IgniPalette p, S l, ActiveField? active) {
     if (active == null) {
       return IgniCard(
         child: Column(
@@ -90,11 +94,10 @@ class _FieldScreenState extends State<FieldScreen> {
             Row(children: [
               Icon(Icons.shield_outlined, size: 18, color: p.warn),
               const SizedBox(width: IgniSpacing.sm),
-              Text('尚未加入任何場域', style: IgniTypography.titleMedium(p.text0)),
+              Text(l.fieldNoneTitle, style: IgniTypography.titleMedium(p.text0)),
             ]),
             const SizedBox(height: IgniSpacing.sm),
-            Text('掃描主辦方的場域 QR、輸入加入代碼，或自行建立一個場域。',
-                style: IgniTypography.bodySmall(p.text2)),
+            Text(l.fieldNoneBody, style: IgniTypography.bodySmall(p.text2)),
           ],
         ),
       );
@@ -109,14 +112,14 @@ class _FieldScreenState extends State<FieldScreen> {
             const SizedBox(width: IgniSpacing.sm),
             Expanded(
               child: Text(
-                active.displayName.isEmpty ? '（未命名場域）' : active.displayName,
+                active.displayName.isEmpty ? l.fieldUnnamed : active.displayName,
                 style: IgniTypography.titleMedium(p.text0),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            _roleChip(active),
+            _roleChip(l, active),
             const SizedBox(width: IgniSpacing.xs),
-            const IgniChip(label: '作用中', tone: IgniChipTone.ok),
+            IgniChip(label: l.fieldActiveChip, tone: IgniChipTone.ok),
           ]),
           const SizedBox(height: IgniSpacing.sm),
           Row(children: [
@@ -142,13 +145,13 @@ class _FieldScreenState extends State<FieldScreen> {
   }
 
   // ── Primary actions ────────────────────────────────────────────────────
-  Widget _actions(IgniPalette p) {
+  Widget _actions(IgniPalette p, S l) {
     return Column(
       children: [
         Row(children: [
           Expanded(
             child: IgniButton(
-              label: '掃碼加入',
+              label: l.fieldScanJoin,
               icon: Icons.qr_code_scanner,
               onPressed: _busy ? null : _scanToJoin,
               fullWidth: true,
@@ -157,7 +160,7 @@ class _FieldScreenState extends State<FieldScreen> {
           const SizedBox(width: IgniSpacing.md),
           Expanded(
             child: IgniButton(
-              label: '輸入代碼',
+              label: l.fieldEnterCode,
               icon: Icons.keyboard,
               variant: IgniButtonVariant.ghost,
               onPressed: _busy ? null : _showCodeInput,
@@ -167,7 +170,7 @@ class _FieldScreenState extends State<FieldScreen> {
         ]),
         const SizedBox(height: IgniSpacing.md),
         IgniButton(
-          label: '建立新場域',
+          label: l.fieldCreateNew,
           icon: Icons.add_circle_outline,
           variant: IgniButtonVariant.ghost,
           onPressed: _busy ? null : _createField,
@@ -178,13 +181,13 @@ class _FieldScreenState extends State<FieldScreen> {
   }
 
   // ── Role chip (UI-F3) — owner「主辦」/ participant「成員」 ─────────────────
-  Widget _roleChip(ActiveField f) => IgniChip(
-        label: f.isOwner ? '主辦' : '成員',
+  Widget _roleChip(S l, ActiveField f) => IgniChip(
+        label: f.isOwner ? l.roleHost : l.roleMember,
         tone: f.isOwner ? IgniChipTone.ok : IgniChipTone.info,
       );
 
   // ── One joined field row ───────────────────────────────────────────────
-  Widget _fieldRow(IgniPalette p, ActiveField f, bool isActive) {
+  Widget _fieldRow(IgniPalette p, S l, ActiveField f, bool isActive) {
     return IgniCard(
       padding: const EdgeInsets.symmetric(
           horizontal: IgniSpacing.md, vertical: IgniSpacing.md),
@@ -198,24 +201,24 @@ class _FieldScreenState extends State<FieldScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(f.displayName.isEmpty ? '（未命名）' : f.displayName,
+              Text(f.displayName.isEmpty ? l.myFieldUnnamed : f.displayName,
                   style: IgniTypography.bodyMedium(p.text0),
                   overflow: TextOverflow.ellipsis),
               MonoText('${f.shortId}…', color: p.text2, fontSize: 11),
             ],
           ),
         ),
-        _roleChip(f),
+        _roleChip(l, f),
         // Owner-only: only the field's creator can re-share its join QR
         // (UI-F3 / D5). Participants joined via QR/code cannot re-share.
         if (f.isOwner)
           IconButton(
-            tooltip: '顯示 QR',
+            tooltip: l.fieldShowQr,
             icon: Icon(Icons.qr_code_2, size: 20, color: p.text1),
             onPressed: _busy ? null : () => _showQrForField(f),
           ),
         IconButton(
-          tooltip: '離開場域',
+          tooltip: l.fieldLeave,
           icon: Icon(Icons.logout, size: 18, color: p.sos),
           onPressed: _busy ? null : () => _confirmLeave(f),
         ),
@@ -225,6 +228,7 @@ class _FieldScreenState extends State<FieldScreen> {
 
   // ── Create → QR ────────────────────────────────────────────────────────
   Future<void> _createField() async {
+    final l = context.l10n;
     final name = await _promptName();
     if (name == null) return;
     setState(() => _busy = true);
@@ -233,7 +237,7 @@ class _FieldScreenState extends State<FieldScreen> {
       if (!mounted) return;
       _showQrSheet(created.field, created.secret);
     } catch (e) {
-      _snack('建立場域失敗：$e');
+      _snack(l.fieldCreateFailed('$e'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -245,7 +249,7 @@ class _FieldScreenState extends State<FieldScreen> {
       final secret = await _field.exportSecretForQr(f.fieldIdHex);
       if (!mounted) return;
       if (secret == null) {
-        _snack('找不到此場域的密鑰，無法顯示 QR');
+        _snack(context.l10n.fieldSecretNotFound);
         return;
       }
       _showQrSheet(f, secret);
@@ -270,17 +274,17 @@ class _FieldScreenState extends State<FieldScreen> {
   Future<void> _showCodeInput() async {
     final controller = TextEditingController();
     final p = context.igni;
+    final l = context.l10n;
     final code = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: p.bg2,
-        title: Text('輸入場域代碼', style: IgniTypography.titleMedium(p.text0)),
+        title: Text(l.fieldCodeTitle, style: IgniTypography.titleMedium(p.text0)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('貼上 IGNI1 場域代碼，或輸入 64 個十六進位字元的場域密鑰。',
-                style: IgniTypography.bodySmall(p.text2)),
+            Text(l.fieldCodeBody, style: IgniTypography.bodySmall(p.text2)),
             const SizedBox(height: IgniSpacing.md),
             TextField(
               controller: controller,
@@ -289,7 +293,7 @@ class _FieldScreenState extends State<FieldScreen> {
               maxLines: 3,
               style: IgniTypography.monoSmall(p.text0),
               decoration: InputDecoration(
-                hintText: 'IGNI1:… 或 a1b2c3…',
+                hintText: l.fieldCodeHint,
                 hintStyle: IgniTypography.monoSmall(p.text3),
                 border: const OutlineInputBorder(),
               ),
@@ -299,11 +303,11 @@ class _FieldScreenState extends State<FieldScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('取消', style: TextStyle(color: p.text2)),
+            child: Text(l.fieldCancel, style: TextStyle(color: p.text2)),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: const Text('加入'),
+            child: Text(l.fieldJoin),
           ),
         ],
       ),
@@ -315,24 +319,26 @@ class _FieldScreenState extends State<FieldScreen> {
   /// Join from a typed/scanned string: an `IGNI1:` QR code, or a raw 64-hex
   /// secret (the upgraded A5 debug path). Bad input prompts, never crashes.
   Future<void> _joinFromCode(String code) async {
+    final l = context.l10n;
     final trimmed = code.trim();
     if (trimmed.startsWith('${FieldQrCodec.prefix}:')) {
       final r = FieldQrCodec.tryDecode(trimmed);
       if (!r.ok) {
-        _snack(_errorMessage(r.error!));
+        _snack(_errorMessage(l, r.error!));
         return;
       }
       final payload = r.payload!;
-      final name = payload.displayName.isEmpty ? '掃碼場域' : payload.displayName;
+      final name =
+          payload.displayName.isEmpty ? l.fieldScannedName : payload.displayName;
       await _join(payload.secret, name: name, cloudBaseUrl: payload.cloudBaseUrl);
       return;
     }
     final secret = _decodeHex32(trimmed);
     if (secret == null) {
-      _snack('代碼格式無法辨識：需為 IGNI1 代碼或 64 個十六進位字元');
+      _snack(l.fieldCodeUnrecognized);
       return;
     }
-    await _join(secret, name: '場域-${trimmed.substring(0, 4)}');
+    await _join(secret, name: l.fieldDefaultNamePrefix(trimmed.substring(0, 4)));
   }
 
   Future<void> _join(List<int> secret,
@@ -341,9 +347,9 @@ class _FieldScreenState extends State<FieldScreen> {
     try {
       final f = await _field.joinBySecret(secret,
           displayName: name, cloudBaseUrl: cloudBaseUrl);
-      if (mounted) _snack('已加入場域 ${f.shortId}…');
+      if (mounted) _snack(context.l10n.fieldJoinedSnack('${f.shortId}…'));
     } catch (e) {
-      if (mounted) _snack('加入場域失敗：$e');
+      if (mounted) _snack(context.l10n.fieldJoinFailed('$e'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -352,26 +358,26 @@ class _FieldScreenState extends State<FieldScreen> {
   // ── Leave (double confirm; irreversible) ───────────────────────────────
   Future<void> _confirmLeave(ActiveField f) async {
     final p = context.igni;
-    final name = f.displayName.isEmpty ? '（未命名場域）' : f.displayName;
+    final l = context.l10n;
+    final name = f.displayName.isEmpty ? l.fieldUnnamed : f.displayName;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: p.bg2,
-        title: Text('離開場域？', style: IgniTypography.titleMedium(p.text0)),
+        title: Text(l.fieldLeaveTitle, style: IgniTypography.titleMedium(p.text0)),
         content: Text(
-          '即將離開「$name」。此動作不可復原，將從本機刪除此場域的密鑰，'
-          '需重新掃碼 / 輸入代碼才能再次加入。',
+          l.fieldLeaveBody(name),
           style: IgniTypography.bodySmall(p.text1),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('取消', style: TextStyle(color: p.text2)),
+            child: Text(l.fieldCancel, style: TextStyle(color: p.text2)),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: p.sos),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('離開'),
+            child: Text(l.fieldLeaveConfirm),
           ),
         ],
       ),
@@ -380,9 +386,9 @@ class _FieldScreenState extends State<FieldScreen> {
     setState(() => _busy = true);
     try {
       await _field.leave(f.fieldIdHex);
-      if (mounted) _snack('已離開場域');
+      if (mounted) _snack(context.l10n.fieldLeftSnack);
     } catch (e) {
-      if (mounted) _snack('離開場域失敗：$e');
+      if (mounted) _snack(context.l10n.fieldLeaveFailed('$e'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -392,18 +398,19 @@ class _FieldScreenState extends State<FieldScreen> {
   Future<String?> _promptName() async {
     final controller = TextEditingController();
     final p = context.igni;
+    final l = context.l10n;
     return showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: p.bg2,
-        title: Text('建立新場域', style: IgniTypography.titleMedium(p.text0)),
+        title: Text(l.fieldCreateTitle, style: IgniTypography.titleMedium(p.text0)),
         content: TextField(
           controller: controller,
           autofocus: true,
           style: IgniTypography.bodyMedium(p.text0),
           decoration: InputDecoration(
-            labelText: '場域名稱',
-            hintText: '例：台北車站避難所',
+            labelText: l.fieldNameLabel,
+            hintText: l.fieldNameHint,
             hintStyle: IgniTypography.bodySmall(p.text3),
             border: const OutlineInputBorder(),
           ),
@@ -411,36 +418,36 @@ class _FieldScreenState extends State<FieldScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('取消', style: TextStyle(color: p.text2)),
+            child: Text(l.fieldCancel, style: TextStyle(color: p.text2)),
           ),
           FilledButton(
             onPressed: () {
               final v = controller.text.trim();
-              Navigator.of(ctx).pop(v.isEmpty ? '新場域' : v);
+              Navigator.of(ctx).pop(v.isEmpty ? l.fieldDefaultName : v);
             },
-            child: const Text('建立'),
+            child: Text(l.fieldCreateConfirm),
           ),
         ],
       ),
     );
   }
 
-  String _errorMessage(FieldQrError e) {
+  String _errorMessage(S l, FieldQrError e) {
     switch (e) {
       case FieldQrError.empty:
-        return '代碼是空的';
+        return l.fieldErrEmpty;
       case FieldQrError.badPrefix:
-        return '這不是 IgniRelay 場域代碼（前綴不符）';
+        return l.fieldErrBadPrefix;
       case FieldQrError.tooFewSegments:
-        return '代碼不完整';
+        return l.fieldErrTooFewSegments;
       case FieldQrError.badSecret:
-        return '代碼的場域密鑰格式錯誤';
+        return l.fieldErrBadSecret;
       case FieldQrError.badCloudUrl:
-        return '代碼的雲端網址無效（僅接受 https://）';
+        return l.fieldErrBadCloudUrl;
       case FieldQrError.staffWithoutCloud:
-        return '代碼格式錯誤：含 staff token 卻缺雲端網址';
+        return l.fieldErrStaffWithoutCloud;
       case FieldQrError.malformed:
-        return '代碼內容毀損，無法解析';
+        return l.fieldErrMalformed;
     }
   }
 

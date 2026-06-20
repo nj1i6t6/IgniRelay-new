@@ -6,6 +6,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import 'package:ignirelay_app/app/controllers/active_field_controller.dart';
 import 'package:ignirelay_app/app/services/field_qr_codec.dart';
+import 'package:ignirelay_app/l10n/l10n_ext.dart';
 import 'package:ignirelay_app/ui/theme/igni_colors.dart';
 import 'package:ignirelay_app/ui/theme/igni_tokens.dart';
 import 'package:ignirelay_app/ui/theme/igni_typography.dart';
@@ -46,6 +47,7 @@ class FieldQrSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.igni;
+    final l = context.l10n;
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(IgniSpacing.xl),
@@ -53,11 +55,11 @@ class FieldQrSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(field.displayName.isEmpty ? '場域 QR' : field.displayName,
+            Text(field.displayName.isEmpty ? l.fieldQrTitle : field.displayName,
                 style: IgniTypography.titleMedium(p.text0),
                 textAlign: TextAlign.center),
             const SizedBox(height: IgniSpacing.xs),
-            Text('讓對方掃描即可加入同一場域',
+            Text(l.fieldQrSubtitle,
                 style: IgniTypography.bodySmall(p.text2),
                 textAlign: TextAlign.center),
             const SizedBox(height: IgniSpacing.lg),
@@ -88,14 +90,14 @@ class FieldQrSheet extends StatelessWidget {
             ]),
             if (kDebugMode) ...[
               const SizedBox(height: IgniSpacing.md),
-              Text('（debug）此代碼含場域密鑰，請勿外流：',
+              Text(l.fieldQrDebugWarning,
                   style: IgniTypography.labelSmall(p.warn)),
               const SizedBox(height: IgniSpacing.xs),
               SelectableText(code, style: IgniTypography.monoSmall(p.text2)),
             ],
             const SizedBox(height: IgniSpacing.lg),
             IgniButton(
-              label: '完成',
+              label: l.fieldQrDone,
               onPressed: () => Navigator.of(context).pop(),
               fullWidth: true,
             ),

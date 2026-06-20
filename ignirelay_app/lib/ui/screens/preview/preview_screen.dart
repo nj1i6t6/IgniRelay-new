@@ -20,6 +20,7 @@
 
 import 'package:flutter/material.dart';
 
+import 'package:ignirelay_app/l10n/l10n_ext.dart';
 import 'package:ignirelay_app/ui/screens/field/field_screen.dart';
 import 'package:ignirelay_app/ui/screens/position/relative_radar.dart';
 import 'package:ignirelay_app/ui/screens/preview/preview_fixtures.dart';
@@ -74,6 +75,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
   @override
   Widget build(BuildContext context) {
     final p = context.igni;
+    final l = context.l10n;
     final last = _index == _count - 1;
     return Scaffold(
       backgroundColor: p.bg0,
@@ -103,7 +105,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
                 children: [
                   Expanded(
                     child: IgniButton(
-                      label: _index == 0 ? '返回' : '上一步',
+                      label: _index == 0 ? l.previewBack : l.previewPrev,
                       variant: IgniButtonVariant.ghost,
                       onPressed: _index == 0
                           ? () => Navigator.of(context).maybePop()
@@ -113,7 +115,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
                   const SizedBox(width: IgniSpacing.md),
                   Expanded(
                     child: IgniButton(
-                      label: last ? '加入場域' : '下一步',
+                      label: last ? l.noFieldJoin : l.previewNext,
                       icon: last ? Icons.qr_code_scanner : null,
                       onPressed: last ? _openField : _next,
                     ),
@@ -136,6 +138,7 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.igni;
+    final l = context.l10n;
     return Padding(
       padding: const EdgeInsets.fromLTRB(IgniSpacing.lg,
           IgniSpacing.screenTitleTop, IgniSpacing.lg, IgniSpacing.lg),
@@ -163,15 +166,15 @@ class _Header extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('先看功能', style: IgniTypography.titleLarge(p.text0)),
+                Text(l.noFieldPreview, style: IgniTypography.titleLarge(p.text0)),
                 const SizedBox(height: 2),
-                Text('示範模式 · 不會送出任何資料',
+                Text(l.previewModeSubtitle,
                     style: IgniTypography.bodySmall(p.text2)),
               ],
             ),
           ),
-          const StatusChip(
-            label: '示範資料',
+          StatusChip(
+            label: l.previewBadge,
             tone: StatusTone.warn,
             icon: Icons.visibility_outlined,
           ),
@@ -255,19 +258,20 @@ class _JoinCtas extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = context.l10n;
     final state = context.findAncestorStateOfType<_PreviewScreenState>();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         IgniButton(
-          label: '加入場域',
+          label: l.noFieldJoin,
           icon: Icons.qr_code_scanner,
           fullWidth: true,
           onPressed: () => state?._openField(),
         ),
         const SizedBox(height: IgniSpacing.sm),
         IgniButton(
-          label: '建立場域',
+          label: l.noFieldCreate,
           icon: Icons.add_circle_outline,
           variant: IgniButtonVariant.ghost,
           fullWidth: true,
@@ -337,25 +341,29 @@ class _EventRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: IgniSpacing.sm),
-          StatusChip(label: _toneLabel(event.tone), tone: event.tone, dense: true),
+          StatusChip(
+              label: _toneLabel(context, event.tone),
+              tone: event.tone,
+              dense: true),
         ],
       ),
     );
   }
 
-  String _toneLabel(StatusTone t) {
+  String _toneLabel(BuildContext context, StatusTone t) {
+    final l = context.l10n;
     switch (t) {
       case StatusTone.sos:
-        return '求救';
+        return l.previewToneSos;
       case StatusTone.warn:
-        return '危害';
+        return l.previewToneWarn;
       case StatusTone.info:
-        return '廣播';
+        return l.previewToneInfo;
       case StatusTone.ok:
-        return '平安';
+        return l.previewToneOk;
       case StatusTone.brand:
       case StatusTone.neutral:
-        return '事件';
+        return l.previewToneNeutral;
     }
   }
 }
@@ -378,7 +386,7 @@ class _FootprintRow extends StatelessWidget {
           Text(footprint.anon8, style: IgniTypography.monoSmall(p.text1)),
           const SizedBox(width: IgniSpacing.sm),
           Expanded(
-            child: Text('最後可信位置 · ${footprint.agoLabel}',
+            child: Text(context.l10n.previewFootprintLine(footprint.agoLabel),
                 style: IgniTypography.bodySmall(p.text2),
                 overflow: TextOverflow.ellipsis),
           ),
@@ -395,11 +403,11 @@ class _JoinPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.igni;
+    final l = context.l10n;
     return _Page(
       icon: Icons.qr_code_scanner,
-      title: '加入場域',
-      intro: '掃描主辦者的 QR 或輸入密鑰即可加入一個場域。場域決定你和誰互通——'
-          '只有同一個場域的人，才看得到彼此。',
+      title: l.noFieldJoin,
+      intro: l.previewJoinIntro,
       children: [
         IgniCard(
           margin: const EdgeInsets.only(bottom: IgniSpacing.lg),
@@ -408,10 +416,13 @@ class _JoinPage extends StatelessWidget {
               Icon(Icons.groups_outlined, size: 20, color: p.brand),
               const SizedBox(width: IgniSpacing.sm),
               Expanded(
-                child: Text(kPreviewFieldLabel,
+                child: Text(previewFieldLabel(l),
                     style: IgniTypography.labelLarge(p.text0)),
               ),
-              const StatusChip(label: '示範', tone: StatusTone.warn, dense: true),
+              StatusChip(
+                  label: l.previewDemoChip,
+                  tone: StatusTone.warn,
+                  dense: true),
             ],
           ),
         ),
@@ -425,25 +436,23 @@ class _SafetyPage extends StatelessWidget {
   const _SafetyPage();
   @override
   Widget build(BuildContext context) {
-    return const _Page(
+    final l = context.l10n;
+    return _Page(
       icon: Icons.shield_outlined,
-      title: '安全：被看見 + 求救',
-      intro: '加入後，App 會定期留下你的足跡，讓場域裡的人知道你還在、在哪附近。'
-          '需要時可以長按發出 SOS。',
+      title: l.previewSafetyTitle,
+      intro: l.previewSafetyIntro,
       children: [
         _InfoCard(
           icon: Icons.my_location,
-          title: '自動足跡（被看見）',
-          body: '靜止時省電、移動時更頻繁地留下足跡。不需要一直盯著手機，'
-              '別人也能看到你最後的位置。',
+          title: l.previewSafetyFootprintTitle,
+          body: l.previewSafetyFootprintBody,
         ),
         _InfoCard(
           icon: Icons.sos,
-          title: '求救 SOS',
-          body: '長按求救鍵，選擇紅色（受困）或黃色（受傷）。送出前有 5 秒可取消，'
-              '避免誤觸。（示範不會真的送出）',
+          title: l.previewSafetySosTitle,
+          body: l.previewSafetySosBody,
         ),
-        _EventRow(kPreviewSos),
+        _EventRow(previewSos(l)),
       ],
     );
   }
@@ -454,18 +463,18 @@ class _PositionPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.igni;
+    final l = context.l10n;
     return _Page(
       icon: Icons.place_outlined,
-      title: '位置：最後可信位置',
-      intro: '看見附近成員「最後可信的位置」與相對方位。雷達固定北朝上，'
-          '越靠近中心代表離你越近。（這裡顯示的是示範資料）',
+      title: l.previewPositionTitle,
+      intro: l.previewPositionIntro,
       children: [
         IgniCard(
           margin: const EdgeInsets.only(bottom: IgniSpacing.md),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              for (final f in kPreviewFootprints) _FootprintRow(f),
+              for (final f in previewFootprints(l)) _FootprintRow(f),
             ],
           ),
         ),
@@ -482,7 +491,7 @@ class _PositionPage extends StatelessWidget {
             height: 320,
             child: RelativeRadar(
               origin: kPreviewOrigin,
-              subjects: previewRadarSubjects(),
+              subjects: previewRadarSubjects(l),
             ),
           ),
         ),
@@ -495,15 +504,15 @@ class _EventsPage extends StatelessWidget {
   const _EventsPage();
   @override
   Widget build(BuildContext context) {
-    return const _Page(
+    final l = context.l10n;
+    return _Page(
       icon: Icons.event_note_outlined,
-      title: '事件：危害 / 廣播 / 打卡',
-      intro: '場域裡的重要訊息會集中在事件：危害提醒、管理者廣播、平安打卡，'
-          '讓你快速掌握現場狀況。',
+      title: l.previewEventsTitle,
+      intro: l.previewEventsIntro,
       children: [
-        _EventRow(kPreviewHazard),
-        _EventRow(kPreviewBroadcast),
-        _EventRow(kPreviewCheckpoint),
+        _EventRow(previewHazard(l)),
+        _EventRow(previewBroadcast(l)),
+        _EventRow(previewCheckpoint(l)),
       ],
     );
   }
@@ -513,25 +522,24 @@ class _AssistPage extends StatelessWidget {
   const _AssistPage();
   @override
   Widget build(BuildContext context) {
-    return const _Page(
+    final l = context.l10n;
+    return _Page(
       icon: Icons.support_agent,
-      title: '協助 + 離線也能用',
-      intro: '需要或能提供協助時，可以在「協助」裡媒合。最重要的是——'
-          '沒有網路時，App 仍透過近距離轉傳運作。',
+      title: l.previewAssistTitle,
+      intro: l.previewAssistIntro,
       children: [
         _InfoCard(
           icon: Icons.volunteer_activism_outlined,
-          title: '協助媒合',
-          body: '提出需求或回應他人需求，讓資源在場域內就近流動。',
+          title: l.previewAssistMatchTitle,
+          body: l.previewAssistMatchBody,
         ),
         _InfoCard(
           icon: Icons.wifi_off,
-          title: '離線降級',
-          body: '沒有基地台或網路時，訊息會透過附近的裝置一手接一手傳遞；'
-              '收訊恢復時自動補送，不會憑空捏造位置。',
+          title: l.previewAssistOfflineTitle,
+          body: l.previewAssistOfflineBody,
         ),
-        SizedBox(height: IgniSpacing.sm),
-        _JoinCtas(),
+        const SizedBox(height: IgniSpacing.sm),
+        const _JoinCtas(),
       ],
     );
   }

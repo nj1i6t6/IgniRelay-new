@@ -3649,4 +3649,327 @@ class SEn extends S {
 
   @override
   String get settingsTextSizeHuge => 'Huge';
+
+  @override
+  String get fieldTitle => 'Field';
+
+  @override
+  String get fieldSubtitle => 'Join a field to send and receive events';
+
+  @override
+  String get fieldNoneTitle => 'Not in any field yet';
+
+  @override
+  String get fieldNoneBody =>
+      'Scan the host\'s field QR, enter a join code, or create your own field.';
+
+  @override
+  String get fieldUnnamed => '(unnamed field)';
+
+  @override
+  String get fieldActiveChip => 'Active';
+
+  @override
+  String get fieldScanJoin => 'Scan to join';
+
+  @override
+  String get fieldEnterCode => 'Enter code';
+
+  @override
+  String get fieldCreateNew => 'Create field';
+
+  @override
+  String fieldJoinedHeader(int count) {
+    return 'Joined fields ($count)';
+  }
+
+  @override
+  String get fieldShowQr => 'Show QR';
+
+  @override
+  String get fieldLeave => 'Leave field';
+
+  @override
+  String fieldCreateFailed(String error) {
+    return 'Couldn\'t create field: $error';
+  }
+
+  @override
+  String get fieldSecretNotFound =>
+      'This field\'s key wasn\'t found, so the QR can\'t be shown';
+
+  @override
+  String get fieldCodeTitle => 'Enter field code';
+
+  @override
+  String get fieldCodeBody =>
+      'Paste an IGNI1 field code, or enter the 64-character hex field key.';
+
+  @override
+  String get fieldCodeHint => 'IGNI1:… or a1b2c3…';
+
+  @override
+  String get fieldCancel => 'Cancel';
+
+  @override
+  String get fieldJoin => 'Join';
+
+  @override
+  String get fieldScannedName => 'Scanned field';
+
+  @override
+  String get fieldCodeUnrecognized =>
+      'Unrecognized code: it must be an IGNI1 code or 64 hex characters';
+
+  @override
+  String fieldDefaultNamePrefix(String prefix) {
+    return 'Field-$prefix';
+  }
+
+  @override
+  String fieldJoinedSnack(String id) {
+    return 'Joined field $id…';
+  }
+
+  @override
+  String fieldJoinFailed(String error) {
+    return 'Couldn\'t join field: $error';
+  }
+
+  @override
+  String get fieldLeaveTitle => 'Leave field?';
+
+  @override
+  String fieldLeaveBody(String name) {
+    return 'About to leave \"$name\". This can\'t be undone — the field\'s key is removed from this device, and you\'ll need to scan or enter the code again to rejoin.';
+  }
+
+  @override
+  String get fieldLeaveConfirm => 'Leave';
+
+  @override
+  String get fieldLeftSnack => 'Left the field';
+
+  @override
+  String fieldLeaveFailed(String error) {
+    return 'Couldn\'t leave field: $error';
+  }
+
+  @override
+  String get fieldCreateTitle => 'Create field';
+
+  @override
+  String get fieldNameLabel => 'Field name';
+
+  @override
+  String get fieldNameHint => 'e.g. Taipei Station shelter';
+
+  @override
+  String get fieldCreateConfirm => 'Create';
+
+  @override
+  String get fieldDefaultName => 'New field';
+
+  @override
+  String get fieldErrEmpty => 'The code is empty';
+
+  @override
+  String get fieldErrBadPrefix =>
+      'This isn\'t an IgniRelay field code (prefix mismatch)';
+
+  @override
+  String get fieldErrTooFewSegments => 'The code is incomplete';
+
+  @override
+  String get fieldErrBadSecret => 'The code\'s field key is malformed';
+
+  @override
+  String get fieldErrBadCloudUrl =>
+      'The code\'s cloud URL is invalid (https:// only)';
+
+  @override
+  String get fieldErrStaffWithoutCloud =>
+      'Malformed code: it has a staff token but no cloud URL';
+
+  @override
+  String get fieldErrMalformed => 'The code is corrupted and can\'t be parsed';
+
+  @override
+  String get fieldScanBack => 'Back';
+
+  @override
+  String get fieldScanTitle => 'Scan field QR';
+
+  @override
+  String get fieldScanHint =>
+      'Point at the host\'s field QR to join automatically';
+
+  @override
+  String get fieldScanReject =>
+      'That\'s not an IgniRelay field QR — try another';
+
+  @override
+  String get fieldScanNoCameraTitle => 'Can\'t open the camera';
+
+  @override
+  String get fieldScanNoCameraBody =>
+      'Check that camera permission is granted, or use \"Enter code\" to join a field instead.';
+
+  @override
+  String get fieldQrTitle => 'Field QR';
+
+  @override
+  String get fieldQrSubtitle => 'Have others scan this to join the same field';
+
+  @override
+  String get fieldQrDebugWarning =>
+      '(debug) This code contains the field key — don\'t share it:';
+
+  @override
+  String get fieldQrDone => 'Done';
+
+  @override
+  String get previewModeSubtitle => 'Demo mode · nothing is sent';
+
+  @override
+  String get previewBadge => 'Demo data';
+
+  @override
+  String get previewBack => 'Back';
+
+  @override
+  String get previewPrev => 'Previous';
+
+  @override
+  String get previewNext => 'Next';
+
+  @override
+  String get previewDemoChip => 'Demo';
+
+  @override
+  String get previewJoinIntro =>
+      'Scan the host\'s QR or enter a key to join a field. The field decides who you connect with — only people in the same field can see each other.';
+
+  @override
+  String get previewSafetyTitle => 'Safety: be seen + call for help';
+
+  @override
+  String get previewSafetyIntro =>
+      'After you join, the app periodically leaves your footprint so people in the field know you\'re still around and roughly where. Press and hold to send an SOS when you need it.';
+
+  @override
+  String get previewSafetyFootprintTitle => 'Automatic footprint (be seen)';
+
+  @override
+  String get previewSafetyFootprintBody =>
+      'Saves power when you\'re still, updates more often when you move. No need to watch your phone — others can still see your last position.';
+
+  @override
+  String get previewSafetySosTitle => 'SOS';
+
+  @override
+  String get previewSafetySosBody =>
+      'Press and hold the SOS button, then choose red (trapped) or yellow (injured). You get 5 seconds to cancel before it sends. (The demo never actually sends.)';
+
+  @override
+  String get previewPositionTitle => 'Location: last trusted position';
+
+  @override
+  String get previewPositionIntro =>
+      'See nearby members\' last trusted position and relative bearing. The radar is fixed north-up; closer to the center means closer to you. (This shows demo data.)';
+
+  @override
+  String previewFootprintLine(String ago) {
+    return 'Last trusted position · $ago';
+  }
+
+  @override
+  String get previewEventsTitle => 'Events: hazards / broadcasts / check-ins';
+
+  @override
+  String get previewEventsIntro =>
+      'Important messages collect under Events: hazard alerts, admin broadcasts, and safety check-ins, so you can size up the situation fast.';
+
+  @override
+  String get previewAssistTitle => 'Assist + works offline';
+
+  @override
+  String get previewAssistIntro =>
+      'Match needs and offers under Assist. Most importantly — with no network, the app keeps working by relaying through nearby devices.';
+
+  @override
+  String get previewAssistMatchTitle => 'Assist matching';
+
+  @override
+  String get previewAssistMatchBody =>
+      'Post a need or answer someone else\'s, so resources move locally within the field.';
+
+  @override
+  String get previewAssistOfflineTitle => 'Offline fallback';
+
+  @override
+  String get previewAssistOfflineBody =>
+      'With no cell tower or network, messages hop device to device nearby; when coverage returns they\'re sent automatically — and it never makes up a position.';
+
+  @override
+  String get previewToneSos => 'SOS';
+
+  @override
+  String get previewToneWarn => 'Hazard';
+
+  @override
+  String get previewToneInfo => 'Broadcast';
+
+  @override
+  String get previewToneOk => 'Safe';
+
+  @override
+  String get previewToneNeutral => 'Event';
+
+  @override
+  String get previewFieldLabel => 'Demo field · DEMO-FIELD';
+
+  @override
+  String previewAlias(String alias) {
+    return 'Alias $alias';
+  }
+
+  @override
+  String get previewFpAgo1 => '1 min ago';
+
+  @override
+  String get previewFpAgo4 => '4 min ago';
+
+  @override
+  String get previewFpAgoTrapped => 'Trapped · 2 min ago';
+
+  @override
+  String get previewSosTitle => 'SOS · Trapped';
+
+  @override
+  String get previewSosAgo => '2 min ago';
+
+  @override
+  String get previewHazardTitle => 'Hazard · Fire (FIRE)';
+
+  @override
+  String get previewHazardDetail => 'sev 2 · heavy smoke at the alley';
+
+  @override
+  String get previewHazardAgo => '6 min ago';
+
+  @override
+  String get previewBroadcastTitle => 'Admin broadcast';
+
+  @override
+  String get previewBroadcastDetail => 'Assembly point moved to the north exit';
+
+  @override
+  String get previewBroadcastAgo => '10 min ago';
+
+  @override
+  String get previewCheckpointTitle => 'Check-in · Safe';
+
+  @override
+  String get previewCheckpointAgo => '12 min ago';
 }

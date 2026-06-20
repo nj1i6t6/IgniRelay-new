@@ -16,6 +16,7 @@ import 'package:ignirelay_app/app/db/database_helper.dart';
 import 'package:ignirelay_app/app/services/anon_identity.dart';
 import 'package:ignirelay_app/app/services/field_qr_codec.dart';
 import 'package:ignirelay_app/app/services/field_session_store.dart';
+import 'package:ignirelay_app/l10n/generated/app_localizations.dart';
 import 'package:ignirelay_app/ui/screens/field/field_screen.dart';
 
 class _FakeKvStore implements SecureKvStore {
@@ -35,11 +36,18 @@ Future<ActiveFieldController> _makeController() async => ActiveFieldController(
       ),
     );
 
-Widget _wrap(ActiveFieldController field) => MultiProvider(
+Widget _wrap(ActiveFieldController field,
+        {Locale locale = const Locale('zh')}) =>
+    MultiProvider(
       providers: [
         ListenableProvider<ActiveFieldController>.value(value: field),
       ],
-      child: const MaterialApp(home: FieldScreen()),
+      child: MaterialApp(
+        locale: locale,
+        supportedLocales: S.supportedLocales,
+        localizationsDelegates: S.localizationsDelegates,
+        home: const FieldScreen(),
+      ),
     );
 
 void main() {
@@ -67,6 +75,21 @@ void main() {
     expect(find.text('建立新場域'), findsOneWidget);
     // No joined-field section.
     expect(find.textContaining('已加入的場域'), findsNothing);
+  });
+
+  testWidgets('en: empty state renders English (UI-H2b)', (tester) async {
+    final field = await _makeController();
+    addTearDown(field.dispose);
+    await tester.pumpWidget(_wrap(field, locale: const Locale('en')));
+    await tester.pump();
+
+    expect(find.text('Field'), findsOneWidget);
+    expect(find.text('Not in any field yet'), findsOneWidget);
+    expect(find.text('Scan to join'), findsOneWidget);
+    expect(find.text('Enter code'), findsOneWidget);
+    expect(find.text('Create field'), findsOneWidget);
+    expect(find.text('場域'), findsNothing);
+    expect(find.text('掃碼加入'), findsNothing);
   });
 
   testWidgets('active field summary + joined list render', (tester) async {

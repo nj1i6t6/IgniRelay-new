@@ -6781,6 +6781,576 @@ abstract class S {
   /// In zh, this message translates to:
   /// **'超大字'**
   String get settingsTextSizeHuge;
+
+  /// No description provided for @fieldTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'場域'**
+  String get fieldTitle;
+
+  /// No description provided for @fieldSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'加入場域後才能收發事件'**
+  String get fieldSubtitle;
+
+  /// No description provided for @fieldNoneTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'尚未加入任何場域'**
+  String get fieldNoneTitle;
+
+  /// No description provided for @fieldNoneBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'掃描主辦方的場域 QR、輸入加入代碼，或自行建立一個場域。'**
+  String get fieldNoneBody;
+
+  /// No description provided for @fieldUnnamed.
+  ///
+  /// In zh, this message translates to:
+  /// **'（未命名場域）'**
+  String get fieldUnnamed;
+
+  /// No description provided for @fieldActiveChip.
+  ///
+  /// In zh, this message translates to:
+  /// **'作用中'**
+  String get fieldActiveChip;
+
+  /// No description provided for @fieldScanJoin.
+  ///
+  /// In zh, this message translates to:
+  /// **'掃碼加入'**
+  String get fieldScanJoin;
+
+  /// No description provided for @fieldEnterCode.
+  ///
+  /// In zh, this message translates to:
+  /// **'輸入代碼'**
+  String get fieldEnterCode;
+
+  /// No description provided for @fieldCreateNew.
+  ///
+  /// In zh, this message translates to:
+  /// **'建立新場域'**
+  String get fieldCreateNew;
+
+  /// No description provided for @fieldJoinedHeader.
+  ///
+  /// In zh, this message translates to:
+  /// **'已加入的場域（{count}）'**
+  String fieldJoinedHeader(int count);
+
+  /// No description provided for @fieldShowQr.
+  ///
+  /// In zh, this message translates to:
+  /// **'顯示 QR'**
+  String get fieldShowQr;
+
+  /// No description provided for @fieldLeave.
+  ///
+  /// In zh, this message translates to:
+  /// **'離開場域'**
+  String get fieldLeave;
+
+  /// No description provided for @fieldCreateFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'建立場域失敗：{error}'**
+  String fieldCreateFailed(String error);
+
+  /// No description provided for @fieldSecretNotFound.
+  ///
+  /// In zh, this message translates to:
+  /// **'找不到此場域的密鑰，無法顯示 QR'**
+  String get fieldSecretNotFound;
+
+  /// No description provided for @fieldCodeTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'輸入場域代碼'**
+  String get fieldCodeTitle;
+
+  /// No description provided for @fieldCodeBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'貼上 IGNI1 場域代碼，或輸入 64 個十六進位字元的場域密鑰。'**
+  String get fieldCodeBody;
+
+  /// No description provided for @fieldCodeHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'IGNI1:… 或 a1b2c3…'**
+  String get fieldCodeHint;
+
+  /// No description provided for @fieldCancel.
+  ///
+  /// In zh, this message translates to:
+  /// **'取消'**
+  String get fieldCancel;
+
+  /// No description provided for @fieldJoin.
+  ///
+  /// In zh, this message translates to:
+  /// **'加入'**
+  String get fieldJoin;
+
+  /// No description provided for @fieldScannedName.
+  ///
+  /// In zh, this message translates to:
+  /// **'掃碼場域'**
+  String get fieldScannedName;
+
+  /// No description provided for @fieldCodeUnrecognized.
+  ///
+  /// In zh, this message translates to:
+  /// **'代碼格式無法辨識：需為 IGNI1 代碼或 64 個十六進位字元'**
+  String get fieldCodeUnrecognized;
+
+  /// No description provided for @fieldDefaultNamePrefix.
+  ///
+  /// In zh, this message translates to:
+  /// **'場域-{prefix}'**
+  String fieldDefaultNamePrefix(String prefix);
+
+  /// No description provided for @fieldJoinedSnack.
+  ///
+  /// In zh, this message translates to:
+  /// **'已加入場域 {id}…'**
+  String fieldJoinedSnack(String id);
+
+  /// No description provided for @fieldJoinFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'加入場域失敗：{error}'**
+  String fieldJoinFailed(String error);
+
+  /// No description provided for @fieldLeaveTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'離開場域？'**
+  String get fieldLeaveTitle;
+
+  /// No description provided for @fieldLeaveBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'即將離開「{name}」。此動作不可復原，將從本機刪除此場域的密鑰，需重新掃碼 / 輸入代碼才能再次加入。'**
+  String fieldLeaveBody(String name);
+
+  /// No description provided for @fieldLeaveConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'離開'**
+  String get fieldLeaveConfirm;
+
+  /// No description provided for @fieldLeftSnack.
+  ///
+  /// In zh, this message translates to:
+  /// **'已離開場域'**
+  String get fieldLeftSnack;
+
+  /// No description provided for @fieldLeaveFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'離開場域失敗：{error}'**
+  String fieldLeaveFailed(String error);
+
+  /// No description provided for @fieldCreateTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'建立新場域'**
+  String get fieldCreateTitle;
+
+  /// No description provided for @fieldNameLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'場域名稱'**
+  String get fieldNameLabel;
+
+  /// No description provided for @fieldNameHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'例：台北車站避難所'**
+  String get fieldNameHint;
+
+  /// No description provided for @fieldCreateConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'建立'**
+  String get fieldCreateConfirm;
+
+  /// No description provided for @fieldDefaultName.
+  ///
+  /// In zh, this message translates to:
+  /// **'新場域'**
+  String get fieldDefaultName;
+
+  /// No description provided for @fieldErrEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'代碼是空的'**
+  String get fieldErrEmpty;
+
+  /// No description provided for @fieldErrBadPrefix.
+  ///
+  /// In zh, this message translates to:
+  /// **'這不是 IgniRelay 場域代碼（前綴不符）'**
+  String get fieldErrBadPrefix;
+
+  /// No description provided for @fieldErrTooFewSegments.
+  ///
+  /// In zh, this message translates to:
+  /// **'代碼不完整'**
+  String get fieldErrTooFewSegments;
+
+  /// No description provided for @fieldErrBadSecret.
+  ///
+  /// In zh, this message translates to:
+  /// **'代碼的場域密鑰格式錯誤'**
+  String get fieldErrBadSecret;
+
+  /// No description provided for @fieldErrBadCloudUrl.
+  ///
+  /// In zh, this message translates to:
+  /// **'代碼的雲端網址無效（僅接受 https://）'**
+  String get fieldErrBadCloudUrl;
+
+  /// No description provided for @fieldErrStaffWithoutCloud.
+  ///
+  /// In zh, this message translates to:
+  /// **'代碼格式錯誤：含 staff token 卻缺雲端網址'**
+  String get fieldErrStaffWithoutCloud;
+
+  /// No description provided for @fieldErrMalformed.
+  ///
+  /// In zh, this message translates to:
+  /// **'代碼內容毀損，無法解析'**
+  String get fieldErrMalformed;
+
+  /// No description provided for @fieldScanBack.
+  ///
+  /// In zh, this message translates to:
+  /// **'返回'**
+  String get fieldScanBack;
+
+  /// No description provided for @fieldScanTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'掃描場域 QR'**
+  String get fieldScanTitle;
+
+  /// No description provided for @fieldScanHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'對準主辦方的場域 QR 即可自動加入'**
+  String get fieldScanHint;
+
+  /// No description provided for @fieldScanReject.
+  ///
+  /// In zh, this message translates to:
+  /// **'這不是 IgniRelay 場域 QR，請換一個'**
+  String get fieldScanReject;
+
+  /// No description provided for @fieldScanNoCameraTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'無法開啟相機'**
+  String get fieldScanNoCameraTitle;
+
+  /// No description provided for @fieldScanNoCameraBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'請確認已授予相機權限，或改用「輸入代碼」加入場域。'**
+  String get fieldScanNoCameraBody;
+
+  /// No description provided for @fieldQrTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'場域 QR'**
+  String get fieldQrTitle;
+
+  /// No description provided for @fieldQrSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'讓對方掃描即可加入同一場域'**
+  String get fieldQrSubtitle;
+
+  /// No description provided for @fieldQrDebugWarning.
+  ///
+  /// In zh, this message translates to:
+  /// **'（debug）此代碼含場域密鑰，請勿外流：'**
+  String get fieldQrDebugWarning;
+
+  /// No description provided for @fieldQrDone.
+  ///
+  /// In zh, this message translates to:
+  /// **'完成'**
+  String get fieldQrDone;
+
+  /// No description provided for @previewModeSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'示範模式 · 不會送出任何資料'**
+  String get previewModeSubtitle;
+
+  /// No description provided for @previewBadge.
+  ///
+  /// In zh, this message translates to:
+  /// **'示範資料'**
+  String get previewBadge;
+
+  /// No description provided for @previewBack.
+  ///
+  /// In zh, this message translates to:
+  /// **'返回'**
+  String get previewBack;
+
+  /// No description provided for @previewPrev.
+  ///
+  /// In zh, this message translates to:
+  /// **'上一步'**
+  String get previewPrev;
+
+  /// No description provided for @previewNext.
+  ///
+  /// In zh, this message translates to:
+  /// **'下一步'**
+  String get previewNext;
+
+  /// No description provided for @previewDemoChip.
+  ///
+  /// In zh, this message translates to:
+  /// **'示範'**
+  String get previewDemoChip;
+
+  /// No description provided for @previewJoinIntro.
+  ///
+  /// In zh, this message translates to:
+  /// **'掃描主辦者的 QR 或輸入密鑰即可加入一個場域。場域決定你和誰互通——只有同一個場域的人，才看得到彼此。'**
+  String get previewJoinIntro;
+
+  /// No description provided for @previewSafetyTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'安全：被看見 + 求救'**
+  String get previewSafetyTitle;
+
+  /// No description provided for @previewSafetyIntro.
+  ///
+  /// In zh, this message translates to:
+  /// **'加入後，App 會定期留下你的足跡，讓場域裡的人知道你還在、在哪附近。需要時可以長按發出 SOS。'**
+  String get previewSafetyIntro;
+
+  /// No description provided for @previewSafetyFootprintTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'自動足跡（被看見）'**
+  String get previewSafetyFootprintTitle;
+
+  /// No description provided for @previewSafetyFootprintBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'靜止時省電、移動時更頻繁地留下足跡。不需要一直盯著手機，別人也能看到你最後的位置。'**
+  String get previewSafetyFootprintBody;
+
+  /// No description provided for @previewSafetySosTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'求救 SOS'**
+  String get previewSafetySosTitle;
+
+  /// No description provided for @previewSafetySosBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'長按求救鍵，選擇紅色（受困）或黃色（受傷）。送出前有 5 秒可取消，避免誤觸。（示範不會真的送出）'**
+  String get previewSafetySosBody;
+
+  /// No description provided for @previewPositionTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'位置：最後可信位置'**
+  String get previewPositionTitle;
+
+  /// No description provided for @previewPositionIntro.
+  ///
+  /// In zh, this message translates to:
+  /// **'看見附近成員「最後可信的位置」與相對方位。雷達固定北朝上，越靠近中心代表離你越近。（這裡顯示的是示範資料）'**
+  String get previewPositionIntro;
+
+  /// No description provided for @previewFootprintLine.
+  ///
+  /// In zh, this message translates to:
+  /// **'最後可信位置 · {ago}'**
+  String previewFootprintLine(String ago);
+
+  /// No description provided for @previewEventsTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'事件：危害 / 廣播 / 打卡'**
+  String get previewEventsTitle;
+
+  /// No description provided for @previewEventsIntro.
+  ///
+  /// In zh, this message translates to:
+  /// **'場域裡的重要訊息會集中在事件：危害提醒、管理者廣播、平安打卡，讓你快速掌握現場狀況。'**
+  String get previewEventsIntro;
+
+  /// No description provided for @previewAssistTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'協助 + 離線也能用'**
+  String get previewAssistTitle;
+
+  /// No description provided for @previewAssistIntro.
+  ///
+  /// In zh, this message translates to:
+  /// **'需要或能提供協助時，可以在「協助」裡媒合。最重要的是——沒有網路時，App 仍透過近距離轉傳運作。'**
+  String get previewAssistIntro;
+
+  /// No description provided for @previewAssistMatchTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'協助媒合'**
+  String get previewAssistMatchTitle;
+
+  /// No description provided for @previewAssistMatchBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'提出需求或回應他人需求，讓資源在場域內就近流動。'**
+  String get previewAssistMatchBody;
+
+  /// No description provided for @previewAssistOfflineTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'離線降級'**
+  String get previewAssistOfflineTitle;
+
+  /// No description provided for @previewAssistOfflineBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'沒有基地台或網路時，訊息會透過附近的裝置一手接一手傳遞；收訊恢復時自動補送，不會憑空捏造位置。'**
+  String get previewAssistOfflineBody;
+
+  /// No description provided for @previewToneSos.
+  ///
+  /// In zh, this message translates to:
+  /// **'求救'**
+  String get previewToneSos;
+
+  /// No description provided for @previewToneWarn.
+  ///
+  /// In zh, this message translates to:
+  /// **'危害'**
+  String get previewToneWarn;
+
+  /// No description provided for @previewToneInfo.
+  ///
+  /// In zh, this message translates to:
+  /// **'廣播'**
+  String get previewToneInfo;
+
+  /// No description provided for @previewToneOk.
+  ///
+  /// In zh, this message translates to:
+  /// **'平安'**
+  String get previewToneOk;
+
+  /// No description provided for @previewToneNeutral.
+  ///
+  /// In zh, this message translates to:
+  /// **'事件'**
+  String get previewToneNeutral;
+
+  /// No description provided for @previewFieldLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'示範場域 · DEMO-FIELD'**
+  String get previewFieldLabel;
+
+  /// No description provided for @previewAlias.
+  ///
+  /// In zh, this message translates to:
+  /// **'化名 {alias}'**
+  String previewAlias(String alias);
+
+  /// No description provided for @previewFpAgo1.
+  ///
+  /// In zh, this message translates to:
+  /// **'1 分鐘前'**
+  String get previewFpAgo1;
+
+  /// No description provided for @previewFpAgo4.
+  ///
+  /// In zh, this message translates to:
+  /// **'4 分鐘前'**
+  String get previewFpAgo4;
+
+  /// No description provided for @previewFpAgoTrapped.
+  ///
+  /// In zh, this message translates to:
+  /// **'受困 · 2 分鐘前'**
+  String get previewFpAgoTrapped;
+
+  /// No description provided for @previewSosTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'求救 · 受困'**
+  String get previewSosTitle;
+
+  /// No description provided for @previewSosAgo.
+  ///
+  /// In zh, this message translates to:
+  /// **'2 分鐘前'**
+  String get previewSosAgo;
+
+  /// No description provided for @previewHazardTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'危害 · 火災 FIRE'**
+  String get previewHazardTitle;
+
+  /// No description provided for @previewHazardDetail.
+  ///
+  /// In zh, this message translates to:
+  /// **'sev 2 · 巷口濃煙'**
+  String get previewHazardDetail;
+
+  /// No description provided for @previewHazardAgo.
+  ///
+  /// In zh, this message translates to:
+  /// **'6 分鐘前'**
+  String get previewHazardAgo;
+
+  /// No description provided for @previewBroadcastTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'管理廣播'**
+  String get previewBroadcastTitle;
+
+  /// No description provided for @previewBroadcastDetail.
+  ///
+  /// In zh, this message translates to:
+  /// **'集合點改至北側出口'**
+  String get previewBroadcastDetail;
+
+  /// No description provided for @previewBroadcastAgo.
+  ///
+  /// In zh, this message translates to:
+  /// **'10 分鐘前'**
+  String get previewBroadcastAgo;
+
+  /// No description provided for @previewCheckpointTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'打卡 · 平安'**
+  String get previewCheckpointTitle;
+
+  /// No description provided for @previewCheckpointAgo.
+  ///
+  /// In zh, this message translates to:
+  /// **'12 分鐘前'**
+  String get previewCheckpointAgo;
 }
 
 class _SDelegate extends LocalizationsDelegate<S> {

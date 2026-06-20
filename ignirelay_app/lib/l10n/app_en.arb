@@ -1467,5 +1467,132 @@
   "settingsTextSizeStandard": "Standard",
   "settingsTextSizeLarge": "Large",
   "settingsTextSizeXLarge": "X-Large",
-  "settingsTextSizeHuge": "Huge"
+  "settingsTextSizeHuge": "Huge",
+
+  "fieldTitle": "Field",
+  "fieldSubtitle": "Join a field to send and receive events",
+  "fieldNoneTitle": "Not in any field yet",
+  "fieldNoneBody": "Scan the host's field QR, enter a join code, or create your own field.",
+  "fieldUnnamed": "(unnamed field)",
+  "fieldActiveChip": "Active",
+  "fieldScanJoin": "Scan to join",
+  "fieldEnterCode": "Enter code",
+  "fieldCreateNew": "Create field",
+  "fieldJoinedHeader": "Joined fields ({count})",
+  "@fieldJoinedHeader": {
+    "placeholders": { "count": {"type": "int"} }
+  },
+  "fieldShowQr": "Show QR",
+  "fieldLeave": "Leave field",
+  "fieldCreateFailed": "Couldn't create field: {error}",
+  "@fieldCreateFailed": {
+    "placeholders": { "error": {"type": "String"} }
+  },
+  "fieldSecretNotFound": "This field's key wasn't found, so the QR can't be shown",
+  "fieldCodeTitle": "Enter field code",
+  "fieldCodeBody": "Paste an IGNI1 field code, or enter the 64-character hex field key.",
+  "fieldCodeHint": "IGNI1:… or a1b2c3…",
+  "fieldCancel": "Cancel",
+  "fieldJoin": "Join",
+  "fieldScannedName": "Scanned field",
+  "fieldCodeUnrecognized": "Unrecognized code: it must be an IGNI1 code or 64 hex characters",
+  "fieldDefaultNamePrefix": "Field-{prefix}",
+  "@fieldDefaultNamePrefix": {
+    "placeholders": { "prefix": {"type": "String"} }
+  },
+  "fieldJoinedSnack": "Joined field {id}…",
+  "@fieldJoinedSnack": {
+    "placeholders": { "id": {"type": "String"} }
+  },
+  "fieldJoinFailed": "Couldn't join field: {error}",
+  "@fieldJoinFailed": {
+    "placeholders": { "error": {"type": "String"} }
+  },
+  "fieldLeaveTitle": "Leave field?",
+  "fieldLeaveBody": "About to leave \"{name}\". This can't be undone — the field's key is removed from this device, and you'll need to scan or enter the code again to rejoin.",
+  "@fieldLeaveBody": {
+    "placeholders": { "name": {"type": "String"} }
+  },
+  "fieldLeaveConfirm": "Leave",
+  "fieldLeftSnack": "Left the field",
+  "fieldLeaveFailed": "Couldn't leave field: {error}",
+  "@fieldLeaveFailed": {
+    "placeholders": { "error": {"type": "String"} }
+  },
+  "fieldCreateTitle": "Create field",
+  "fieldNameLabel": "Field name",
+  "fieldNameHint": "e.g. Taipei Station shelter",
+  "fieldCreateConfirm": "Create",
+  "fieldDefaultName": "New field",
+  "fieldErrEmpty": "The code is empty",
+  "fieldErrBadPrefix": "This isn't an IgniRelay field code (prefix mismatch)",
+  "fieldErrTooFewSegments": "The code is incomplete",
+  "fieldErrBadSecret": "The code's field key is malformed",
+  "fieldErrBadCloudUrl": "The code's cloud URL is invalid (https:// only)",
+  "fieldErrStaffWithoutCloud": "Malformed code: it has a staff token but no cloud URL",
+  "fieldErrMalformed": "The code is corrupted and can't be parsed",
+
+  "fieldScanBack": "Back",
+  "fieldScanTitle": "Scan field QR",
+  "fieldScanHint": "Point at the host's field QR to join automatically",
+  "fieldScanReject": "That's not an IgniRelay field QR — try another",
+  "fieldScanNoCameraTitle": "Can't open the camera",
+  "fieldScanNoCameraBody": "Check that camera permission is granted, or use \"Enter code\" to join a field instead.",
+
+  "fieldQrTitle": "Field QR",
+  "fieldQrSubtitle": "Have others scan this to join the same field",
+  "fieldQrDebugWarning": "(debug) This code contains the field key — don't share it:",
+  "fieldQrDone": "Done",
+
+  "previewModeSubtitle": "Demo mode · nothing is sent",
+  "previewBadge": "Demo data",
+  "previewBack": "Back",
+  "previewPrev": "Previous",
+  "previewNext": "Next",
+  "previewDemoChip": "Demo",
+  "previewJoinIntro": "Scan the host's QR or enter a key to join a field. The field decides who you connect with — only people in the same field can see each other.",
+  "previewSafetyTitle": "Safety: be seen + call for help",
+  "previewSafetyIntro": "After you join, the app periodically leaves your footprint so people in the field know you're still around and roughly where. Press and hold to send an SOS when you need it.",
+  "previewSafetyFootprintTitle": "Automatic footprint (be seen)",
+  "previewSafetyFootprintBody": "Saves power when you're still, updates more often when you move. No need to watch your phone — others can still see your last position.",
+  "previewSafetySosTitle": "SOS",
+  "previewSafetySosBody": "Press and hold the SOS button, then choose red (trapped) or yellow (injured). You get 5 seconds to cancel before it sends. (The demo never actually sends.)",
+  "previewPositionTitle": "Location: last trusted position",
+  "previewPositionIntro": "See nearby members' last trusted position and relative bearing. The radar is fixed north-up; closer to the center means closer to you. (This shows demo data.)",
+  "previewFootprintLine": "Last trusted position · {ago}",
+  "@previewFootprintLine": {
+    "placeholders": { "ago": {"type": "String"} }
+  },
+  "previewEventsTitle": "Events: hazards / broadcasts / check-ins",
+  "previewEventsIntro": "Important messages collect under Events: hazard alerts, admin broadcasts, and safety check-ins, so you can size up the situation fast.",
+  "previewAssistTitle": "Assist + works offline",
+  "previewAssistIntro": "Match needs and offers under Assist. Most importantly — with no network, the app keeps working by relaying through nearby devices.",
+  "previewAssistMatchTitle": "Assist matching",
+  "previewAssistMatchBody": "Post a need or answer someone else's, so resources move locally within the field.",
+  "previewAssistOfflineTitle": "Offline fallback",
+  "previewAssistOfflineBody": "With no cell tower or network, messages hop device to device nearby; when coverage returns they're sent automatically — and it never makes up a position.",
+  "previewToneSos": "SOS",
+  "previewToneWarn": "Hazard",
+  "previewToneInfo": "Broadcast",
+  "previewToneOk": "Safe",
+  "previewToneNeutral": "Event",
+
+  "previewFieldLabel": "Demo field · DEMO-FIELD",
+  "previewAlias": "Alias {alias}",
+  "@previewAlias": {
+    "placeholders": { "alias": {"type": "String"} }
+  },
+  "previewFpAgo1": "1 min ago",
+  "previewFpAgo4": "4 min ago",
+  "previewFpAgoTrapped": "Trapped · 2 min ago",
+  "previewSosTitle": "SOS · Trapped",
+  "previewSosAgo": "2 min ago",
+  "previewHazardTitle": "Hazard · Fire (FIRE)",
+  "previewHazardDetail": "sev 2 · heavy smoke at the alley",
+  "previewHazardAgo": "6 min ago",
+  "previewBroadcastTitle": "Admin broadcast",
+  "previewBroadcastDetail": "Assembly point moved to the north exit",
+  "previewBroadcastAgo": "10 min ago",
+  "previewCheckpointTitle": "Check-in · Safe",
+  "previewCheckpointAgo": "12 min ago"
 }

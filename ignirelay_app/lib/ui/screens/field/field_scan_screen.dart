@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'package:ignirelay_app/app/services/field_qr_codec.dart';
+import 'package:ignirelay_app/l10n/generated/app_localizations.dart';
+import 'package:ignirelay_app/l10n/l10n_ext.dart';
 import 'package:ignirelay_app/ui/theme/igni_colors.dart';
 import 'package:ignirelay_app/ui/theme/igni_tokens.dart';
 import 'package:ignirelay_app/ui/theme/igni_typography.dart';
@@ -52,6 +54,7 @@ class _FieldScanScreenState extends State<FieldScanScreen> {
   @override
   Widget build(BuildContext context) {
     final p = context.igni;
+    final l = context.l10n;
     return Scaffold(
       backgroundColor: p.bg0,
       body: Stack(
@@ -60,7 +63,7 @@ class _FieldScanScreenState extends State<FieldScanScreen> {
           MobileScanner(
             controller: _controller,
             onDetect: _onDetect,
-            errorBuilder: (ctx, error, child) => _cameraError(p, error),
+            errorBuilder: (ctx, error, child) => _cameraError(p, l, error),
           ),
           // Scan reticle.
           Center(
@@ -81,11 +84,11 @@ class _FieldScanScreenState extends State<FieldScanScreen> {
                 _scrimButton(
                   p,
                   icon: Icons.arrow_back,
-                  tooltip: '返回',
+                  tooltip: l.fieldScanBack,
                   onTap: () => Navigator.of(context).pop(),
                 ),
                 const SizedBox(width: IgniSpacing.md),
-                _scrimLabel(p, '掃描場域 QR'),
+                _scrimLabel(p, l.fieldScanTitle),
               ]),
             ),
           ),
@@ -97,9 +100,7 @@ class _FieldScanScreenState extends State<FieldScanScreen> {
                 padding: const EdgeInsets.all(IgniSpacing.xl),
                 child: _scrimLabel(
                   p,
-                  _lastReject == null
-                      ? '對準主辦方的場域 QR 即可自動加入'
-                      : '這不是 IgniRelay 場域 QR，請換一個',
+                  _lastReject == null ? l.fieldScanHint : l.fieldScanReject,
                 ),
               ),
             ),
@@ -109,7 +110,7 @@ class _FieldScanScreenState extends State<FieldScanScreen> {
     );
   }
 
-  Widget _cameraError(IgniPalette p, MobileScannerException error) {
+  Widget _cameraError(IgniPalette p, S l, MobileScannerException error) {
     return Container(
       color: p.bg0,
       alignment: Alignment.center,
@@ -119,12 +120,12 @@ class _FieldScanScreenState extends State<FieldScanScreen> {
         children: [
           Icon(Icons.no_photography_outlined, size: 40, color: p.text3),
           const SizedBox(height: IgniSpacing.md),
-          Text('無法開啟相機',
+          Text(l.fieldScanNoCameraTitle,
               style: IgniTypography.titleMedium(p.text0),
               textAlign: TextAlign.center),
           const SizedBox(height: IgniSpacing.sm),
           Text(
-            '請確認已授予相機權限，或改用「輸入代碼」加入場域。',
+            l.fieldScanNoCameraBody,
             style: IgniTypography.bodySmall(p.text2),
             textAlign: TextAlign.center,
           ),

@@ -3542,4 +3542,314 @@ class SZh extends S {
 
   @override
   String get settingsTextSizeHuge => '超大字';
+
+  @override
+  String get fieldTitle => '場域';
+
+  @override
+  String get fieldSubtitle => '加入場域後才能收發事件';
+
+  @override
+  String get fieldNoneTitle => '尚未加入任何場域';
+
+  @override
+  String get fieldNoneBody => '掃描主辦方的場域 QR、輸入加入代碼，或自行建立一個場域。';
+
+  @override
+  String get fieldUnnamed => '（未命名場域）';
+
+  @override
+  String get fieldActiveChip => '作用中';
+
+  @override
+  String get fieldScanJoin => '掃碼加入';
+
+  @override
+  String get fieldEnterCode => '輸入代碼';
+
+  @override
+  String get fieldCreateNew => '建立新場域';
+
+  @override
+  String fieldJoinedHeader(int count) {
+    return '已加入的場域（$count）';
+  }
+
+  @override
+  String get fieldShowQr => '顯示 QR';
+
+  @override
+  String get fieldLeave => '離開場域';
+
+  @override
+  String fieldCreateFailed(String error) {
+    return '建立場域失敗：$error';
+  }
+
+  @override
+  String get fieldSecretNotFound => '找不到此場域的密鑰，無法顯示 QR';
+
+  @override
+  String get fieldCodeTitle => '輸入場域代碼';
+
+  @override
+  String get fieldCodeBody => '貼上 IGNI1 場域代碼，或輸入 64 個十六進位字元的場域密鑰。';
+
+  @override
+  String get fieldCodeHint => 'IGNI1:… 或 a1b2c3…';
+
+  @override
+  String get fieldCancel => '取消';
+
+  @override
+  String get fieldJoin => '加入';
+
+  @override
+  String get fieldScannedName => '掃碼場域';
+
+  @override
+  String get fieldCodeUnrecognized => '代碼格式無法辨識：需為 IGNI1 代碼或 64 個十六進位字元';
+
+  @override
+  String fieldDefaultNamePrefix(String prefix) {
+    return '場域-$prefix';
+  }
+
+  @override
+  String fieldJoinedSnack(String id) {
+    return '已加入場域 $id…';
+  }
+
+  @override
+  String fieldJoinFailed(String error) {
+    return '加入場域失敗：$error';
+  }
+
+  @override
+  String get fieldLeaveTitle => '離開場域？';
+
+  @override
+  String fieldLeaveBody(String name) {
+    return '即將離開「$name」。此動作不可復原，將從本機刪除此場域的密鑰，需重新掃碼 / 輸入代碼才能再次加入。';
+  }
+
+  @override
+  String get fieldLeaveConfirm => '離開';
+
+  @override
+  String get fieldLeftSnack => '已離開場域';
+
+  @override
+  String fieldLeaveFailed(String error) {
+    return '離開場域失敗：$error';
+  }
+
+  @override
+  String get fieldCreateTitle => '建立新場域';
+
+  @override
+  String get fieldNameLabel => '場域名稱';
+
+  @override
+  String get fieldNameHint => '例：台北車站避難所';
+
+  @override
+  String get fieldCreateConfirm => '建立';
+
+  @override
+  String get fieldDefaultName => '新場域';
+
+  @override
+  String get fieldErrEmpty => '代碼是空的';
+
+  @override
+  String get fieldErrBadPrefix => '這不是 IgniRelay 場域代碼（前綴不符）';
+
+  @override
+  String get fieldErrTooFewSegments => '代碼不完整';
+
+  @override
+  String get fieldErrBadSecret => '代碼的場域密鑰格式錯誤';
+
+  @override
+  String get fieldErrBadCloudUrl => '代碼的雲端網址無效（僅接受 https://）';
+
+  @override
+  String get fieldErrStaffWithoutCloud => '代碼格式錯誤：含 staff token 卻缺雲端網址';
+
+  @override
+  String get fieldErrMalformed => '代碼內容毀損，無法解析';
+
+  @override
+  String get fieldScanBack => '返回';
+
+  @override
+  String get fieldScanTitle => '掃描場域 QR';
+
+  @override
+  String get fieldScanHint => '對準主辦方的場域 QR 即可自動加入';
+
+  @override
+  String get fieldScanReject => '這不是 IgniRelay 場域 QR，請換一個';
+
+  @override
+  String get fieldScanNoCameraTitle => '無法開啟相機';
+
+  @override
+  String get fieldScanNoCameraBody => '請確認已授予相機權限，或改用「輸入代碼」加入場域。';
+
+  @override
+  String get fieldQrTitle => '場域 QR';
+
+  @override
+  String get fieldQrSubtitle => '讓對方掃描即可加入同一場域';
+
+  @override
+  String get fieldQrDebugWarning => '（debug）此代碼含場域密鑰，請勿外流：';
+
+  @override
+  String get fieldQrDone => '完成';
+
+  @override
+  String get previewModeSubtitle => '示範模式 · 不會送出任何資料';
+
+  @override
+  String get previewBadge => '示範資料';
+
+  @override
+  String get previewBack => '返回';
+
+  @override
+  String get previewPrev => '上一步';
+
+  @override
+  String get previewNext => '下一步';
+
+  @override
+  String get previewDemoChip => '示範';
+
+  @override
+  String get previewJoinIntro =>
+      '掃描主辦者的 QR 或輸入密鑰即可加入一個場域。場域決定你和誰互通——只有同一個場域的人，才看得到彼此。';
+
+  @override
+  String get previewSafetyTitle => '安全：被看見 + 求救';
+
+  @override
+  String get previewSafetyIntro =>
+      '加入後，App 會定期留下你的足跡，讓場域裡的人知道你還在、在哪附近。需要時可以長按發出 SOS。';
+
+  @override
+  String get previewSafetyFootprintTitle => '自動足跡（被看見）';
+
+  @override
+  String get previewSafetyFootprintBody =>
+      '靜止時省電、移動時更頻繁地留下足跡。不需要一直盯著手機，別人也能看到你最後的位置。';
+
+  @override
+  String get previewSafetySosTitle => '求救 SOS';
+
+  @override
+  String get previewSafetySosBody =>
+      '長按求救鍵，選擇紅色（受困）或黃色（受傷）。送出前有 5 秒可取消，避免誤觸。（示範不會真的送出）';
+
+  @override
+  String get previewPositionTitle => '位置：最後可信位置';
+
+  @override
+  String get previewPositionIntro =>
+      '看見附近成員「最後可信的位置」與相對方位。雷達固定北朝上，越靠近中心代表離你越近。（這裡顯示的是示範資料）';
+
+  @override
+  String previewFootprintLine(String ago) {
+    return '最後可信位置 · $ago';
+  }
+
+  @override
+  String get previewEventsTitle => '事件：危害 / 廣播 / 打卡';
+
+  @override
+  String get previewEventsIntro => '場域裡的重要訊息會集中在事件：危害提醒、管理者廣播、平安打卡，讓你快速掌握現場狀況。';
+
+  @override
+  String get previewAssistTitle => '協助 + 離線也能用';
+
+  @override
+  String get previewAssistIntro =>
+      '需要或能提供協助時，可以在「協助」裡媒合。最重要的是——沒有網路時，App 仍透過近距離轉傳運作。';
+
+  @override
+  String get previewAssistMatchTitle => '協助媒合';
+
+  @override
+  String get previewAssistMatchBody => '提出需求或回應他人需求，讓資源在場域內就近流動。';
+
+  @override
+  String get previewAssistOfflineTitle => '離線降級';
+
+  @override
+  String get previewAssistOfflineBody =>
+      '沒有基地台或網路時，訊息會透過附近的裝置一手接一手傳遞；收訊恢復時自動補送，不會憑空捏造位置。';
+
+  @override
+  String get previewToneSos => '求救';
+
+  @override
+  String get previewToneWarn => '危害';
+
+  @override
+  String get previewToneInfo => '廣播';
+
+  @override
+  String get previewToneOk => '平安';
+
+  @override
+  String get previewToneNeutral => '事件';
+
+  @override
+  String get previewFieldLabel => '示範場域 · DEMO-FIELD';
+
+  @override
+  String previewAlias(String alias) {
+    return '化名 $alias';
+  }
+
+  @override
+  String get previewFpAgo1 => '1 分鐘前';
+
+  @override
+  String get previewFpAgo4 => '4 分鐘前';
+
+  @override
+  String get previewFpAgoTrapped => '受困 · 2 分鐘前';
+
+  @override
+  String get previewSosTitle => '求救 · 受困';
+
+  @override
+  String get previewSosAgo => '2 分鐘前';
+
+  @override
+  String get previewHazardTitle => '危害 · 火災 FIRE';
+
+  @override
+  String get previewHazardDetail => 'sev 2 · 巷口濃煙';
+
+  @override
+  String get previewHazardAgo => '6 分鐘前';
+
+  @override
+  String get previewBroadcastTitle => '管理廣播';
+
+  @override
+  String get previewBroadcastDetail => '集合點改至北側出口';
+
+  @override
+  String get previewBroadcastAgo => '10 分鐘前';
+
+  @override
+  String get previewCheckpointTitle => '打卡 · 平安';
+
+  @override
+  String get previewCheckpointAgo => '12 分鐘前';
 }

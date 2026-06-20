@@ -18,14 +18,25 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:ignirelay_app/l10n/generated/app_localizations.dart';
 import 'package:ignirelay_app/ui/screens/position/relative_radar.dart';
 import 'package:ignirelay_app/ui/screens/preview/preview_screen.dart';
+
+// UI-H2b: PreviewScreen now localizes via context.l10n, so the harness supplies
+// the S delegates + an explicit zh locale. This adds NO provider — the
+// fixture-only / zero-provider property the import-guard test enforces is intact.
+Widget _previewApp({Locale locale = const Locale('zh')}) => MaterialApp(
+      locale: locale,
+      supportedLocales: S.supportedLocales,
+      localizationsDelegates: S.localizationsDelegates,
+      home: const PreviewScreen(),
+    );
 
 void main() {
   group('PreviewScreen — fixture-only render (no providers)', () {
     testWidgets('renders the 示範資料 badge + first page with zero providers',
         (tester) async {
-      await tester.pumpWidget(const MaterialApp(home: PreviewScreen()));
+      await tester.pumpWidget(_previewApp());
       await tester.pumpAndSettle();
 
       expect(find.byType(PreviewScreen), findsOneWidget);
@@ -35,7 +46,7 @@ void main() {
 
     testWidgets('guided tour covers the five concepts; radar bounded; no 目前位置',
         (tester) async {
-      await tester.pumpWidget(const MaterialApp(home: PreviewScreen()));
+      await tester.pumpWidget(_previewApp());
       await tester.pumpAndSettle();
 
       // p1 — 加入場域
@@ -63,6 +74,17 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.textContaining('離線'), findsWidgets);
       expect(find.text('下一步'), findsNothing);
+    });
+
+    testWidgets('en: badge + first page render English (UI-H2b)',
+        (tester) async {
+      await tester.pumpWidget(_previewApp(locale: const Locale('en')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Demo data'), findsOneWidget);
+      expect(find.text('Join field'), findsWidgets); // page-1 title/CTA
+      expect(find.text('Next'), findsOneWidget);
+      expect(find.text('示範資料'), findsNothing);
     });
   });
 

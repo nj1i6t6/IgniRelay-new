@@ -1467,5 +1467,132 @@
   "settingsTextSizeStandard": "標準",
   "settingsTextSizeLarge": "大字",
   "settingsTextSizeXLarge": "特大字",
-  "settingsTextSizeHuge": "超大字"
+  "settingsTextSizeHuge": "超大字",
+
+  "fieldTitle": "場域",
+  "fieldSubtitle": "加入場域後才能收發事件",
+  "fieldNoneTitle": "尚未加入任何場域",
+  "fieldNoneBody": "掃描主辦方的場域 QR、輸入加入代碼，或自行建立一個場域。",
+  "fieldUnnamed": "（未命名場域）",
+  "fieldActiveChip": "作用中",
+  "fieldScanJoin": "掃碼加入",
+  "fieldEnterCode": "輸入代碼",
+  "fieldCreateNew": "建立新場域",
+  "fieldJoinedHeader": "已加入的場域（{count}）",
+  "@fieldJoinedHeader": {
+    "placeholders": { "count": {"type": "int"} }
+  },
+  "fieldShowQr": "顯示 QR",
+  "fieldLeave": "離開場域",
+  "fieldCreateFailed": "建立場域失敗：{error}",
+  "@fieldCreateFailed": {
+    "placeholders": { "error": {"type": "String"} }
+  },
+  "fieldSecretNotFound": "找不到此場域的密鑰，無法顯示 QR",
+  "fieldCodeTitle": "輸入場域代碼",
+  "fieldCodeBody": "貼上 IGNI1 場域代碼，或輸入 64 個十六進位字元的場域密鑰。",
+  "fieldCodeHint": "IGNI1:… 或 a1b2c3…",
+  "fieldCancel": "取消",
+  "fieldJoin": "加入",
+  "fieldScannedName": "掃碼場域",
+  "fieldCodeUnrecognized": "代碼格式無法辨識：需為 IGNI1 代碼或 64 個十六進位字元",
+  "fieldDefaultNamePrefix": "場域-{prefix}",
+  "@fieldDefaultNamePrefix": {
+    "placeholders": { "prefix": {"type": "String"} }
+  },
+  "fieldJoinedSnack": "已加入場域 {id}…",
+  "@fieldJoinedSnack": {
+    "placeholders": { "id": {"type": "String"} }
+  },
+  "fieldJoinFailed": "加入場域失敗：{error}",
+  "@fieldJoinFailed": {
+    "placeholders": { "error": {"type": "String"} }
+  },
+  "fieldLeaveTitle": "離開場域？",
+  "fieldLeaveBody": "即將離開「{name}」。此動作不可復原，將從本機刪除此場域的密鑰，需重新掃碼 / 輸入代碼才能再次加入。",
+  "@fieldLeaveBody": {
+    "placeholders": { "name": {"type": "String"} }
+  },
+  "fieldLeaveConfirm": "離開",
+  "fieldLeftSnack": "已離開場域",
+  "fieldLeaveFailed": "離開場域失敗：{error}",
+  "@fieldLeaveFailed": {
+    "placeholders": { "error": {"type": "String"} }
+  },
+  "fieldCreateTitle": "建立新場域",
+  "fieldNameLabel": "場域名稱",
+  "fieldNameHint": "例：台北車站避難所",
+  "fieldCreateConfirm": "建立",
+  "fieldDefaultName": "新場域",
+  "fieldErrEmpty": "代碼是空的",
+  "fieldErrBadPrefix": "這不是 IgniRelay 場域代碼（前綴不符）",
+  "fieldErrTooFewSegments": "代碼不完整",
+  "fieldErrBadSecret": "代碼的場域密鑰格式錯誤",
+  "fieldErrBadCloudUrl": "代碼的雲端網址無效（僅接受 https://）",
+  "fieldErrStaffWithoutCloud": "代碼格式錯誤：含 staff token 卻缺雲端網址",
+  "fieldErrMalformed": "代碼內容毀損，無法解析",
+
+  "fieldScanBack": "返回",
+  "fieldScanTitle": "掃描場域 QR",
+  "fieldScanHint": "對準主辦方的場域 QR 即可自動加入",
+  "fieldScanReject": "這不是 IgniRelay 場域 QR，請換一個",
+  "fieldScanNoCameraTitle": "無法開啟相機",
+  "fieldScanNoCameraBody": "請確認已授予相機權限，或改用「輸入代碼」加入場域。",
+
+  "fieldQrTitle": "場域 QR",
+  "fieldQrSubtitle": "讓對方掃描即可加入同一場域",
+  "fieldQrDebugWarning": "（debug）此代碼含場域密鑰，請勿外流：",
+  "fieldQrDone": "完成",
+
+  "previewModeSubtitle": "示範模式 · 不會送出任何資料",
+  "previewBadge": "示範資料",
+  "previewBack": "返回",
+  "previewPrev": "上一步",
+  "previewNext": "下一步",
+  "previewDemoChip": "示範",
+  "previewJoinIntro": "掃描主辦者的 QR 或輸入密鑰即可加入一個場域。場域決定你和誰互通——只有同一個場域的人，才看得到彼此。",
+  "previewSafetyTitle": "安全：被看見 + 求救",
+  "previewSafetyIntro": "加入後，App 會定期留下你的足跡，讓場域裡的人知道你還在、在哪附近。需要時可以長按發出 SOS。",
+  "previewSafetyFootprintTitle": "自動足跡（被看見）",
+  "previewSafetyFootprintBody": "靜止時省電、移動時更頻繁地留下足跡。不需要一直盯著手機，別人也能看到你最後的位置。",
+  "previewSafetySosTitle": "求救 SOS",
+  "previewSafetySosBody": "長按求救鍵，選擇紅色（受困）或黃色（受傷）。送出前有 5 秒可取消，避免誤觸。（示範不會真的送出）",
+  "previewPositionTitle": "位置：最後可信位置",
+  "previewPositionIntro": "看見附近成員「最後可信的位置」與相對方位。雷達固定北朝上，越靠近中心代表離你越近。（這裡顯示的是示範資料）",
+  "previewFootprintLine": "最後可信位置 · {ago}",
+  "@previewFootprintLine": {
+    "placeholders": { "ago": {"type": "String"} }
+  },
+  "previewEventsTitle": "事件：危害 / 廣播 / 打卡",
+  "previewEventsIntro": "場域裡的重要訊息會集中在事件：危害提醒、管理者廣播、平安打卡，讓你快速掌握現場狀況。",
+  "previewAssistTitle": "協助 + 離線也能用",
+  "previewAssistIntro": "需要或能提供協助時，可以在「協助」裡媒合。最重要的是——沒有網路時，App 仍透過近距離轉傳運作。",
+  "previewAssistMatchTitle": "協助媒合",
+  "previewAssistMatchBody": "提出需求或回應他人需求，讓資源在場域內就近流動。",
+  "previewAssistOfflineTitle": "離線降級",
+  "previewAssistOfflineBody": "沒有基地台或網路時，訊息會透過附近的裝置一手接一手傳遞；收訊恢復時自動補送，不會憑空捏造位置。",
+  "previewToneSos": "求救",
+  "previewToneWarn": "危害",
+  "previewToneInfo": "廣播",
+  "previewToneOk": "平安",
+  "previewToneNeutral": "事件",
+
+  "previewFieldLabel": "示範場域 · DEMO-FIELD",
+  "previewAlias": "化名 {alias}",
+  "@previewAlias": {
+    "placeholders": { "alias": {"type": "String"} }
+  },
+  "previewFpAgo1": "1 分鐘前",
+  "previewFpAgo4": "4 分鐘前",
+  "previewFpAgoTrapped": "受困 · 2 分鐘前",
+  "previewSosTitle": "求救 · 受困",
+  "previewSosAgo": "2 分鐘前",
+  "previewHazardTitle": "危害 · 火災 FIRE",
+  "previewHazardDetail": "sev 2 · 巷口濃煙",
+  "previewHazardAgo": "6 分鐘前",
+  "previewBroadcastTitle": "管理廣播",
+  "previewBroadcastDetail": "集合點改至北側出口",
+  "previewBroadcastAgo": "10 分鐘前",
+  "previewCheckpointTitle": "打卡 · 平安",
+  "previewCheckpointAgo": "12 分鐘前"
 }

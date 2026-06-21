@@ -22,8 +22,10 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:latlong2/latlong.dart';
 
-import 'package:ignirelay_app/app/proto/event_envelope_v2.dart' show SafetyState;
+import 'package:ignirelay_app/app/proto/event_envelope_v2.dart'
+    show SafetyState, LocationEvidence;
 import 'package:ignirelay_app/app/services/event_publisher_v2_facade.dart';
 import 'package:ignirelay_app/app/services/location_evidence_builder.dart';
 
@@ -53,25 +55,86 @@ class SosController extends ChangeNotifier {
     // main.dart to a ≤1500ms one-shot refresh that falls back to last-known.
     // Its failure NEVER aborts or delays the send beyond its own timeout
     // (SOS zero-delay red line); a null location is still sent.
-    Future<void> Function()? ensureFreshLocation,
+    //
+    // A11-debug-1-fix — the hook now RETURNS the fresh-or-last-known fix it
+    // resolved (was `Future<void>`, whose result was discarded). SOS builds its
+    // location evidence from THAT same fix, so the refresh and the attached
+    // coordinate can never diverge (the bug: refresh succeeded but the location
+    // was read from a separate, still-empty source).
+    Future<LatLng?> Function()? ensureFreshLocation,
+    // A11-debug-1-fix — last-resort OS last-known fix (wired to
+    // LocationService.lastKnownPosition). Consulted ONLY when the bounded
+    // refresh and the builder's own source both yield nothing, so a real
+    // (if stale) platform fix is still attached instead of sending no
+    // coordinate. NEVER fabricates a coordinate.
+    Future<LatLng?> Function()? lastKnownLocation,
   })  : _facade = facade,
         _locationBuilder = locationBuilder,
         _countdown = countdownDuration,
-        _ensureFreshLocation = ensureFreshLocation;
+        _ensureFreshLocation = ensureFreshLocation,
+        _lastKnownLocation = lastKnownLocation;
 
   final EventPublisherV2Facade _facade;
   final LocationEvidenceBuilder _locationBuilder;
   final Duration _countdown;
-  final Future<void> Function()? _ensureFreshLocation;
+  final Future<LatLng?> Function()? _ensureFreshLocation;
+  final Future<LatLng?> Function()? _lastKnownLocation;
 
-  Future<void> _ensureFresh() async {
+  /// Run the bounded fresh-fix hook (§4.2), returning the fresh-or-last-known
+  /// fix it resolved (null when no hook / it yielded nothing). NEVER throws and
+  /// never blocks past the hook's own timeout — a refresh failure must not
+  /// abort/delay the SOS (zero-delay red line).
+  Future<LatLng?> _ensureFresh() async {
     final f = _ensureFreshLocation;
-    if (f == null) return;
+    if (f == null) return null;
     try {
-      await f();
+      return await f();
     } catch (_) {
       // Best-effort: a refresh failure must never block/abort the SOS send.
+      return null;
     }
+  }
+
+  /// Resolve the best REAL location for an SOS / SAFE and turn it into wire
+  /// evidence. Order (most→least preferred, all REAL fixes):
+  ///   1. the bounded fresh-or-last-known fix the [_ensureFreshLocation] hook
+  ///      resolved (§4.2 — one bounded fix, falls back to last-known);
+  ///   2. the builder's own source (the same LocationService.currentLocation in
+  ///      production; the injected source under test);
+  ///   3. the OS last-known fix ([_lastKnownLocation]) — the cheap, possibly
+  ///      stale platform fix the bounded high-accuracy refresh may have skipped.
+  /// Returns null when NO real fix exists anywhere; the SOS/SAFE still sends
+  /// (zero-delay) but never with a fabricated coordinate (Owner red line).
+  Future<LocationEvidence?> _resolveSendLocation() async {
+    final fresh = await _ensureFresh();
+    if (fresh != null) {
+      return _locationBuilder.buildFromDegrees(
+        latDegrees: fresh.latitude,
+        lngDegrees: fresh.longitude,
+      );
+    }
+    final fromBuilder = _locationBuilder.build();
+    if (fromBuilder != null) return fromBuilder;
+    final lastKnown = _lastKnownLocation;
+    if (lastKnown != null) {
+      // The last-resort seam must NEVER abort the SOS (zero-delay red line):
+      // a throwing injected / alternate implementation is treated as "no fix".
+      // (The default LocationService.lastKnownPosition already swallows errors,
+      // but the seam contract cannot rely on that.)
+      LatLng? ll;
+      try {
+        ll = await lastKnown();
+      } catch (_) {
+        ll = null;
+      }
+      if (ll != null) {
+        return _locationBuilder.buildFromDegrees(
+          latDegrees: ll.latitude,
+          lngDegrees: ll.longitude,
+        );
+      }
+    }
+    return null;
   }
 
   Timer? _tickTimer;
@@ -142,11 +205,13 @@ class SosController extends ChangeNotifier {
     if (severity == null) return;
     _phase = SosPhase.sending;
     notifyListeners();
-    await _ensureFresh(); // §4.2: one bounded fresh fix, fall back to last-known
+    // §4.2: one bounded fresh fix → builder source → OS last-known; null when no
+    // real fix exists (still sent — zero-delay; never a fabricated coordinate).
+    final location = await _resolveSendLocation();
     try {
       final outcome = await _facade.publishStatusUpdate(
         safetyState: severity.safetyState,
-        location: _locationBuilder.build(), // null when no GPS — still sent
+        location: location,
       );
       _activeSeverity = severity;
       _lastOutcome = outcome;
@@ -163,10 +228,12 @@ class SosController extends ChangeNotifier {
   /// armed state).
   Future<BroadcastOutcome?> markSafe() async {
     _cancelTimers();
-    await _ensureFresh(); // §4.2: one bounded fresh fix, fall back to last-known
+    // Same resolution as _send (§4.2): fresh → builder → OS last-known; null
+    // when no real fix (still sent — never a fabricated coordinate).
+    final location = await _resolveSendLocation();
     final outcome = await _facade.publishStatusUpdate(
       safetyState: SafetyState.safe,
-      location: _locationBuilder.build(),
+      location: location,
     );
     _activeSeverity = null;
     _armedSeverity = null;

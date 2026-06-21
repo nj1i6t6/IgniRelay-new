@@ -66,7 +66,8 @@ void main() {
 
   Future<({SosController sos, EventPublisherV2Facade facade})> makeSos({
     Duration countdown = const Duration(milliseconds: 40),
-    Future<void> Function()? ensureFreshLocation,
+    Future<LatLng?> Function()? ensureFreshLocation,
+    Future<LatLng?> Function()? lastKnownLocation,
     LatLng? Function()? currentLocation,
   }) async {
     final registry = PeerCapabilityRegistry(
@@ -83,6 +84,7 @@ void main() {
           : LocationEvidenceBuilder(currentLocation: currentLocation),
       countdownDuration: countdown,
       ensureFreshLocation: ensureFreshLocation,
+      lastKnownLocation: lastKnownLocation,
     );
     addTearDown(() async {
       sos.dispose();
@@ -170,7 +172,10 @@ void main() {
       () async {
     final order = <String>[];
     final h = await makeSos(
-      ensureFreshLocation: () async => order.add('refresh'),
+      ensureFreshLocation: () async {
+        order.add('refresh');
+        return null;
+      },
       currentLocation: () {
         order.add('build');
         return null;
@@ -200,11 +205,136 @@ void main() {
 
   test('markSafe also requests one bounded fresh fix before SAFE', () async {
     var refreshCalls = 0;
-    final h = await makeSos(ensureFreshLocation: () async => refreshCalls++);
+    final h = await makeSos(ensureFreshLocation: () async {
+      refreshCalls++;
+      return null;
+    });
     h.sos.arm(SosSeverity.trapped);
     await Future<void>.delayed(const Duration(milliseconds: 220));
     final afterSend = refreshCalls; // _send called the hook once
     await h.sos.markSafe();
     expect(refreshCalls, afterSend + 1, reason: 'markSafe refreshes too');
+  });
+
+  // ── A11-debug-1-fix — SOS / SAFE attach a REAL coordinate when one exists ──
+  // The 無座標-on-receiver bug: the refresh hook's resolved fix was discarded
+  // and the bounded refresh never consulted the OS last-known. These lock in
+  // the "use whatever real fix exists; never fabricate" contract.
+
+  test('SOS attaches the fresh fix the refresh resolved (lat/lng correct)',
+      () async {
+    final h = await makeSos(
+      // The bounded refresh resolves a real fix; the SOS must build evidence
+      // from THAT fix (was discarded → location read from an empty source).
+      ensureFreshLocation: () async => const LatLng(22.64131, 120.30958),
+    );
+    h.sos.arm(SosSeverity.trapped);
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    expect(h.sos.phase, SosPhase.sent);
+    final loc =
+        StatusUpdateData.decode((await outbox()).single['payload'] as Uint8List)
+            .location;
+    expect(loc, isNotNull, reason: 'a resolved fix must ride the SOS');
+    expect(loc!.latDegrees, closeTo(22.64131, 1e-5));
+    expect(loc.lngDegrees, closeTo(120.30958, 1e-5));
+  });
+
+  test('SOS with no fix anywhere still publishes, location == null (no fake)',
+      () async {
+    // noGps builder + no refresh hook + no OS last-known → honest null.
+    final h = await makeSos();
+    h.sos.arm(SosSeverity.trapped);
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    expect(h.sos.phase, SosPhase.sent);
+    expect(
+      StatusUpdateData.decode((await outbox()).single['payload'] as Uint8List)
+          .location,
+      isNull,
+    );
+  });
+
+  test('markSafe attaches a real fix when one exists', () async {
+    final h = await makeSos(
+      ensureFreshLocation: () async => const LatLng(22.0, 120.0),
+    );
+    h.sos.arm(SosSeverity.trapped);
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    await h.sos.markSafe();
+    final safe =
+        StatusUpdateData.decode((await outbox()).last['payload'] as Uint8List);
+    expect(safe.safetyState, SafetyState.safe);
+    expect(safe.location, isNotNull);
+    expect(safe.location!.latDegrees, closeTo(22.0, 1e-5));
+  });
+
+  test('refresh fails but builder last-known exists → uses last-known',
+      () async {
+    // The bounded refresh throws; the builder still has a (last-known) fix.
+    final h = await makeSos(
+      ensureFreshLocation: () async => throw Exception('refresh boom'),
+      currentLocation: () => const LatLng(25.03, 121.56),
+    );
+    h.sos.arm(SosSeverity.injured);
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    expect(h.sos.phase, SosPhase.sent);
+    final loc =
+        StatusUpdateData.decode((await outbox()).single['payload'] as Uint8List)
+            .location;
+    expect(loc, isNotNull, reason: 'last-known used when refresh fails');
+    expect(loc!.latDegrees, closeTo(25.03, 1e-5));
+  });
+
+  test('refresh + builder empty but OS last-known exists → uses OS last-known',
+      () async {
+    // Device case: bounded refresh yields nothing, in-app source empty, but the
+    // OS still holds an older fix. The SOS must attach THAT real coordinate.
+    final h = await makeSos(
+      ensureFreshLocation: () async => null,
+      lastKnownLocation: () async => const LatLng(24.5, 118.2),
+    );
+    h.sos.arm(SosSeverity.trapped);
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    final loc =
+        StatusUpdateData.decode((await outbox()).single['payload'] as Uint8List)
+            .location;
+    expect(loc, isNotNull, reason: 'OS last-known used as last resort');
+    expect(loc!.latDegrees, closeTo(24.5, 1e-5));
+    expect(loc.lngDegrees, closeTo(118.2, 1e-5));
+  });
+
+  test('refresh + builder + OS last-known all empty → null, never throws',
+      () async {
+    final h = await makeSos(
+      ensureFreshLocation: () async => null,
+      lastKnownLocation: () async => null,
+    );
+    h.sos.arm(SosSeverity.trapped);
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    expect(h.sos.phase, SosPhase.sent, reason: 'no fix must not abort the SOS');
+    expect(
+      StatusUpdateData.decode((await outbox()).single['payload'] as Uint8List)
+          .location,
+      isNull,
+    );
+  });
+
+  test('a throwing OS last-known seam is treated as null, never aborts the SOS',
+      () async {
+    // A11-debug-1-fix-polish — zero-delay red line: even the last-resort seam
+    // must not abort the send if it throws (the default impl swallows, but an
+    // injected / alternate seam might not).
+    final h = await makeSos(
+      ensureFreshLocation: () async => null,
+      lastKnownLocation: () async => throw Exception('last-known boom'),
+    );
+    h.sos.arm(SosSeverity.trapped);
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    expect(h.sos.phase, SosPhase.sent,
+        reason: 'a throwing last-known seam must not abort the SOS');
+    expect(
+      StatusUpdateData.decode((await outbox()).single['payload'] as Uint8List)
+          .location,
+      isNull,
+    );
   });
 }

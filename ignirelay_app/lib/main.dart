@@ -554,12 +554,18 @@ class _IgniRelayAppState extends State<IgniRelayApp>
             ),
             // UI-F5b §4.2: one bounded fresh fix (≤1500ms) before send, last-known
             // fallback. GPS failure NEVER aborts/delays the SOS (zero-delay).
-            ensureFreshLocation: () async {
-              await context
-                  .read<LocationRefreshCoordinator>()
-                  .ensureFreshForManualEvent(
-                      timeout: const Duration(milliseconds: 1500));
-            },
+            // A11-debug-1-fix: RETURN the resolved fresh-or-last-known fix so the
+            // SOS builds its location from the same fix the refresh produced.
+            ensureFreshLocation: () => context
+                .read<LocationRefreshCoordinator>()
+                .ensureFreshForManualEvent(
+                    timeout: const Duration(milliseconds: 1500)),
+            // A11-debug-1-fix: last-resort OS last-known fix (cheap, possibly
+            // stale) for when the bounded refresh times out but the platform
+            // still holds an older fix — attach THAT real coordinate rather than
+            // sending none. Never fabricates a coordinate.
+            lastKnownLocation: () =>
+                context.read<LocationService>().lastKnownPosition(),
           ),
         ),
         // #4-7 (A5) — active-field source. Long-lived module-level instance

@@ -206,6 +206,25 @@ class LocationService {
     }
   }
 
+  /// The OS's cached last-known position — a cheap, possibly-stale fix that is
+  /// returned instantly without a high-accuracy acquisition. Used as the
+  /// SOS / SAFE last-resort (A11-debug-1-fix): when the bounded in-app
+  /// [refreshOnce] yields nothing but the platform still holds an older fix,
+  /// SOS attaches THAT real coordinate rather than sending none. NEVER throws.
+  ///
+  /// Deliberately does NOT adopt the fix as [currentLocation] / does not touch
+  /// [lastFixAt], so the §4.2 fix-age diagnostic stays honest (an old fix must
+  /// not masquerade as fresh). Callers use it only to attach real evidence —
+  /// never to fabricate a coordinate (Owner no-fake-coordinate rule).
+  Future<LatLng?> lastKnownPosition() async {
+    try {
+      return await getLastKnownFn();
+    } catch (e) {
+      debugPrint('[LocationService] lastKnownPosition 失敗: $e');
+      return null;
+    }
+  }
+
   /// 計算兩點間 Haversine 距離 (公尺)
   static double haversineMeters(LatLng a, LatLng b) {
     const R = 6371000.0;

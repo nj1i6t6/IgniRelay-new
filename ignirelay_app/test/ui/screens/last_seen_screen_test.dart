@@ -529,6 +529,40 @@ void main() {
         reason: 'eventId dedup ignores the duplicate regardless of payload');
   });
 
+  testWidgets(
+      'backfill > _maxObsPerSubject keeps the NEWEST fix (oldest-first replay)',
+      (tester) async {
+    // A11-debug-4-polish: backfill is returned newest-first; _cap() trims the
+    // list FRONT. If replayed in that order the freshest fix would be capped
+    // away. 13 observations (> the 12 cap) for one anon — the newest carries a
+    // distinctive coordinate that must survive and be displayed. (CHECKPOINT
+    // shares this `_byAnon` / `_cap` path.)
+    final now = DateTime(2026, 6, 15, 12, 0, 0);
+    final obs = <PresenceUpdate>[
+      // Newest-first, as queryByType (hlc_timestamp DESC) would return them.
+      for (var i = 12; i >= 0; i--)
+        PresenceUpdate(
+          eventId: 'cap-$i',
+          anon8: 'cap00001',
+          source: 1,
+          lat: 25.0 + i * 0.00001, // i=12 → 25.00012 (newest, distinctive)
+          lng: 121.0,
+          observedAt: now.subtract(Duration(minutes: 13 - i)), // i=12 → now-1m
+        ),
+    ];
+    await tester.pumpWidget(screen(
+      now: () => now,
+      presenceBackfill: () async => obs,
+    ));
+    await tester.pump();
+    await tester.pump();
+
+    // The freshest fix (i=12 → 25.00012) survives the cap and is shown; the
+    // next-newest (25.00011) would only show if the newest had been dropped.
+    expect(find.textContaining('25.00012'), findsOneWidget);
+    expect(find.textContaining('25.00011'), findsNothing);
+  });
+
   // ── UI-H3 — large-text / text-scale stress ─────────────────────────────────
   // The estimate card crams a mono label + an SOS chip + a confidence chip into
   // one Row, plus an age/uncertainty meta Row and the 列表/雷達 toggle — all

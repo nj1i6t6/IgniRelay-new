@@ -184,14 +184,25 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
   /// Best-effort: a backfill failure leaves the live streams working.
   Future<void> _hydrate() async {
     try {
+      // Backfill arrives newest-first (queryByType orders hlc_timestamp DESC),
+      // but _cap() trims each subject's observation list from the FRONT — which
+      // for live events (appended oldest→newest) drops the oldest. Replay the
+      // backfill oldest→newest too, else a subject with > _maxObsPerSubject rows
+      // would have its FRESHEST fix capped away (A11-debug-4-polish). Sort by
+      // observedAt (the authoritative observation time) rather than relying on
+      // the DESC row order, which is keyed on hlc_timestamp.
       final presence = await _presenceBackfill();
       if (!mounted) return;
-      for (final p in presence) {
+      final orderedPresence = [...presence]
+        ..sort((a, b) => a.observedAt.compareTo(b.observedAt));
+      for (final p in orderedPresence) {
         _onPresence(p);
       }
       final checkpoints = await _checkpointBackfill();
       if (!mounted) return;
-      for (final c in checkpoints) {
+      final orderedCheckpoints = [...checkpoints]
+        ..sort((a, b) => a.observedAt.compareTo(b.observedAt));
+      for (final c in orderedCheckpoints) {
         _onCheckpoint(c);
       }
       final sos = await _sosBackfill();

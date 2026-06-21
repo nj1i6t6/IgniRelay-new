@@ -14,10 +14,12 @@ import 'package:ignirelay_app/app/services/hazard_type_codec.dart';
 /// Phase 0b #3B-2: the old-product send surface (supply / request / chat /
 /// match-negotiation / location / cancel / expireStaleMatches) was removed
 /// from both [EventManager] and this facade. What remains are the two
-/// whitepaper-aligned publish paths: SOS/求援 (`publishEvent`, dual-written as
-/// a v2 STATUS_UPDATE) and HAZARD_MARKER (`publishHazard`, dual-written as a v2
-/// hazard payload), plus the read-only hazard query/CRUD forwarders. Chat is
-/// no longer dual-written here — `ChatService` talks to the v2 facade directly.
+/// whitepaper-aligned publish paths: SOS/求援 (`publishEvent`, still dual-written
+/// as a v2 STATUS_UPDATE) and HAZARD_MARKER (`publishHazard`, **v2-only since
+/// A11-debug-2-fix** — the v1 legacy dual-write was removed because the receiver
+/// landed both copies as two `Event_Logs` rows, i.e. the duplicate HAZARD bug),
+/// plus the read-only hazard query/CRUD forwarders. Chat is no longer
+/// dual-written here — `ChatService` talks to the v2 facade directly.
 ///
 /// IMPORTANT for tests: `v2Facade` is optional. Harnesses that construct
 /// `EventPublisher(eventManager: EventManager())` keep working (they simply
@@ -80,6 +82,24 @@ class EventPublisher {
     return id;
   }
 
+  /// Publish a HAZARD_MARKER. **v2-only** (A11-debug-2-fix): the legacy v1
+  /// dual-write (`EventManager.publishHazard`) is removed — it made the receiver
+  /// land BOTH a v1 and a v2 copy as two `Event_Logs` rows with different
+  /// event_ids, i.e. the "duplicate HAZARD after restart" the A11 device test
+  /// hit. HAZARD now rides the v0.3 envelope only; the `V2InboundProjector`
+  /// covers receiver display. NO wire/proto/canonical change — this only stops
+  /// EMITTING the legacy copy.
+  ///
+  /// Intentional consequences (recorded in STATUS — A11-debug-2-fix):
+  ///   • HAZARD is no longer delivered to v1-only peers (part of the v2 migration).
+  ///   • The sender no longer writes a LOCAL read-model row for its own hazard
+  ///     (the v1 path did that); a self-sent event is not self-listed — same as
+  ///     SOS, which has never round-tripped through the local read-model.
+  ///   • No `EventManager` rate-limit, and [radiusMeters] is no longer persisted
+  ///     (both lived on the v1 path; the v2 payload carries no radius — reserved
+  ///     tag). [radiusMeters] is kept for API compatibility but ignored.
+  /// The returned String is a UI-only correlation handle (debug snackbar); the
+  /// real envelope id is owned by the v2 facade.
   Future<String> publishHazard({
     required String type,
     required int severity,
@@ -88,19 +108,16 @@ class EventPublisher {
     double radiusMeters = 200.0,
     String description = '',
   }) async {
-    final id = await _em.publishHazard(
-      type: type, severity: severity, lat: lat, lng: lng,
-      radiusMeters: radiusMeters, description: description,
-    );
-    _dualWriteHazardMarker(
+    _publishHazardMarkerV2(
       type: type,
       severity: severity,
       lat: lat,
       lng: lng,
-      radiusMeters: radiusMeters,
       description: description,
     );
-    return id;
+    // UI-only correlation handle: HAZARD is v2-only, so there is no v1 event id
+    // to return; the real envelope id is owned by the v2 facade.
+    return 'hz-${DateTime.now().microsecondsSinceEpoch.toRadixString(16)}';
   }
 
   Future<List<Map<String, dynamic>>> getActiveHazards() =>
@@ -156,20 +173,20 @@ class EventPublisher {
     }));
   }
 
-  void _dualWriteHazardMarker({
+  void _publishHazardMarkerV2({
     required String type,
     required int severity,
     required double lat,
     required double lng,
-    required double radiusMeters,
     required String description,
   }) {
     final v2 = _v2;
     if (v2 == null) return;
-    // #4-5: typed HazardMarkerData payload (the JSON shim is gone). The legacy
-    // `type` STRING maps to the wire `HazardType` enum via HazardTypeCodec;
-    // lat/lng become a LocationEvidence (the typed payload carries no radius —
-    // radiusMeters stays on the v1 read-model path only).
+    // #4-5: typed HazardMarkerData payload. The legacy `type` STRING maps to the
+    // wire `HazardType` enum via HazardTypeCodec; lat/lng become a
+    // LocationEvidence. The typed payload carries no radius (reserved tag); since
+    // A11-debug-2-fix removed the v1 read-model path, radius is no longer
+    // persisted anywhere (acceptable — the mapless HAZARD UI never shows radius).
     final fut = v2.publishHazardMarker(
       hazardType: HazardTypeCodec.fromV1String(type),
       severity: severity,

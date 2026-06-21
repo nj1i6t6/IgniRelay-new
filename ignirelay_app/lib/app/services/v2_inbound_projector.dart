@@ -34,11 +34,16 @@
 //
 // MIGRATION NOTE — DOUBLE DISPLAY DURING DUAL-WRITE
 //
-// The four v2-eligible types are still DUAL-WRITTEN on the legacy v1 wire (see
-// EventPublisher). While dual-write is on, a received event arrives on BOTH
-// wires with DIFFERENT ids, so it will surface twice. Disabling the per-type v1
-// dual-write (the migration step) removes the duplicate. This projector is the
-// prerequisite that makes such a per-type v2-only migration safe.
+// While a v2-eligible type is DUAL-WRITTEN on the legacy v1 wire (see
+// EventPublisher), a received event arrives on BOTH wires with DIFFERENT ids,
+// so it surfaces twice. Disabling the per-type v1 dual-write (the migration
+// step) removes the duplicate; this projector is the prerequisite that makes
+// such a per-type v2-only migration safe.
+//
+// HAZARD_MARKER: its v1 dual-write was REMOVED in A11-debug-2-fix (it was the
+// "duplicate HAZARD after restart" source). HAZARD is now v2-only, and this
+// projector is its SOLE receiver-side path into the v1 `Event_Logs` read-model.
+// SOS-class STATUS_UPDATE (via EventPublisher.publishEvent) is still dual-written.
 
 import 'dart:async';
 import 'dart:convert';

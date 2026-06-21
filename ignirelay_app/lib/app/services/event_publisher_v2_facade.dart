@@ -106,7 +106,10 @@
 //       lives inside publishStatusUpdate so all callers go through ONE
 //       priority-derivation path. publishSosStatus is now a thin
 //       priority-hinted wrapper for direct callers that already know.)
-//     - EventPublisher.publishHazard             → publishHazardMarker
+//   (EventPublisher.publishHazard → publishHazardMarker was a dual-write entry
+//    until A11-debug-2-fix; HAZARD is now v2-ONLY — the legacy v1 publish was
+//    removed because the receiver landed both copies as duplicate Event_Logs
+//    rows. HAZARD_MARKER still rides this facade via publishHazardMarker.)
 //
 //   Still on legacy path only (NOT 0d-eligible; legacy EventPublisher → v0.2):
 //     - SUPPLY_REQUEST / SUPPLY_OFFER       (existing match/supply flow)

@@ -55,8 +55,9 @@ void main() {
     expect(spy.statusCalls.single.safetyState, SafetyState.injured);
   });
 
-  test('publishHazard keeps legacy write and dual-writes hazard payload',
-      () async {
+  test(
+      'publishHazard is v2-only — NO legacy v1 write, only the v2 facade '
+      '(A11-debug-2-fix)', () async {
     final spy = _SpyEventPublisherV2Facade();
     addTearDown(spy.dispose);
     final publisher = EventPublisher(
@@ -64,7 +65,7 @@ void main() {
       v2Facade: spy,
     );
 
-    final hazardId = await publisher.publishHazard(
+    final handle = await publisher.publishHazard(
       type: 'FIRE',
       severity: 3,
       lat: 25.03,
@@ -72,19 +73,24 @@ void main() {
       radiusMeters: 180,
       description: 'smoke seen',
     );
+    expect(handle, isNotEmpty, reason: 'a UI correlation handle is returned');
 
+    // STRENGTHENED (was: assert a legacy Hazards_State row exists). The v1 path
+    // is gone, so NO local read-model row is written — this is precisely what
+    // stops the receiver-side duplicate AT SOURCE: there is no v1 copy to also
+    // land as a second Event_Logs row with a different event_id.
     final db = await DatabaseHelper().database;
-    final hazardRows = await db.query(
-      'Hazards_State',
-      where: 'hazard_id = ?',
-      whereArgs: [hazardId],
-    );
-    expect(hazardRows.length, 1);
-    expect(hazardRows.first['type'], 'FIRE');
+    final hazardRows = await db.query('Hazards_State');
+    expect(hazardRows, isEmpty,
+        reason: 'v1 dual-write removed → no legacy Hazards_State row');
+    final eventRows = await db.query('Event_Logs',
+        where: 'event_type = ?', whereArgs: [EventType.hazardMarker]);
+    expect(eventRows, isEmpty,
+        reason: 'v1 dual-write removed → no legacy Event_Logs hazard row');
 
-    // #4-5: the v2 dual-write now hands the facade STRUCTURED args (typed
-    // HazardMarkerData), not a JSON shim. The legacy 'FIRE' string maps to the
-    // wire HazardType enum; lat/lng become a LocationEvidence.
+    // The v2 facade still receives the STRUCTURED HazardMarkerData (unchanged):
+    // the legacy 'FIRE' string maps to the wire HazardType enum; lat/lng become
+    // a LocationEvidence.
     expect(spy.hazardCalls.length, 1);
     final call = spy.hazardCalls.single;
     expect(call.hazardType, HazardType.fire);

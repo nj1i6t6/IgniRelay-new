@@ -211,4 +211,97 @@ void main() {
       await tester.pump();
     }
   });
+
+  // ── A11-live-fix — receiver mount backfill ─────────────────────────────────
+  // A SOS that landed in the read-model while this page was NOT in the
+  // foreground must show when the page is (re)opened. Live broadcast streams do
+  // not replay, so the fix hydrates from recentSos()/recentSosResolutions() on
+  // mount. Confirmed on real devices (2026-06-21 A11 live test): with the SOS
+  // page open the alert showed; navigating away+back showed 附近求救（0） while
+  // the row was still in Event_Logs — this guards that regression.
+  Widget wrapBackfill(
+    SosController sos, {
+    List<SosAlert> alerts = const [],
+    List<SosResolved> resolutions = const [],
+  }) =>
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SosController>.value(value: sos),
+        ],
+        child: MaterialApp(
+          locale: const Locale('zh'),
+          supportedLocales: S.supportedLocales,
+          localizationsDelegates: S.localizationsDelegates,
+          home: SosScreen(
+            alertSource: const Stream<SosAlert>.empty(),
+            resolvedSource: const Stream<SosResolved>.empty(),
+            alertBackfill: () async => alerts,
+            resolvedBackfill: () async => resolutions,
+          ),
+        ),
+      );
+
+  // sender_pub_key 0xAB 0xCD 0x12 0x34 → hex 'abcd1234' (matches SosResolved).
+  final author = Uint8List.fromList([0xAB, 0xCD, 0x12, 0x34]);
+  SosAlert sosAt(DateTime t, {String eventId = 'sos-1'}) => SosAlert(
+        eventId: eventId,
+        urgency: 3, // TRAPPED → 受困
+        description: '',
+        lat: 25.0339805,
+        lng: 121.5654177,
+        senderPubKey: author,
+        timestamp: t,
+      );
+
+  testWidgets('mount backfill shows a SOS already in the read-model',
+      (tester) async {
+    final h = await harness(countdown: const Duration(seconds: 5));
+    await tester.pumpWidget(wrapBackfill(
+      h.sos,
+      alerts: [sosAt(DateTime(2026, 6, 21, 23, 24))],
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('附近求救（1）'), findsOneWidget);
+    expect(find.textContaining('目前沒有收到求救訊號'), findsNothing);
+    expect(find.text('受困'), findsWidgets); // alert chip (+ maybe title)
+    expect(find.textContaining('25.03398'), findsOneWidget); // received coords
+  });
+
+  testWidgets('backfill: SAFE after SOS (same author) → 已解除', (tester) async {
+    final h = await harness(countdown: const Duration(seconds: 5));
+    await tester.pumpWidget(wrapBackfill(
+      h.sos,
+      alerts: [sosAt(DateTime(2026, 6, 21, 23, 24))],
+      resolutions: [
+        SosResolved(
+          authorKeyHex: 'abcd1234',
+          timestamp: DateTime(2026, 6, 21, 23, 26), // later than the SOS
+        ),
+      ],
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('附近求救（1）'), findsOneWidget);
+    expect(find.text('已解除'), findsOneWidget);
+  });
+
+  testWidgets('backfill: SOS after SAFE (same author) → still active',
+      (tester) async {
+    final h = await harness(countdown: const Duration(seconds: 5));
+    await tester.pumpWidget(wrapBackfill(
+      h.sos,
+      alerts: [sosAt(DateTime(2026, 6, 21, 23, 26))], // later than the SAFE
+      resolutions: [
+        SosResolved(
+          authorKeyHex: 'abcd1234',
+          timestamp: DateTime(2026, 6, 21, 23, 24),
+        ),
+      ],
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('附近求救（1）'), findsOneWidget);
+    expect(find.text('已解除'), findsNothing); // newer SOS un-resolves
+  });
 }

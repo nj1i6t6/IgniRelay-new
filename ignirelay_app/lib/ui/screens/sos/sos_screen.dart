@@ -21,10 +21,34 @@ import 'package:ignirelay_app/ui/widgets/mono_text.dart';
 /// 帶位置發送→「我安全了」解除。收方：`sosAlerts` 告警卡（含位置、相對時間），
 /// 收到同 author 的 SAFE（`sosResolutions`）即標「已解除」。
 ///
+/// 收方在 mount 時先從 read-model 回填已落地的求救（`recentSos` /
+/// `recentSosResolutions`，A11-live-fix），再接 live 串流——否則本頁不在前景時
+/// 收到的 SOS（broadcast 串流不重播）會在切回本頁時「消失」。對齊
+/// [LastSeenScreen] 的 mount-backfill 模式（A11-debug-4-fix）。
+///
 /// 守 DESIGN_LANGUAGE §4：經 `context.igni` 與 Igni 元件取值，screen 內不寫死
 /// Material 調色常數。
 class SosScreen extends StatefulWidget {
-  const SosScreen({super.key});
+  const SosScreen({
+    super.key,
+    this.alertSource,
+    this.resolvedSource,
+    this.alertBackfill,
+    this.resolvedBackfill,
+  });
+
+  /// Test seams — override the typed `EventStream` receiver streams. Default to
+  /// the DI'd `EventStream` (`sosAlerts` / `sosResolutions`).
+  final Stream<SosAlert>? alertSource;
+  final Stream<SosResolved>? resolvedSource;
+
+  /// Mount-backfill seams (A11-live-fix). When omitted they default to the DI'd
+  /// `EventStream` read-model queries (`recentSos` / `recentSosResolutions`).
+  /// They feed the SAME handlers as the live streams (eventId dedup +
+  /// author-LWW), so a SOS that landed while this page was NOT in the foreground
+  /// is shown on mount instead of being invisible until the next live event.
+  final Future<List<SosAlert>> Function()? alertBackfill;
+  final Future<List<SosResolved>> Function()? resolvedBackfill;
 
   @override
   State<SosScreen> createState() => _SosScreenState();
@@ -32,32 +56,96 @@ class SosScreen extends StatefulWidget {
 
 class _SosScreenState extends State<SosScreen> {
   late final SosController _sos = context.read<SosController>();
-  late final EventStream _events = context.read<EventStream>();
 
   StreamSubscription<SosAlert>? _alertSub;
   StreamSubscription<SosResolved>? _resolvedSub;
+
+  /// Mount-backfill loaders (A11-live-fix), resolved once in [initState] from
+  /// the widget seam or the DI'd `EventStream`.
+  late final Future<List<SosAlert>> Function() _alertBackfill;
+  late final Future<List<SosResolved>> Function() _resolvedBackfill;
 
   // Latest incoming SOS per author (sender_pub_key hex); plus the authors who
   // have since reported SAFE so the card shows 已解除.
   final Map<String, SosAlert> _alerts = <String, SosAlert>{};
   final Set<String> _resolved = <String>{};
 
+  /// eventId dedup so a row arriving via BOTH the mount backfill and the live
+  /// stream is applied once (A11-live-fix). SAFE resolutions are an idempotent
+  /// set-add keyed by author and need no dedup.
+  final Set<String> _seenSos = <String>{};
+
   @override
   void initState() {
     super.initState();
-    _alertSub = _events.sosAlerts.listen((a) {
+    // Only reach for the DI'd EventStream when a stream OR backfill seam is not
+    // injected (tests inject all four and never touch the EventStream provider).
+    final needEvents = widget.alertSource == null ||
+        widget.resolvedSource == null ||
+        widget.alertBackfill == null ||
+        widget.resolvedBackfill == null;
+    final events = needEvents ? context.read<EventStream>() : null;
+    _alertSub = (widget.alertSource ?? events!.sosAlerts).listen(_onAlert);
+    _resolvedSub =
+        (widget.resolvedSource ?? events!.sosResolutions).listen(_onResolved);
+    _alertBackfill = widget.alertBackfill ?? () => events!.recentSos();
+    _resolvedBackfill =
+        widget.resolvedBackfill ?? () => events!.recentSosResolutions();
+    unawaited(_hydrate());
+  }
+
+  /// One-shot mount backfill from the read-model (A11-live-fix). Feeds rows
+  /// through the SAME handlers as the live streams so the dedup / author-LWW
+  /// rules are defined once. SOS alerts and SAFE resolutions are merged into a
+  /// single timestamp-ordered timeline and replayed oldest→newest, so author-LWW
+  /// converges identically to live arrival order:
+  ///   • old SOS + later SAFE → 標已解除
+  ///   • old SAFE + later SOS → 顯示求救中
+  /// Best-effort: a backfill failure leaves the live streams working.
+  Future<void> _hydrate() async {
+    try {
+      final alerts = await _alertBackfill();
+      final resolutions = await _resolvedBackfill();
       if (!mounted) return;
-      final key = _authorKey(a);
-      setState(() {
+      final timeline = <_SosTimelineEvent>[
+        for (final a in alerts) _SosTimelineEvent(a.timestamp, alert: a),
+        for (final r in resolutions) _SosTimelineEvent(r.timestamp, resolved: r),
+      ]..sort(_SosTimelineEvent.compare);
+      for (final e in timeline) {
+        final alert = e.alert;
+        final resolved = e.resolved;
+        if (alert != null) {
+          _onAlert(alert);
+        } else if (resolved != null) {
+          _onResolved(resolved);
+        }
+      }
+    } catch (_) {
+      // Backfill is best-effort; the live streams still populate the view.
+    }
+  }
+
+  /// Apply one incoming SOS alert (shared by the live stream and mount backfill).
+  /// Keyed by author so re-arrivals collapse; keeps the NEWEST alert per author
+  /// (so an out-of-order backfill row can't clobber a fresher live one). A fresh
+  /// SOS un-resolves its author.
+  void _onAlert(SosAlert a) {
+    if (!mounted) return;
+    if (a.eventId.isNotEmpty && !_seenSos.add(a.eventId)) return;
+    final key = _authorKey(a);
+    setState(() {
+      final existing = _alerts[key];
+      if (existing == null || !a.timestamp.isBefore(existing.timestamp)) {
         _alerts[key] = a;
-        _resolved.remove(key); // a fresh SOS un-resolves the author
-      });
+      }
+      _resolved.remove(key); // a fresh SOS un-resolves the author
     });
-    _resolvedSub = _events.sosResolutions.listen((r) {
-      if (!mounted) return;
-      if (r.authorKeyHex.isEmpty) return;
-      setState(() => _resolved.add(r.authorKeyHex));
-    });
+  }
+
+  /// Apply one SAFE resolution (shared by the live stream and mount backfill).
+  void _onResolved(SosResolved r) {
+    if (!mounted || r.authorKeyHex.isEmpty) return;
+    setState(() => _resolved.add(r.authorKeyHex));
   }
 
   @override
@@ -374,5 +462,21 @@ class _SosScreenState extends State<SosScreen> {
     if (d.inMinutes < 60) return l.timeAgoMinutes(d.inMinutes);
     if (d.inHours < 24) return l.timeAgoHours(d.inHours);
     return l.timeAgoDays(d.inDays);
+  }
+}
+
+/// One entry on the mount-backfill replay timeline — either an SOS alert or a
+/// SAFE resolution. Sorted oldest→newest so author-LWW converges the same way
+/// live arrival order does; a SAFE at the SAME instant as its SOS (tie) sorts
+/// AFTER the alert so it resolves it (mirrors [LastSeenScreen]'s `_SosEvent`).
+class _SosTimelineEvent {
+  _SosTimelineEvent(this.ts, {this.alert, this.resolved});
+  final DateTime ts;
+  final SosAlert? alert;
+  final SosResolved? resolved;
+  int get _kind => resolved != null ? 1 : 0;
+  static int compare(_SosTimelineEvent a, _SosTimelineEvent b) {
+    final c = a.ts.compareTo(b.ts);
+    return c != 0 ? c : a._kind - b._kind;
   }
 }

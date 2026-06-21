@@ -47,7 +47,19 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="false"
+        android:allowBackup="false"
         android:enableOnBackInvokedCallback="true">
+
+        <!-- A11-debug-3: allowBackup=false disables Android cloud auto-backup so
+             flutter_secure_storage ciphertext is NEVER backed up and restored
+             onto a device whose Android Keystore key differs — the BAD_DECRYPT
+             that bricked identity/field-secret reads in the A11 device test.
+             The matching read-side self-heal (IdentityManager / AnonIdentityService
+             / FieldSessionStore catch BAD_DECRYPT → regenerate / not-joined) also
+             covers any residual restore vector (Android 12+ D2D transfer) and
+             Keystore-invalidation cases that allowBackup cannot prevent, so a
+             separate dataExtractionRules resource is unnecessary. -->
+
 
         <activity
             android:name=".MainActivity"

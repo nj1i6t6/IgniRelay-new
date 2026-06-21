@@ -19,6 +19,7 @@
 
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:sqflite/sqflite.dart' show ConflictAlgorithm;
 
 import 'package:ignirelay_app/app/crypto/field_auth_v2.dart';
@@ -84,7 +85,21 @@ class FieldSessionStore {
   /// The persisted `field_join_secret` for a joined field, or `null` when the
   /// field is not joined or its secret is missing / corrupt.
   Future<Uint8List?> secretFor(String fieldIdHex) async {
-    final stored = await _secure.read(_secretKey(fieldIdHex));
+    String? stored;
+    try {
+      stored = await _secure.read(_secretKey(fieldIdHex));
+    } catch (e) {
+      // A11-debug-3: an undecryptable field secret (Android Keystore BAD_DECRYPT
+      // — cloud/D2D restore before allowBackup=false, or Keystore invalidation)
+      // must NOT crash the field-load path. Degrade to "secret missing" (the
+      // documented null contract == field unusable); the user can leave +
+      // re-join. We do NOT auto-delete here: leave() is the explicit removal
+      // path, and deleting on a transient platform error would be more
+      // destructive than a graceful null.
+      debugPrint('[FieldSessionStore] secret read failed for '
+          '$fieldIdHex ($e); treating as missing');
+      return null;
+    }
     if (stored == null) return null;
     return _tryDecodeHex(stored);
   }

@@ -20,6 +20,7 @@
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Minimal secure key/value abstraction so [AnonIdentityService] is unit
@@ -72,7 +73,19 @@ class AnonIdentityService {
     final cached = _cached;
     if (cached != null) return cached;
 
-    final existing = await _store.read(storageKey);
+    String? existing;
+    try {
+      existing = await _store.read(storageKey);
+    } catch (e) {
+      // A11-debug-3: an undecryptable anon_user_id (Android Keystore BAD_DECRYPT
+      // — cloud/D2D restore before allowBackup=false, or a Keystore key
+      // invalidated by an OS credential change) must NOT crash the
+      // presence/footprint path. Treat as absent; a fresh id is minted below and
+      // OVERWRITES the unreadable value. A new anon id is privacy-equivalent to a
+      // rotation — never a crash. Only the persisted read is caught.
+      debugPrint('[AnonIdentity] secure-storage read failed ($e); minting fresh id');
+      existing = null;
+    }
     if (existing != null) {
       final bytes = _tryDecodeHex(existing);
       if (bytes != null && bytes.length == idBytes) {

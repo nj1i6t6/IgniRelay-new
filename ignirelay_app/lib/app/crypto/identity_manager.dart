@@ -1,8 +1,15 @@
 import 'dart:convert';
 import 'package:cryptography/cryptography.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ignirelay_app/app/crdt/hlc.dart';
+// SecureKvStore / FlutterSecureKvStore are the shared secure-storage seam
+// (introduced for AnonIdentityService, A2). IdentityManager reuses it so the
+// BAD_DECRYPT self-heal (A11-debug-3) is unit-testable without the
+// flutter_secure_storage platform channel — identical base64 read/write
+// semantics, no change to the stored key format.
+import 'package:ignirelay_app/app/services/anon_identity.dart'
+    show SecureKvStore, FlutterSecureKvStore;
 
 class IdentityManager {
   static final IdentityManager _instance = IdentityManager._internal();
@@ -13,7 +20,16 @@ class IdentityManager {
   int _identityLevel = 0; // Default: Level 0 (Anonymous)
   bool _initialized = false;
 
-  static const _secureStorage = FlutterSecureStorage();
+  /// Test seam: inject a fake [SecureKvStore] so the BAD_DECRYPT recovery path
+  /// can be exercised without the platform channel. Mirrors
+  /// `DatabaseHelper.testDatabasePathOverride`. Production leaves it null and
+  /// uses the real `flutter_secure_storage`-backed store.
+  @visibleForTesting
+  static SecureKvStore? debugSecureStoreOverride;
+
+  SecureKvStore get _secure =>
+      debugSecureStoreOverride ?? const FlutterSecureKvStore();
+
   static const _privKeyKey = 'ed25519_private_key';
   static const _pubKeyKey = 'ed25519_public_key';
 
@@ -27,8 +43,26 @@ class IdentityManager {
     _identityLevel = prefs.getInt('identity_level') ?? 0;
 
     // 嘗試從 Secure Storage 恢復金鑰（Android Keystore / iOS Keychain）
-    final savedPrivateKey = await _secureStorage.read(key: _privKeyKey);
-    final savedPublicKey = await _secureStorage.read(key: _pubKeyKey);
+    String? savedPrivateKey;
+    String? savedPublicKey;
+    try {
+      savedPrivateKey = await _secure.read(_privKeyKey);
+      savedPublicKey = await _secure.read(_pubKeyKey);
+    } catch (e) {
+      // A11-debug-3: a persisted key that can no longer be decrypted (Android
+      // Keystore BAD_DECRYPT — e.g. cloud/D2D restore before allowBackup=false,
+      // or a Keystore key invalidated by an OS credential / biometric change)
+      // must NOT brick startup (this read runs in main.dart Stage 1 = "失敗 =
+      // 無法啟動"). Treat both as absent; _generateAndSave() below mints a fresh
+      // identity and OVERWRITES the unreadable ciphertext. A fresh identity is
+      // the same state as a clean install — acceptable degradation, never a
+      // crash. Scope is narrow: only the persisted read is caught, recovery is
+      // logged, and no other error is swallowed.
+      debugPrint('[IdentityManager] secure-storage read failed ($e); '
+          'regenerating identity');
+      savedPrivateKey = null;
+      savedPublicKey = null;
+    }
 
     if (savedPrivateKey != null && savedPublicKey != null) {
       try {
@@ -61,8 +95,8 @@ class IdentityManager {
             type: KeyPairType.ed25519,
           );
           // 遷移至 Secure Storage 並清除舊存儲
-          await _secureStorage.write(key: _privKeyKey, value: legacyPriv);
-          await _secureStorage.write(key: _pubKeyKey, value: legacyPub);
+          await _secure.write(_privKeyKey, legacyPriv);
+          await _secure.write(_pubKeyKey, legacyPub);
           await prefs.remove(_privKeyKey);
           await prefs.remove(_pubKeyKey);
         } catch (_) {
@@ -97,8 +131,8 @@ class IdentityManager {
     final privData = await _keyPair!.extractPrivateKeyBytes();
     final pubKey = await _keyPair!.extractPublicKey();
     final pubData = pubKey.bytes;
-    await _secureStorage.write(key: _privKeyKey, value: base64Encode(privData));
-    await _secureStorage.write(key: _pubKeyKey, value: base64Encode(pubData));
+    await _secure.write(_privKeyKey, base64Encode(privData));
+    await _secure.write(_pubKeyKey, base64Encode(pubData));
   }
 
   /// 獲取或產生本機金鑰對 (Ed25519)

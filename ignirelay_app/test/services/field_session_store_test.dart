@@ -3,6 +3,7 @@
 
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ignirelay_app/app/crypto/field_auth_v2.dart';
 import 'package:ignirelay_app/app/db/database_helper.dart';
@@ -146,6 +147,17 @@ void main() {
     expect(reloaded.displayName, 'renamed');
     expect(reloaded.cloudBaseUrl, 'https://c');
   });
+
+  test('A11-debug-3: secret read BAD_DECRYPT degrades to null, never throws',
+      () async {
+    // An undecryptable field secret (Keystore BAD_DECRYPT) must not crash the
+    // field-load path; secretFor returns its documented null (== secret missing
+    // / field unusable), so the caller can recover by leave + re-join.
+    final store = FieldSessionStore(
+        db: DatabaseHelper(), secureStore: _ThrowingReadSecureKv());
+
+    expect(await store.secretFor('00112233445566778899aabbccddeeff'), isNull);
+  });
 }
 
 String _hex(List<int> bytes) {
@@ -164,4 +176,19 @@ class _InMemorySecureKv implements SecureKvStore {
   Future<void> write(String key, String value) async => map[key] = value;
   @override
   Future<void> delete(String key) async => map.remove(key);
+}
+
+/// Secure store whose [read] throws a BAD_DECRYPT-style [PlatformException]
+/// (Android Keystore can no longer decrypt the persisted secret).
+class _ThrowingReadSecureKv implements SecureKvStore {
+  @override
+  Future<String?> read(String key) async {
+    throw PlatformException(
+        code: 'Exception encountered', message: 'BAD_DECRYPT');
+  }
+
+  @override
+  Future<void> write(String key, String value) async {}
+  @override
+  Future<void> delete(String key) async {}
 }

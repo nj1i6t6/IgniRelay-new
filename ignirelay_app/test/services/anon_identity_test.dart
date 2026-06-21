@@ -4,14 +4,29 @@
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ignirelay_app/app/services/anon_identity.dart';
 
 class _FakeKvStore implements SecureKvStore {
+  _FakeKvStore({this.throwOnRead = false});
+
   final Map<String, String> m = {};
   int writes = 0;
+
+  /// When true, [read] throws a BAD_DECRYPT-style [PlatformException] (Android
+  /// Keystore can no longer decrypt the persisted value). Writes still succeed.
+  bool throwOnRead;
+
   @override
-  Future<String?> read(String key) async => m[key];
+  Future<String?> read(String key) async {
+    if (throwOnRead) {
+      throw PlatformException(
+          code: 'Exception encountered', message: 'BAD_DECRYPT');
+    }
+    return m[key];
+  }
+
   @override
   Future<void> write(String key, String value) async {
     writes++;
@@ -76,6 +91,21 @@ void main() {
     final id = await svc.getOrCreate();
     expect(id.length, 16);
     // Stored value is now valid 32-char hex.
+    expect(store.m[AnonIdentityService.storageKey]!.length, 32);
+  });
+
+  test('A11-debug-3: read BAD_DECRYPT does not crash — mints a fresh id',
+      () async {
+    // Android Keystore can no longer decrypt the persisted value (cloud/D2D
+    // restore before allowBackup=false, or a Keystore key invalidated by an OS
+    // credential change). getOrCreate must self-heal, not throw.
+    final store = _FakeKvStore(throwOnRead: true);
+    final svc = AnonIdentityService(store: store);
+
+    final id = await svc.getOrCreate();
+    expect(id.length, 16, reason: 'a fresh 16-byte id replaces the unreadable one');
+    expect(store.writes, 1, reason: 'the fresh id is persisted (overwrites)');
+    // The freshly written value is valid 32-char hex (recoverable state).
     expect(store.m[AnonIdentityService.storageKey]!.length, 32);
   });
 

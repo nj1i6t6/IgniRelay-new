@@ -263,6 +263,68 @@ class EventStream {
     return out;
   }
 
+  // ── Mount backfill (A11-debug-4-fix) ──────────────────────────────────────
+  //
+  // The typed streams above are broadcast and DO NOT replay: any event that
+  // landed in `Event_Logs` before a UI mounts is never pushed again. These
+  // one-shot queries let a screen (LastSeenScreen) hydrate already-stored
+  // PRESENCE / SOS / SAFE / CHECKPOINT on mount, instead of staying blank after
+  // a restart until the next live event. They mirror [recentHazards] and reuse
+  // the SAME row→typed mappings as the live dispatch (so the two never drift).
+  // Decode failures skip the row (bad data is not fatal).
+
+  /// Already-stored PRESENCE footprints, newest-first.
+  Future<List<PresenceUpdate>> recentPresence({int limit = 50}) async {
+    final rows =
+        await _store.queryByType(LocalReadModelType.presence, limit: limit);
+    final out = <PresenceUpdate>[];
+    for (final row in rows) {
+      final payload = row['payload'] as Uint8List?;
+      if (payload == null) continue;
+      final update = _presenceFromSnapshot(_eventIdOf(row), payload, _tsOf(row));
+      if (update != null) out.add(update);
+    }
+    return out;
+  }
+
+  /// Already-stored CHECKPOINT crossings, newest-first.
+  Future<List<CheckpointCrossing>> recentCheckpoints({int limit = 50}) async {
+    final rows =
+        await _store.queryByType(LocalReadModelType.checkpoint, limit: limit);
+    final out = <CheckpointCrossing>[];
+    for (final row in rows) {
+      final payload = row['payload'] as Uint8List?;
+      if (payload == null) continue;
+      final crossing =
+          _checkpointFromSnapshot(_eventIdOf(row), payload, _tsOf(row));
+      if (crossing != null) out.add(crossing);
+    }
+    return out;
+  }
+
+  /// Already-stored SOS-class alerts (requestBroadcast urgency≥2) within
+  /// [window], newest-first. Coordinates come from `received_lat`/`received_lng`
+  /// (see [_sosFromRow]).
+  Future<List<SosAlert>> recentSos(
+      {Duration window = const Duration(hours: 24)}) async {
+    final rows = await _store.queryRecentSos(window: window);
+    final out = <SosAlert>[];
+    for (final row in rows) {
+      final alert = _sosFromRow(row);
+      if (alert != null) out.add(alert);
+    }
+    return out;
+  }
+
+  /// Already-stored SOS resolutions (SAFE), newest-first. The caller merges
+  /// these with [recentSos] into a timestamp-ordered timeline so author-LWW
+  /// converges the same way live arrival order does.
+  Future<List<SosResolved>> recentSosResolutions({int limit = 50}) async {
+    final rows =
+        await _store.queryByType(LocalReadModelType.sosResolved, limit: limit);
+    return [for (final row in rows) _sosResolvedFromRow(row)];
+  }
+
   void start() {
     _subscription ??= _handler.events.listen((_) {
       unawaited(_dispatchRecentEvents());
@@ -278,29 +340,16 @@ class EventStream {
       latestNewEventId = eventId;
 
       final eventType = row['event_type'] as int? ?? -1;
-      final urgency = row['urgency'] as int? ?? 0;
       final payload = row['payload'] as Uint8List?;
-      final timestamp = DateTime.fromMillisecondsSinceEpoch(
-        (row['hlc_timestamp'] as int?) ?? DateTime.now().millisecondsSinceEpoch,
-      );
+      final timestamp = _tsOf(row);
 
       switch (eventType) {
         case EventType.requestBroadcast:
           // requestBroadcast urgency≥2 = SOS-class（含 V2InboundProjector 投影的
           // v2 SOS）。urgency<2 的請求不再有 typed stream（supplyChanges 已下線）。
-          if (urgency >= 2) {
-            final data =
-                payload == null ? null : _decoder.decodeRequestData(payload);
-            _sosController.add(SosAlert(
-              eventId: eventId,
-              urgency: urgency,
-              description: data?.note ?? '',
-              lat: row['lat'] as double?,
-              lng: row['lng'] as double?,
-              senderPubKey: row['sender_pub_key'] as Uint8List?,
-              timestamp: timestamp,
-            ));
-          }
+          // 列→SosAlert 映射集中在 [_sosFromRow]，live 與 [recentSos] backfill 共用。
+          final alert = _sosFromRow(row);
+          if (alert != null) _sosController.add(alert);
           break;
         case EventType.hazardMarker:
           final data =
@@ -327,12 +376,9 @@ class EventStream {
           break;
         case LocalReadModelType.sosResolved:
           // SOS 解除 read-model row（A8）：投影自 STATUS_UPDATE safetyState=SAFE，
-          // 以 sender_pub_key 標記哪位 author 已回報安全。
-          final pubKey = row['sender_pub_key'] as Uint8List?;
-          _sosResolvedController.add(SosResolved(
-            authorKeyHex: pubKey == null ? '' : _hex(pubKey),
-            timestamp: timestamp,
-          ));
+          // 以 sender_pub_key 標記哪位 author 已回報安全。列→SosResolved 映射集中
+          // 在 [_sosResolvedFromRow]，live 與 [recentSosResolutions] backfill 共用。
+          _sosResolvedController.add(_sosResolvedFromRow(row));
           break;
         case LocalReadModelType.checkpoint:
           // CHECKPOINT read-model row（A9）：payload 是純 JSON snapshot（非 protobuf），
@@ -431,6 +477,51 @@ class EventStream {
       return null;
     }
   }
+
+  /// Build a [SosAlert] from a requestBroadcast `Event_Logs` row, or null for a
+  /// non-SOS row (urgency < 2). Shared by the live dispatch and [recentSos] so
+  /// the SOS read-model mapping lives in ONE place.
+  ///
+  /// A11-debug-4-fix: coordinates are read from `received_lat`/`received_lng` —
+  /// the ONLY columns where `ingestVerifiedEvent` / the v2 projector persist a
+  /// received event's location (`Event_Logs` has NO `lat`/`lng` column). The
+  /// pre-fix code read `row['lat']`/`row['lng']`, which are absent → always null,
+  /// so a received SOS lost its coordinates and the receiver showed「（無座標）」
+  /// even when the sender had a GPS fix. This is receive/read-side only; the SOS
+  /// send path is untouched.
+  SosAlert? _sosFromRow(Map<String, dynamic> row) {
+    final urgency = (row['urgency'] as int?) ?? 0;
+    if (urgency < 2) return null;
+    final payload = row['payload'] as Uint8List?;
+    final data = payload == null ? null : _decoder.decodeRequestData(payload);
+    return SosAlert(
+      eventId: _eventIdOf(row),
+      urgency: urgency,
+      description: data?.note ?? '',
+      lat: row['received_lat'] as double?,
+      lng: row['received_lng'] as double?,
+      senderPubKey: row['sender_pub_key'] as Uint8List?,
+      timestamp: _tsOf(row),
+    );
+  }
+
+  /// Build a [SosResolved] from a `LocalReadModelType.sosResolved` row. Shared by
+  /// the live dispatch and [recentSosResolutions].
+  SosResolved _sosResolvedFromRow(Map<String, dynamic> row) {
+    final pubKey = row['sender_pub_key'] as Uint8List?;
+    return SosResolved(
+      authorKeyHex: pubKey == null ? '' : _hex(pubKey),
+      timestamp: _tsOf(row),
+    );
+  }
+
+  static String _eventIdOf(Map<String, dynamic> row) =>
+      (row['event_id'] as String?) ?? '';
+
+  static DateTime _tsOf(Map<String, dynamic> row) =>
+      DateTime.fromMillisecondsSinceEpoch(
+        (row['hlc_timestamp'] as int?) ?? DateTime.now().millisecondsSinceEpoch,
+      );
 
   static String _hex(Uint8List bytes) {
     final sb = StringBuffer();

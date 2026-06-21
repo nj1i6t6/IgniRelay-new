@@ -44,6 +44,10 @@ void main() {
     DateTime Function()? now,
     PositionEstimate? Function()? localEstimate,
     Locale locale = const Locale('zh'),
+    Future<List<PresenceUpdate>> Function()? presenceBackfill,
+    Future<List<CheckpointCrossing>> Function()? checkpointBackfill,
+    Future<List<SosAlert>> Function()? sosBackfill,
+    Future<List<SosResolved>> Function()? sosResolvedBackfill,
   }) =>
       MaterialApp(
         locale: locale,
@@ -54,6 +58,14 @@ void main() {
           checkpointSource: cp.stream,
           sosSource: sos.stream,
           sosResolvedSource: sosRes.stream,
+          // Mount backfill seams default to empty so these stream-driven tests
+          // never reach for an EventStream provider (A11-debug-4-fix).
+          presenceBackfill: presenceBackfill ?? () async => <PresenceUpdate>[],
+          checkpointBackfill:
+              checkpointBackfill ?? () async => <CheckpointCrossing>[],
+          sosBackfill: sosBackfill ?? () async => <SosAlert>[],
+          sosResolvedBackfill:
+              sosResolvedBackfill ?? () async => <SosResolved>[],
           now: now,
           localEstimate: localEstimate,
           refreshInterval: Duration.zero, // no timer
@@ -311,6 +323,10 @@ void main() {
         checkpointSource: cp.stream,
         sosSource: sos.stream,
         sosResolvedSource: sosRes.stream,
+        presenceBackfill: () async => <PresenceUpdate>[],
+        checkpointBackfill: () async => <CheckpointCrossing>[],
+        sosBackfill: () async => <SosAlert>[],
+        sosResolvedBackfill: () async => <SosResolved>[],
         now: () => now,
         localEstimate: () => originVal,
         refreshInterval: Duration.zero,
@@ -360,6 +376,159 @@ void main() {
     expect(find.text('最後可信位置'), findsNothing);
   });
 
+  // ── A11-debug-4-fix — mount backfill (read-model hydrate) ───────────────────
+  // The view must populate on mount from the Event_Logs read-model, not stay
+  // blank after a restart until the next live event.
+
+  testWidgets('mount backfill renders PRESENCE with NO live event',
+      (tester) async {
+    final now = DateTime(2026, 6, 15, 12, 0, 0);
+    await tester.pumpWidget(screen(
+      now: () => now,
+      presenceBackfill: () async => [
+        PresenceUpdate(
+          eventId: 'v2-bf-1',
+          anon8: 'f0f1f2f3',
+          source: 1,
+          lat: 25.05,
+          lng: 121.55,
+          accuracyM: 10,
+          observedAt: now.subtract(const Duration(seconds: 30)),
+        ),
+      ],
+    ));
+    await tester.pump(); // let _hydrate() resolve
+    await tester.pump(); // rebuild after setState
+
+    expect(find.text('f0f1f2f3'), findsOneWidget);
+    expect(find.textContaining('25.05'), findsOneWidget);
+    expect(find.textContaining('目前位置'), findsNothing);
+  });
+
+  testWidgets('mount backfill renders SOS WITH coordinates (received_lat/lng)',
+      (tester) async {
+    final now = DateTime(2026, 6, 15, 12, 0, 0);
+    await tester.pumpWidget(screen(
+      now: () => now,
+      sosBackfill: () async => [
+        SosAlert(
+          eventId: 'v2-sos-bf',
+          urgency: 3,
+          description: '受困',
+          lat: 25.0339805,
+          lng: 121.5654177,
+          senderPubKey: Uint8List.fromList(const [0x0A, 0x0B, 0x0C, 0x0D]),
+          timestamp: now.subtract(const Duration(seconds: 20)),
+        ),
+      ],
+    ));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.widgetWithText(StatusChip, 'SOS'), findsOneWidget);
+    expect(find.textContaining('25.03398'), findsOneWidget); // coords surfaced
+    expect(find.textContaining('目前位置'), findsNothing);
+  });
+
+  testWidgets('backfill timeline: old SOS + later SAFE → SOS cleared',
+      (tester) async {
+    final now = DateTime(2026, 6, 15, 12, 0, 0);
+    final pubKey = Uint8List.fromList(const [0x22, 0x33, 0x44, 0x55]);
+    await tester.pumpWidget(screen(
+      now: () => now,
+      sosBackfill: () async => [
+        SosAlert(
+          eventId: 'sos-old',
+          urgency: 3,
+          description: '受困',
+          lat: 25.02,
+          lng: 121.01,
+          senderPubKey: pubKey,
+          timestamp: now.subtract(const Duration(minutes: 5)), // older
+        ),
+      ],
+      sosResolvedBackfill: () async => [
+        SosResolved(
+          authorKeyHex: hexOf(pubKey),
+          timestamp: now.subtract(const Duration(minutes: 1)), // later SAFE
+        ),
+      ],
+    ));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.widgetWithText(StatusChip, 'SOS'), findsNothing,
+        reason: 'a later SAFE supersedes the older SOS (author-LWW)');
+  });
+
+  testWidgets('backfill timeline: old SAFE + later SOS → SOS shown',
+      (tester) async {
+    final now = DateTime(2026, 6, 15, 12, 0, 0);
+    final pubKey = Uint8List.fromList(const [0x66, 0x77, 0x88, 0x99]);
+    await tester.pumpWidget(screen(
+      now: () => now,
+      sosBackfill: () async => [
+        SosAlert(
+          eventId: 'sos-new',
+          urgency: 3,
+          description: '受困',
+          lat: 25.02,
+          lng: 121.01,
+          senderPubKey: pubKey,
+          timestamp: now.subtract(const Duration(minutes: 1)), // later SOS
+        ),
+      ],
+      sosResolvedBackfill: () async => [
+        SosResolved(
+          authorKeyHex: hexOf(pubKey),
+          timestamp: now.subtract(const Duration(minutes: 5)), // older SAFE
+        ),
+      ],
+    ));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.widgetWithText(StatusChip, 'SOS'), findsOneWidget,
+        reason: 'a later SOS stands despite an older SAFE');
+  });
+
+  testWidgets('same eventId via backfill + live is applied once (dedup)',
+      (tester) async {
+    final now = DateTime(2026, 6, 15, 12, 0, 0);
+    await tester.pumpWidget(screen(
+      now: () => now,
+      presenceBackfill: () async => [
+        PresenceUpdate(
+          eventId: 'v2-dup',
+          anon8: 'aaaaaaaa',
+          source: 1,
+          lat: 25.05,
+          lng: 121.55,
+          observedAt: now.subtract(const Duration(seconds: 30)),
+        ),
+      ],
+    ));
+    await tester.pump(); // backfill applied → _seenPresence = {v2-dup}
+    await tester.pump();
+    expect(find.text('aaaaaaaa'), findsOneWidget);
+
+    // SAME eventId arrives live with a different anon8 → dedup must drop it.
+    pres.add(PresenceUpdate(
+      eventId: 'v2-dup',
+      anon8: 'bbbbbbbb',
+      source: 1,
+      lat: 25.06,
+      lng: 121.56,
+      observedAt: now.subtract(const Duration(seconds: 10)),
+    ));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('aaaaaaaa'), findsOneWidget);
+    expect(find.text('bbbbbbbb'), findsNothing,
+        reason: 'eventId dedup ignores the duplicate regardless of payload');
+  });
+
   // ── UI-H3 — large-text / text-scale stress ─────────────────────────────────
   // The estimate card crams a mono label + an SOS chip + a confidence chip into
   // one Row, plus an age/uncertainty meta Row and the 列表/雷達 toggle — all
@@ -386,6 +555,10 @@ void main() {
               checkpointSource: cp.stream,
               sosSource: sos.stream,
               sosResolvedSource: sosRes.stream,
+              presenceBackfill: () async => <PresenceUpdate>[],
+              checkpointBackfill: () async => <CheckpointCrossing>[],
+              sosBackfill: () async => <SosAlert>[],
+              sosResolvedBackfill: () async => <SosResolved>[],
               now: () => now,
               refreshInterval: Duration.zero,
             ),

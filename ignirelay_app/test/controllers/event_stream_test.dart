@@ -21,6 +21,8 @@
 // 由於 EventStream 的 dispatch logic 是 private，這份測試以「靜態 invariants」
 // 與「整合層面的可訂閱性」為主，外加 anyEventChanges 在 ingest 後可被觀察到。
 
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -160,6 +162,84 @@ void main() {
       expect(h.description, '淹水');
       expect(h.lat, closeTo(24.5, 1e-9));
       expect(h.lng, closeTo(120.5, 1e-9));
+    });
+  });
+
+  group('EventStream — mount backfill (A11-debug-4-fix)', () {
+    test('recentSos reads coordinates from received_lat/received_lng', () async {
+      // The receive-side column fix: ingestVerifiedEvent persists a received
+      // event's location into received_lat/received_lng (Event_Logs has no
+      // lat/lng column). recentSos (and the shared live mapping) must read THOSE
+      // columns, else SOS shows 「（無座標）」 even when the sender had a fix.
+      final sender = List<int>.generate(32, (i) => i + 5);
+      final eventId = 'sos-bf-${DateTime.now().microsecondsSinceEpoch}';
+      final payload =
+          pb.RequestData(note: '受困', mobilityMode: 'CAN_GO').writeToBuffer();
+      await MeshEventHandler().ingestVerifiedEvent(
+        eventId: eventId,
+        eventType: EventType.requestBroadcast,
+        urgency: 3,
+        payload: payload,
+        senderPubKey: sender,
+        hlcTimestamp: DateTime.now().millisecondsSinceEpoch,
+        lat: 25.0339805,
+        lng: 121.5654177,
+      );
+
+      final alerts = await stream.recentSos();
+      final a = alerts.firstWhere((e) => e.eventId == eventId);
+      expect(a.urgency, 3);
+      expect(a.description, '受困');
+      expect(a.senderPubKey, sender);
+      expect(a.lat, closeTo(25.0339805, 1e-9));
+      expect(a.lng, closeTo(121.5654177, 1e-9));
+    });
+
+    test('recentPresence decodes PRESENCE snapshot rows', () async {
+      final eventId = 'pres-bf-${DateTime.now().microsecondsSinceEpoch}';
+      final snapshot = utf8.encode(jsonEncode(<String, dynamic>{
+        'anon8': 'a1b2c3d4',
+        'src': 1,
+        'observed_ms': DateTime(2026, 6, 15, 12).millisecondsSinceEpoch,
+        'lat': 24.5,
+        'lng': 120.5,
+        'acc': 8,
+        'battery': 77,
+      }));
+      await MeshEventHandler().ingestVerifiedEvent(
+        eventId: eventId,
+        eventType: LocalReadModelType.presence,
+        urgency: 0,
+        payload: snapshot,
+        senderPubKey: List<int>.generate(8, (i) => i),
+        hlcTimestamp: DateTime.now().millisecondsSinceEpoch,
+      );
+
+      final list = await stream.recentPresence();
+      final p = list.firstWhere((e) => e.eventId == eventId);
+      expect(p.anon8, 'a1b2c3d4');
+      expect(p.lat, closeTo(24.5, 1e-9));
+      expect(p.lng, closeTo(120.5, 1e-9));
+      expect(p.batteryHint, 77);
+    });
+
+    test('recentSosResolutions decodes SAFE rows keyed by author', () async {
+      final author = List<int>.generate(6, (i) => i + 0x40);
+      final eventId = 'safe-bf-${DateTime.now().microsecondsSinceEpoch}';
+      await MeshEventHandler().ingestVerifiedEvent(
+        eventId: eventId,
+        eventType: LocalReadModelType.sosResolved,
+        urgency: 0,
+        payload: utf8.encode(
+            jsonEncode(<String, dynamic>{'resolved_ms': DateTime.now().millisecondsSinceEpoch})),
+        senderPubKey: author,
+        hlcTimestamp: DateTime.now().millisecondsSinceEpoch,
+      );
+
+      final list = await stream.recentSosResolutions();
+      final expectedHex =
+          author.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+      expect(list.any((r) => r.authorKeyHex == expectedHex), isTrue);
     });
   });
 

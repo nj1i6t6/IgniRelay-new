@@ -53,6 +53,10 @@ class LastSeenScreen extends StatefulWidget {
     this.checkpointSource,
     this.sosSource,
     this.sosResolvedSource,
+    this.presenceBackfill,
+    this.checkpointBackfill,
+    this.sosBackfill,
+    this.sosResolvedBackfill,
     this.localEstimate,
     this.now,
     this.refreshInterval = const Duration(seconds: 30),
@@ -68,6 +72,17 @@ class LastSeenScreen extends StatefulWidget {
   /// SOS 解除 stream（A8；投影自 STATUS_UPDATE safetyState=SAFE）。收到後把對應
   /// author（`sender_pub_key` hex）的 SOS entry 移除，位置頁不再顯示其 SOS 標籤。
   final Stream<SosResolved>? sosResolvedSource;
+
+  /// Mount-backfill seams (A11-debug-4-fix). When omitted they default to the
+  /// DI'd `EventStream` read-model queries (`recentPresence` / `recentCheckpoints`
+  /// / `recentSos` / `recentSosResolutions`); tests inject. They feed the SAME
+  /// handlers as the live streams (eventId dedup + author-LWW), so the position
+  /// view is populated on mount instead of staying blank after a restart until
+  /// the next live event.
+  final Future<List<PresenceUpdate>> Function()? presenceBackfill;
+  final Future<List<CheckpointCrossing>> Function()? checkpointBackfill;
+  final Future<List<SosAlert>> Function()? sosBackfill;
+  final Future<List<SosResolved>> Function()? sosResolvedBackfill;
 
   /// The device's own [PositionEstimate] (radar origin). When omitted it is read
   /// from the DI'd [LocalPositionSource]. Returning null = "no local position".
@@ -89,6 +104,20 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
   StreamSubscription<SosResolved>? _sosResolvedSub;
   Timer? _refresh;
 
+  /// Mount-backfill loaders (A11-debug-4-fix), resolved once in [initState] from
+  /// the widget seam or the DI'd `EventStream`.
+  late final Future<List<PresenceUpdate>> Function() _presenceBackfill;
+  late final Future<List<CheckpointCrossing>> Function() _checkpointBackfill;
+  late final Future<List<SosAlert>> Function() _sosBackfill;
+  late final Future<List<SosResolved>> Function() _sosResolvedBackfill;
+
+  /// eventId dedup so a row arriving via BOTH the mount backfill and the live
+  /// stream is applied once (A11-debug-4-fix). SOS resolutions are an idempotent
+  /// remove and need no dedup.
+  final Set<String> _seenPresence = <String>{};
+  final Set<String> _seenCheckpoint = <String>{};
+  final Set<String> _seenSos = <String>{};
+
   /// The view the user picked. The radar only *shows* while a local origin
   /// exists — if it is/becomes null the build derives the degrade state, so a
   /// position lost mid-radar falls back to the list (and auto-recovers).
@@ -106,12 +135,17 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
   @override
   void initState() {
     super.initState();
-    // Only reach for the DI'd EventStream when at least one source is not
-    // injected (tests inject all three and never touch the provider tree).
+    // Only reach for the DI'd EventStream when at least one stream OR backfill
+    // seam is not injected (tests inject all seams and never touch the provider
+    // tree).
     final needEvents = widget.presenceSource == null ||
         widget.checkpointSource == null ||
         widget.sosSource == null ||
-        widget.sosResolvedSource == null;
+        widget.sosResolvedSource == null ||
+        widget.presenceBackfill == null ||
+        widget.checkpointBackfill == null ||
+        widget.sosBackfill == null ||
+        widget.sosResolvedBackfill == null;
     final events = needEvents ? context.read<EventStream>() : null;
     _presenceSub =
         (widget.presenceSource ?? events!.presenceUpdates).listen(_onPresence);
@@ -120,11 +154,64 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
     _sosSub = (widget.sosSource ?? events!.sosAlerts).listen(_onSos);
     _sosResolvedSub = (widget.sosResolvedSource ?? events!.sosResolutions)
         .listen(_onSosResolved);
+
+    // Mount backfill loaders default to the EventStream read-model queries.
+    _presenceBackfill =
+        widget.presenceBackfill ?? () => events!.recentPresence();
+    _checkpointBackfill =
+        widget.checkpointBackfill ?? () => events!.recentCheckpoints();
+    _sosBackfill = widget.sosBackfill ?? () => events!.recentSos();
+    _sosResolvedBackfill =
+        widget.sosResolvedBackfill ?? () => events!.recentSosResolutions();
+
     if (widget.refreshInterval > Duration.zero) {
       // Ages / confidence drift with wall time; refresh so the view stays honest.
       _refresh = Timer.periodic(widget.refreshInterval, (_) {
         if (mounted) setState(() {});
       });
+    }
+
+    unawaited(_hydrate());
+  }
+
+  /// One-shot mount backfill from the read-model (A11-debug-4-fix). Feeds rows
+  /// through the SAME handlers as the live streams so the dedup / author-LWW
+  /// rules are defined once. SOS alerts and SAFE resolutions are merged into a
+  /// single timestamp-ordered timeline and replayed oldest→newest, so the
+  /// author-LWW converges identically to live arrival order:
+  ///   • old SOS + later SAFE → SOS cleared
+  ///   • old SAFE + later SOS → SOS shown
+  /// Best-effort: a backfill failure leaves the live streams working.
+  Future<void> _hydrate() async {
+    try {
+      final presence = await _presenceBackfill();
+      if (!mounted) return;
+      for (final p in presence) {
+        _onPresence(p);
+      }
+      final checkpoints = await _checkpointBackfill();
+      if (!mounted) return;
+      for (final c in checkpoints) {
+        _onCheckpoint(c);
+      }
+      final sos = await _sosBackfill();
+      final resolutions = await _sosResolvedBackfill();
+      if (!mounted) return;
+      final timeline = <_SosEvent>[
+        for (final a in sos) _SosEvent(a.timestamp, alert: a),
+        for (final r in resolutions) _SosEvent(r.timestamp, resolved: r),
+      ]..sort(_SosEvent.compare);
+      for (final e in timeline) {
+        final alert = e.alert;
+        final resolved = e.resolved;
+        if (alert != null) {
+          _onSos(alert);
+        } else if (resolved != null) {
+          _onSosResolved(resolved);
+        }
+      }
+    } catch (_) {
+      // Backfill is best-effort; the live streams still populate the view.
     }
   }
 
@@ -140,6 +227,7 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
 
   void _onPresence(PresenceUpdate p) {
     if (!mounted || p.anon8.isEmpty) return;
+    if (p.eventId.isNotEmpty && !_seenPresence.add(p.eventId)) return;
     _addPerson(
       p.anon8,
       PositionObservation(
@@ -154,6 +242,7 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
 
   void _onCheckpoint(CheckpointCrossing c) {
     if (!mounted || c.anon8.isEmpty) return;
+    if (c.eventId.isNotEmpty && !_seenCheckpoint.add(c.eventId)) return;
     _addPerson(
       c.anon8,
       PositionObservation(
@@ -167,6 +256,7 @@ class _LastSeenScreenState extends State<LastSeenScreen> {
 
   void _onSos(SosAlert a) {
     if (!mounted) return;
+    if (a.eventId.isNotEmpty && !_seenSos.add(a.eventId)) return;
     final key = (a.senderPubKey != null && a.senderPubKey!.isNotEmpty)
         ? _hex(a.senderPubKey!)
         : 'evt:${a.eventId}';
@@ -522,4 +612,20 @@ class _Entry {
   final String label;
   final PositionEstimate est;
   final StatusTone baseTone;
+}
+
+/// One item on the merged SOS/SAFE mount-backfill timeline (A11-debug-4-fix).
+/// Exactly one of [alert] / [resolved] is set. Sorted oldest→newest; on an exact
+/// timestamp tie a resolution is applied AFTER an alert (kind 1 > 0) so a
+/// same-instant SAFE still clears its SOS (the terminal state wins the tie).
+class _SosEvent {
+  _SosEvent(this.ts, {this.alert, this.resolved});
+  final DateTime ts;
+  final SosAlert? alert;
+  final SosResolved? resolved;
+  int get _kind => resolved != null ? 1 : 0;
+  static int compare(_SosEvent a, _SosEvent b) {
+    final c = a.ts.compareTo(b.ts);
+    return c != 0 ? c : a._kind - b._kind;
+  }
 }

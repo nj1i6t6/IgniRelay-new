@@ -188,7 +188,7 @@ void main() {
   // a joined-row (name + role chip + QR action) — name/chip rows that can
   // overflow under 1.45 / effective 2.0 on a narrow phone width. A long field
   // name pushes the worst case.
-  testWidgets('large text (UI-H3): active + joined rows survive 1.45 / 2.0',
+  testWidgets('large text (UI-H3): active + joined rows survive 1.15–2.0',
       (tester) async {
     tester.view.physicalSize = const Size(360, 820);
     tester.view.devicePixelRatio = 1.0;
@@ -199,7 +199,7 @@ void main() {
     addTearDown(field.dispose);
     await field.createField(displayName: '中正紀念堂臨時避難收容場域站點'); // long name
 
-    for (final scale in const [1.45, 2.0]) {
+    for (final scale in const [1.15, 1.30, 1.45, 2.0]) {
       await tester.pumpWidget(MultiProvider(
         providers: [
           ListenableProvider<ActiveFieldController>.value(value: field),

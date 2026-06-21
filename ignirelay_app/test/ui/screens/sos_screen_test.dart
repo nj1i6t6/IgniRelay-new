@@ -190,7 +190,7 @@ void main() {
         ),
       );
 
-  testWidgets('large text (UI-H3): trigger + countdown survive 1.45 / 2.0',
+  testWidgets('large text (UI-H3): trigger + countdown survive 1.15–2.0',
       (tester) async {
     tester.view.physicalSize = const Size(360, 820);
     tester.view.devicePixelRatio = 1.0;
@@ -198,7 +198,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     final h = await harness(countdown: const Duration(seconds: 5));
-    for (final scale in const [1.45, 2.0]) {
+    for (final scale in const [1.15, 1.30, 1.45, 2.0]) {
       await tester.pumpWidget(wrapScaled(h.sos, h.events, scale));
       await tester.pump();
       expect(tester.takeException(), isNull, reason: 'SOS trigger @ $scale');

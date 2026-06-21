@@ -567,7 +567,7 @@ void main() {
   // The estimate card crams a mono label + an SOS chip + a confidence chip into
   // one Row, plus an age/uncertainty meta Row and the 列表/雷達 toggle — all
   // overflow candidates under 1.45 / effective 2.0 on a narrow phone width.
-  testWidgets('large text (UI-H3): estimate cards survive 1.45 / 2.0',
+  testWidgets('large text (UI-H3): estimate cards survive 1.15–2.0',
       (tester) async {
     tester.view.physicalSize = const Size(360, 820);
     tester.view.devicePixelRatio = 1.0;
@@ -575,7 +575,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     final now = DateTime(2026, 6, 15, 12, 0, 0);
-    for (final scale in const [1.45, 2.0]) {
+    for (final scale in const [1.15, 1.30, 1.45, 2.0]) {
       await tester.pumpWidget(MaterialApp(
         locale: const Locale('zh'),
         supportedLocales: S.supportedLocales,

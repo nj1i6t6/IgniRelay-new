@@ -91,14 +91,14 @@ void main() {
     // Walk all five tour pages (incl. the radar page + event/footprint rows) at
     // 1.45 and effective 2.0 on a narrow phone width, asserting no overflow.
     // Still zero-provider (the MediaQuery wrapper adds no provider).
-    testWidgets('large text (UI-H3): five pages survive 1.45 / 2.0',
+    testWidgets('large text (UI-H3): five pages survive 1.15–2.0',
         (tester) async {
       tester.view.physicalSize = const Size(360, 820);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      for (final scale in const [1.45, 2.0]) {
+      for (final scale in const [1.15, 1.30, 1.45, 2.0]) {
         await tester.pumpWidget(MaterialApp(
           locale: const Locale('zh'),
           supportedLocales: S.supportedLocales,

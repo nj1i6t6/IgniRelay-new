@@ -15,6 +15,7 @@ import 'package:ignirelay_app/ui/shell/app_shell.dart';
 import 'package:ignirelay_app/ui/shell/debug_shell.dart';
 import 'package:ignirelay_app/app/db/database_helper.dart';
 import 'package:ignirelay_app/app/crypto/identity_manager.dart';
+import 'package:ignirelay_app/app/mesh/ble_emergency_mesh_delivery.dart';
 import 'package:ignirelay_app/app/mesh/event_manager.dart';
 import 'package:ignirelay_app/app/mesh/mesh_constants.dart';
 import 'package:ignirelay_app/app/geo/village_geofence.dart';
@@ -303,6 +304,12 @@ Future<void> _startV2Bridge() async {
     // attempt immediately so the queue clears as soon as a peer reaches
     // isReadyForTraffic.
     _eventPublisherV2.attachBridge(bridge);
+
+    // A11-latency-fix — wire the emergency-delivery hook so an SOS/SAFE that
+    // finds no ready peer triggers an immediate connect (bypassing the gossip
+    // cooldown) instead of waiting for the next cycle. Backed by the same
+    // BleManager singleton the transport scans/connects with.
+    _eventPublisherV2.attachEmergencyDelivery(BleEmergencyMeshDelivery());
 
     debugPrint('[main] v2 bridge started');
   } catch (e, st) {

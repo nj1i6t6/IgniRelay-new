@@ -896,6 +896,199 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  // ── A11-latency-fix — emergency-delivery hook ──────────────────────────
+  //
+  // SOS / SAFE that finds no ready peer must trigger an immediate connect
+  // (the hook) instead of waiting for the next gossip cycle. The predicate is
+  // keyed on PRIORITY + SAFETY STATE, never on event type — so PRESENCE and
+  // CHECKPOINT (both NON-SOS) must NOT fire it even though CHECKPOINT also
+  // rides at PriorityV2.status (the same priority SAFE ends up at).
+  group('A11-latency-fix emergency delivery', () {
+    test('SOS with a ready peer sends immediately, does NOT call the hook',
+        () async {
+      final registry =
+          PeerCapabilityRegistry(helloTimeout: const Duration(seconds: 5));
+      final bridge = await _makeRecordingBridge(registry);
+      final hook = _CountingEmergencyDelivery();
+      final facade = EventPublisherV2Facade(
+        registry: registry,
+        bridge: bridge,
+        emergencyDelivery: hook,
+      );
+      addTearDown(() async {
+        await facade.dispose();
+        await registry.dispose();
+      });
+      _markPeerActive(registry, 'EM:01');
+
+      final outcome =
+          await facade.publishStatusUpdate(safetyState: SafetyState.trapped);
+      expect(outcome.anyAccepted, isTrue);
+      expect(bridge.invocations.length, 1);
+      expect(hook.calls, 0,
+          reason: 'a ready peer means no emergency connect is needed');
+    });
+
+    test(
+        'SOS (TRAPPED) with zero ready peers enqueues once, calls hook once, '
+        'no duplicate envelope', () async {
+      final registry =
+          PeerCapabilityRegistry(helloTimeout: const Duration(seconds: 5));
+      final bridge = await _makeRecordingBridge(registry);
+      final hook = _CountingEmergencyDelivery();
+      final facade = EventPublisherV2Facade(
+        registry: registry,
+        bridge: bridge,
+        emergencyDelivery: hook,
+      );
+      addTearDown(() async {
+        await facade.dispose();
+        await registry.dispose();
+      });
+
+      final outcome =
+          await facade.publishStatusUpdate(safetyState: SafetyState.trapped);
+      expect(outcome.queued, isTrue);
+      expect(facade.pendingQueueDepth, 1);
+      expect(hook.calls, 1);
+      expect(bridge.invocations, isEmpty);
+
+      // The hook only accelerates connectivity; it must NOT mint a second
+      // envelope. When a peer arrives, the SAME single queued envelope drains
+      // exactly once.
+      _markPeerActive(registry, 'EM:02');
+      await _drainMicrotasks();
+      expect(bridge.invocations.length, 1,
+          reason: 'exactly one envelope — emergency hook does not duplicate');
+      expect(facade.pendingQueueDepth, 0);
+      expect(hook.calls, 1, reason: 'no further hook call on drain');
+    });
+
+    test('SOS_YELLOW (INJURED) with zero ready peers calls the hook', () async {
+      final registry =
+          PeerCapabilityRegistry(helloTimeout: const Duration(seconds: 5));
+      final bridge = await _makeRecordingBridge(registry);
+      final hook = _CountingEmergencyDelivery();
+      final facade = EventPublisherV2Facade(
+        registry: registry,
+        bridge: bridge,
+        emergencyDelivery: hook,
+      );
+      addTearDown(() async {
+        await facade.dispose();
+        await registry.dispose();
+      });
+
+      final outcome =
+          await facade.publishStatusUpdate(safetyState: SafetyState.injured);
+      expect(outcome.queued, isTrue);
+      expect(hook.calls, 1);
+    });
+
+    test('SAFE with zero ready peers calls the hook even at STATUS priority',
+        () async {
+      final registry =
+          PeerCapabilityRegistry(helloTimeout: const Duration(seconds: 5));
+      final bridge = await _makeRecordingBridge(registry);
+      final hook = _CountingEmergencyDelivery();
+      final facade = EventPublisherV2Facade(
+        registry: registry,
+        bridge: bridge,
+        emergencyDelivery: hook,
+      );
+      addTearDown(() async {
+        await facade.dispose();
+        await registry.dispose();
+      });
+
+      final outcome =
+          await facade.publishStatusUpdate(safetyState: SafetyState.safe);
+      expect(outcome.queued, isTrue);
+      expect(hook.calls, 1,
+          reason: 'the SOS resolution must propagate fast too');
+
+      // Prove the fire was NOT priority-driven: SAFE stays at STATUS, yet it
+      // still triggered the hook (so the predicate genuinely also keys on
+      // safetyState == SAFE, per the task spec).
+      _markPeerActive(registry, 'EM:03');
+      await _drainMicrotasks();
+      expect(bridge.invocations.single.priority, PriorityV2.status);
+    });
+
+    test('PRESENCE with zero ready peers enqueues but does NOT call the hook',
+        () async {
+      final registry =
+          PeerCapabilityRegistry(helloTimeout: const Duration(seconds: 5));
+      final bridge = await _makeRecordingBridge(registry);
+      final hook = _CountingEmergencyDelivery();
+      final facade = EventPublisherV2Facade(
+        registry: registry,
+        bridge: bridge,
+        emergencyDelivery: hook,
+      );
+      addTearDown(() async {
+        await facade.dispose();
+        await registry.dispose();
+      });
+
+      final outcome = await facade.publishPresence(anonUserId: Uint8List(16));
+      expect(outcome.queued, isTrue);
+      expect(facade.pendingQueueDepth, 1);
+      expect(hook.calls, 0,
+          reason: 'PRESENCE keeps its normal cadence; never emergency');
+    });
+
+    test(
+        'CHECKPOINT (also STATUS priority) with zero peers does NOT call the '
+        'hook — proves the predicate is not priority==STATUS', () async {
+      final registry =
+          PeerCapabilityRegistry(helloTimeout: const Duration(seconds: 5));
+      final bridge = await _makeRecordingBridge(registry);
+      final hook = _CountingEmergencyDelivery();
+      final facade = EventPublisherV2Facade(
+        registry: registry,
+        bridge: bridge,
+        emergencyDelivery: hook,
+      );
+      addTearDown(() async {
+        await facade.dispose();
+        await registry.dispose();
+      });
+
+      final outcome = await facade.publishCheckpoint(
+        anonUserId: Uint8List(16),
+        checkpointId: 'gate-1',
+      );
+      expect(outcome.queued, isTrue);
+      expect(hook.calls, 0);
+    });
+
+    test('a throwing emergency hook never fails the publish (stays queued)',
+        () async {
+      final registry =
+          PeerCapabilityRegistry(helloTimeout: const Duration(seconds: 5));
+      final bridge = await _makeRecordingBridge(registry);
+      final hook = _CountingEmergencyDelivery(throwOnCall: true);
+      final facade = EventPublisherV2Facade(
+        registry: registry,
+        bridge: bridge,
+        emergencyDelivery: hook,
+      );
+      addTearDown(() async {
+        await facade.dispose();
+        await registry.dispose();
+      });
+
+      final outcome =
+          await facade.publishStatusUpdate(safetyState: SafetyState.trapped);
+      expect(hook.calls, 1, reason: 'hook was invoked');
+      expect(outcome.queued, isTrue,
+          reason: 'a throwing hook must not abort the publish');
+      expect(facade.pendingQueueDepth, 1,
+          reason: 'the envelope is still safely queued');
+    });
+  });
 }
 
 class _SendInvocation {
@@ -1063,6 +1256,19 @@ class _InMemorySecureKv implements SecureKvStore {
   Future<void> write(String key, String value) async => _m[key] = value;
   @override
   Future<void> delete(String key) async => _m.remove(key);
+}
+
+/// A11-latency-fix — test double for the emergency-delivery hook. Counts calls
+/// and can throw to prove a misbehaving hook never aborts the publish.
+class _CountingEmergencyDelivery implements EmergencyMeshDelivery {
+  _CountingEmergencyDelivery({this.throwOnCall = false});
+  final bool throwOnCall;
+  int calls = 0;
+  @override
+  void requestEmergencyConnect() {
+    calls++;
+    if (throwOnCall) throw StateError('emergency hook boom');
+  }
 }
 
 Future<List<Map<String, Object?>>> _queryOutboxRows(DatabaseHelper db) async {

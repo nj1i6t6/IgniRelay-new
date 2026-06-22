@@ -280,6 +280,33 @@ class _PendingPublish {
   });
 }
 
+/// A11-latency-fix — narrow emergency-delivery seam.
+///
+/// When an emergency event (SOS_RED / SOS_YELLOW / SAFE — see the predicate in
+/// [EventPublisherV2Facade.publishStatusUpdate]) is published but there is no
+/// peer `isReadyForTraffic`, the facade enqueues the envelope as usual AND asks
+/// this hook to trigger an immediate connection attempt — bypassing the normal
+/// gossip reconnect/cooldown window — so the EXISTING queue-drain path
+/// (`_onPeerStateChange` → `_drainQueue`) sends the already-enqueued envelope
+/// within seconds instead of waiting up to a full peer cooldown.
+///
+/// Contract:
+///   • Fire-and-forget — `requestEmergencyConnect` MUST NOT block the publish
+///     and MUST NOT throw to the facade (the facade still guards with a
+///     try/catch as defence in depth). A failure here never aborts publish;
+///     the outcome stays `queued`.
+///   • It does NOT create or carry an envelope. Exactly one envelope is minted
+///     per publish (in `_broadcast`); this hook only accelerates connectivity.
+///
+/// The production implementation lives in the mesh layer (it pokes the BLE
+/// connection state machine); UI never touches it. Injected at the app root so
+/// the facade depends only on this abstraction and stays unit-testable.
+abstract class EmergencyMeshDelivery {
+  /// Request an immediate connection attempt to nearby peers for emergency
+  /// delivery. Idempotent / cheap to call repeatedly. Never throws.
+  void requestEmergencyConnect();
+}
+
 class EventPublisherV2Facade {
   /// Cap on the local pending queue. Older entries are dropped first
   /// (FIFO). Chosen so a small mesh with intermittent peers can absorb
@@ -300,6 +327,13 @@ class EventPublisherV2Facade {
   /// wiring → publishes carry the zero field_id (legacy behaviour); production
   /// always attaches one via [attachActiveField].
   ActiveFieldController? _activeField;
+
+  /// A11-latency-fix — optional emergency-delivery hook. When attached, an
+  /// emergency publish (see [publishStatusUpdate]) that finds no ready peer
+  /// triggers an immediate connection attempt so the queued envelope drains
+  /// within seconds. `null` in tests / pre-wiring → emergency publishes simply
+  /// queue and wait for the normal gossip cycle (pre-A11-latency-fix behaviour).
+  EmergencyMeshDelivery? _emergencyDelivery;
 
   StreamSubscription<PeerCapabilityState>? _registrySub;
   final ListQueue<_PendingPublish> _pending = ListQueue<_PendingPublish>();
@@ -331,10 +365,12 @@ class EventPublisherV2Facade {
     DateTime Function()? now,
     DatabaseHelper? db,
     Uint8List Function()? envelopeIdFactory,
+    EmergencyMeshDelivery? emergencyDelivery,
   })  : _registry = registry,
         _bridge = bridge,
         _now = now ?? DateTime.now,
         _db = db,
+        _emergencyDelivery = emergencyDelivery,
         _newEnvelopeId = envelopeIdFactory ?? MessagePublisherV2.newEnvelopeId {
     _registrySub = _registry.changes.listen(_onPeerStateChange);
     _hydration = _hydrateFromOutbox();
@@ -375,6 +411,14 @@ class EventPublisherV2Facade {
   /// publishes with the zero field_id (the pre-A5 / unit-test default).
   void attachActiveField(ActiveFieldController controller) {
     _activeField = controller;
+  }
+
+  /// A11-latency-fix — attach the emergency-delivery hook once the BLE
+  /// connection layer is available (wired from `main.dart`). Until attached,
+  /// emergency publishes queue and wait for the normal gossip cycle. Idempotent
+  /// replace; pass a fresh hook to swap (teardown can pass back a no-op).
+  void attachEmergencyDelivery(EmergencyMeshDelivery delivery) {
+    _emergencyDelivery = delivery;
   }
 
   Future<void> dispose() async {
@@ -447,12 +491,31 @@ class EventPublisherV2Facade {
     // numeric value (lower = more severe) per priority_matrix_v2.dart.
     final effectivePriority =
         PriorityV2.moreSevere(priority, data.impliedPriorityFloor());
+    // A11-latency-fix — emergency-delivery predicate. Keyed on PRIORITY and
+    // SAFETY STATE, never on event type: SOS / SAFE / PRESENCE all *could* be
+    // STATUS_UPDATE, so an `eventType == statusUpdate` test would wrongly sweep
+    // in PRESENCE. PRESENCE never reaches THIS method (it rides
+    // `publishPresence` → `eventType == presence`), so the only STATUS_UPDATEs
+    // here are SOS-class and SAFE. The three emergency cases:
+    //   • TRAPPED  → floor SOS_RED    → effectivePriority == sosRed
+    //   • INJURED / urgent need → floor SOS_YELLOW → effectivePriority == sosYellow
+    //   • SAFE ("我安全了") → effectivePriority STAYS status, so we additionally
+    //     fire on `safetyState == SAFE` — the SOS RESOLUTION must propagate fast
+    //     too, otherwise responders keep reacting to a stale SOS.
+    // A non-SOS, non-SAFE status (e.g. UNSAFE with no urgent needs → STATUS)
+    // is NOT emergency. (The dead legacy `EventPublisher.publishEvent`
+    // urgency-0 → SAFE mapping has no production caller; even if it fired, a
+    // deliberate SAFE/cancel broadcast is fine to accelerate.)
+    final isEmergency = effectivePriority == PriorityV2.sosRed ||
+        effectivePriority == PriorityV2.sosYellow ||
+        safetyState == SafetyState.safe;
     return _broadcast(
       eventType: EventTypeV2.statusUpdate,
       priority: effectivePriority,
       payload: data.encode(),
       ttlOffset: const Duration(hours: 12), // §11.2 STATUS_UPDATE default
       maxHops: EventTypeV2.maxHopsDefault(EventTypeV2.statusUpdate) ?? 6,
+      emergency: isEmergency,
     );
   }
 
@@ -633,6 +696,12 @@ class EventPublisherV2Facade {
     required Uint8List payload,
     required Duration ttlOffset,
     required int maxHops,
+    // A11-latency-fix — true only for SOS_RED / SOS_YELLOW / SAFE (set by
+    // [publishStatusUpdate]). When true AND the publish has to queue (no ready
+    // peer / no bridge), the emergency-delivery hook is poked so the queued
+    // envelope drains within seconds. Defaults false: PRESENCE / CHECKPOINT /
+    // HAZARD / ADMIN_BROADCAST never set it, so they keep their normal cadence.
+    bool emergency = false,
   }) async {
     final field = _resolvePublishField(eventType);
     if (field.rejected) {
@@ -673,6 +742,9 @@ class EventPublisherV2Facade {
         fieldId: fieldId,
         fieldMacKey: fieldMacKey,
       ));
+      // Emergency event with no transport yet → accelerate connectivity so the
+      // queued envelope sends as soon as the bridge attaches AND a peer is ready.
+      _maybeRequestEmergencyConnect(emergency);
       return BroadcastOutcome.bridgeNotReady(_pending.length);
     }
 
@@ -693,6 +765,12 @@ class EventPublisherV2Facade {
         fieldId: fieldId,
         fieldMacKey: fieldMacKey,
       ));
+      // No peer is ready right now: for an emergency, don't wait for the next
+      // gossip reconnect — poke the hook to connect immediately. The SAME
+      // already-enqueued envelope (one envelope_id) drains via
+      // `_onPeerStateChange` → `_drainQueue` once a peer reaches
+      // isReadyForTraffic. No second envelope is created.
+      _maybeRequestEmergencyConnect(emergency);
       return BroadcastOutcome.queued(_pending.length);
     }
 
@@ -709,6 +787,20 @@ class EventPublisherV2Facade {
       fieldId: fieldId,
       fieldMacKey: fieldMacKey,
     );
+  }
+
+  /// A11-latency-fix — best-effort emergency-connect trigger. Only fires for
+  /// emergency publishes that had to queue. Guarded so a throwing/missing hook
+  /// NEVER aborts or changes the publish outcome (which stays `queued`).
+  void _maybeRequestEmergencyConnect(bool emergency) {
+    if (!emergency) return;
+    final hook = _emergencyDelivery;
+    if (hook == null) return;
+    try {
+      hook.requestEmergencyConnect();
+    } catch (e) {
+      debugPrint('[EventPublisherV2Facade] emergency-connect hook threw: $e');
+    }
   }
 
   Future<BroadcastOutcome> _sendToPeers({

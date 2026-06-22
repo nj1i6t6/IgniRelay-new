@@ -42,6 +42,26 @@ class BleManager {
   // 節點冷卻時間
   final Map<String, DateTime> _peerCooldown = {};
 
+  // A11-latency-fix — emergency-delivery window.
+  //
+  // While `DateTime.now()` is before [_emergencyConnectUntil], the per-peer
+  // cooldown is bypassed (see [_isInCooldown]) so an SOS/SAFE can reconnect
+  // immediately instead of waiting up to kPeerCooldownSec for the next gossip
+  // cycle. Set by [requestEmergencyConnect] (poked from the v2 publish facade
+  // via an injected EmergencyMeshDelivery hook); never persisted.
+  //
+  // This is a NARROW, ADDITIVE change: it only relaxes WHEN a connect is
+  // allowed to start. The connect → v2-sync → 2s → disconnect flow and the
+  // cooldown duration itself are unchanged; once the window lapses, normal
+  // gossip cadence resumes.
+  static const int _kEmergencyConnectWindowSec = 15;
+  DateTime? _emergencyConnectUntil;
+
+  bool get _inEmergencyWindow {
+    final until = _emergencyConnectUntil;
+    return until != null && DateTime.now().isBefore(until);
+  }
+
   // 待連線設備佇列（序列化處理，避免 Android BLE 並行 GATT 衝突）
   // 存 String (deviceAddress)，統一走 NativeBridge
   final List<dynamic> _pendingDevices = [];
@@ -101,6 +121,41 @@ class BleManager {
     await NativeBridge.stopNordicScan();
     await _nordicEventSub?.cancel();
     _nordicEventSub = null;
+  }
+
+  /// A11-latency-fix — request an immediate connection attempt for emergency
+  /// delivery (SOS / SAFE). Poked by the v2 publish facade (via an injected
+  /// EmergencyMeshDelivery hook) when an emergency event has to queue because
+  /// no peer is ready.
+  ///
+  /// Effect (narrow, additive — see [_emergencyConnectUntil]):
+  ///   1. Opens a short window during which [_isInCooldown] returns false, so
+  ///      peers we just synced with become connectable again immediately.
+  ///   2. Proactively re-queues those recently-synced peers so we reconnect
+  ///      NOW rather than waiting for the next scan to re-discover them.
+  /// The connection then brings up the v2 HELLO → registry `isReadyForTraffic`
+  /// → the facade's existing queue drain sends the already-enqueued envelope.
+  ///
+  /// No-op when the transport is not running (nothing to accelerate). Safe to
+  /// call repeatedly; never throws.
+  void requestEmergencyConnect() {
+    if (!_isActive) {
+      _dlog('EMERGENCY_CONNECT ignored (transport inactive)');
+      return;
+    }
+    _emergencyConnectUntil =
+        DateTime.now().add(const Duration(seconds: _kEmergencyConnectWindowSec));
+    _dlog('EMERGENCY_CONNECT → cooldown bypassed for ${_kEmergencyConnectWindowSec}s '
+        '(known=${_knownPeers.length}, cooldown=${_peerCooldown.length})');
+    // Re-queue recently-synced peers (still within their normal cooldown) so we
+    // reconnect immediately. The cooldown gate is bypassed for the window above.
+    for (final peer in _peerCooldown.keys.toList()) {
+      if (!_pendingDevices.contains(peer)) {
+        _knownPeers.add(peer);
+        _pendingDevices.add(peer);
+      }
+    }
+    _processQueue();
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -812,6 +867,10 @@ class BleManager {
   }
 
   bool _isInCooldown(String deviceId) {
+    // A11-latency-fix — during an emergency window an SOS/SAFE must reach a
+    // peer ASAP, so the cooldown is bypassed entirely (any nearby peer,
+    // including ones we just synced with, becomes connectable again).
+    if (_inEmergencyWindow) return false;
     final last = _peerCooldown[deviceId];
     if (last == null) return false;
     return DateTime.now().difference(last) <

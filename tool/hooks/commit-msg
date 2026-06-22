@@ -1,0 +1,90 @@
+#!/bin/sh
+# IgniRelay commit-msg hook — enforces two-stage commit flow
+#
+# Rules (read from staged + commit message):
+#   1. Message starts with "docs: STATUS entry" => STATUS.md must be staged (else block).
+#      On success, clears .git/STATUS_PENDING marker.
+#   2. Functional commit (message NOT starting with "docs:") + staged code change
+#      (lib/, test/, tool/, ignirelay_app/{lib,test,tool,android,ios,pubspec}*)
+#      => allow and write .git/STATUS_PENDING marker.
+#   3. If .git/STATUS_PENDING exists and this message is not "docs: STATUS entry"
+#      => block: previous functional commit still lacks STATUS.
+#
+# Pure-docs commits (message starts with "docs:" but not "docs: STATUS entry")
+# are allowed without touching PENDING.
+#
+# Exit 0 = allow / 1 = block
+
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null)
+if [ -z "$repo_root" ]; then exit 0; fi
+
+pending="$repo_root/.git/STATUS_PENDING"
+msg_file="$1"
+first_line=""
+if [ -n "$msg_file" ] && [ -f "$msg_file" ]; then
+  first_line=$(grep -v '^#' "$msg_file" 2>/dev/null | grep -v '^[[:space:]]*$' | head -n 1)
+fi
+# strip leading UTF-8 BOM
+first_line=$(printf '%s' "$first_line" | sed '1s/^\xEF\xBB\xBF//')
+
+case "$first_line" in
+  "docs: STATUS entry"*) is_status_commit=1;;
+  docs:*) is_status_commit=0; is_docs_commit=1;;
+  *) is_status_commit=0; is_docs_commit=0;;
+esac
+
+staged=$(git -C "$repo_root" diff --cached --name-only 2>/dev/null)
+staged_status_md=0
+has_code_change=0
+for f in $staged; do
+  if [ "$f" = "STATUS.md" ]; then staged_status_md=1; fi
+  case "$f" in
+    lib/*|test/*|tool/*|ignirelay_app/lib/*|ignirelay_app/test/*|ignirelay_app/tool/*|ignirelay_app/android/*|ignirelay_app/ios/*|ignirelay_app/pubspec*)
+      has_code_change=1;;
+  esac
+done
+
+# Rule 3: PENDING exists and not a STATUS commit => block
+if [ -f "$pending" ] && [ "$is_status_commit" -eq 0 ]; then
+  echo "" >&2
+  echo "========================================================" >&2
+  echo " pre-commit BLOCKED" >&2
+  echo "========================================================" >&2
+  echo " 上一個功能 commit 尚未補 STATUS.md。" >&2
+  echo " 依兩段式 commit 慣例，功能 commit 後必須緊接：" >&2
+  echo "   1. 更新 STATUS.md（append 新 entry + 覆寫檔尾 Current State 段）" >&2
+  echo "   2. git add STATUS.md" >&2
+  echo "   3. git commit -m \"docs: STATUS entry — <任務> DONE @ <hash>\"" >&2
+  echo "" >&2
+  echo " 補完 STATUS commit 後才可繼續其他 commit。" >&2
+  echo "========================================================" >&2
+  echo "" >&2
+  exit 1
+fi
+
+if [ "$is_status_commit" -eq 1 ]; then
+  # Rule 1: STATUS commit must stage STATUS.md
+  if [ "$staged_status_md" -eq 0 ]; then
+    echo "" >&2
+    echo "========================================================" >&2
+    echo " pre-commit BLOCKED" >&2
+    echo "========================================================" >&2
+    echo " 此 commit 訊息為 \"docs: STATUS entry...\" 但未 staged STATUS.md。" >&2
+    echo " 請先更新 STATUS.md 並 git add STATUS.md。" >&2
+    echo "========================================================" >&2
+  echo "" >&2
+    exit 1
+  fi
+  rm -f "$pending"
+  echo "[commit-msg] STATUS entry commit 放行，PENDING 標記已清除。"
+  exit 0
+fi
+
+if [ "$is_docs_commit" -eq 0 ] && [ "$has_code_change" -eq 1 ]; then
+  # Rule 2: functional commit => mark PENDING
+  date '+%Y-%m-%d %H:%M:%S' > "$pending"
+  echo "[commit-msg] 功能 commit 放行。已標記 STATUS_PENDING — 下一步必須補 STATUS.md 並做 \"docs: STATUS entry\" commit。"
+  exit 0
+fi
+
+exit 0

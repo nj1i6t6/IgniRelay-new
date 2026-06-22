@@ -1,6 +1,5 @@
 {
   "@@locale": "en",
-
   "appTitle": "IgniRelay",
   "mainStartupLoading": "IgniRelay Starting...",
   "mainBluetoothDialogTitle": "Bluetooth Required",
@@ -9,1446 +8,48 @@
   "mainBluetoothDialogConfirm": "Enable Bluetooth",
   "mainBleFailSnack": "BLE Mesh failed to start: {error}",
   "@mainBleFailSnack": {
-    "placeholders": { "error": {"type": "String"} }
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   },
   "mainPermissionSnack": "Bluetooth and location permissions are required for Mesh networking",
-
-  "tabMap": "Offline Map",
-  "tabMeshGuard": "Mesh Guard",
-  "tabChat": "Chat",
-  "tabMatch": "Supply Match",
-  "tabProfile": "Identity",
-  "mainTabSosYellowSnack": "Help signal received: {desc}",
-  "@mainTabSosYellowSnack": {
-    "placeholders": { "desc": {"type": "String"} }
-  },
-  "mainTabSosYellowAction": "View Map",
-  "mainTabSosRedDialogTitle": "Emergency SOS Signal!",
-  "mainTabSosRedDialogFallback": "Someone nearby sent an emergency SOS",
-  "mainTabSosRedDialogContent": "This signal was transmitted via Mesh network. The sender may be nearby.\nPlease check the map for location info.",
-  "mainTabSosRedDialogDismiss": "Got it",
-  "mainTabSosRedDialogViewMap": "View Map",
-  "mainTabMatchNotifProvider": "Someone is willing to provide what you need! Tap to view.",
-  "mainTabMatchNotifRequester": "Someone needs your supplies! Tap to view.",
-  "mainTabMatchNotifAction": "View Match",
-
-  "onboardingBadgeL0": "Anonymous (L0)",
-  "onboardingBadgeL1": "Phone Verified (L1)",
-  "onboardingBadgeL2": "Community Endorsed (L2)",
-  "onboardingBadgeL3": "Gov. Verified (L3)",
-  "onboardingDeviceId": "Device ID: {pubKeyHex}...",
-  "@onboardingDeviceId": {
-    "placeholders": { "pubKeyHex": {"type": "String"} }
-  },
-  "onboardingTitle": "IgniRelay\nOffline Mesh Disaster Relief System",
-  "onboardingDesc": "Build a self-organizing network via BLE Mesh even without internet.\nTransmit SOS and supply matching messages in real time.",
-  "onboardingNicknameHint": "Set your nickname (optional)",
-  "onboardingUpgradeDialogTitle": "Phone Verification (L1)",
-  "onboardingUpgradeDialogContent": "Verify your phone number via SMS OTP\nto upgrade trust level to L1 (Bronze).\n\nMore features will be unlocked after verification.",
-  "onboardingUpgradeDialogConfirm": "Confirm Upgrade",
-  "onboardingUpgradeSnack": "Upgraded to L1 (Bronze) - Phone Verified",
-  "onboardingUpgradeButton": "Upgrade to L1 (Phone Verification)",
-  "onboardingStartButton": "Start Using IgniRelay",
-
-  "profileTitle": "Identity & Trust",
-  "profileBadgeDescL0": "Auto-generated Ed25519 key, no network needed",
-  "profileBadgeDescL1": "Phone number linked, trust level increased",
-  "profileBadgeDescL2": "Endorsed by 3+ users",
-  "profileBadgeDescL3": "Verified via TW FidO government identity",
-  "profileAnonymous": "Anonymous User",
-  "profileNicknameDialogTitle": "Edit Nickname",
-  "profileNicknameDialogHint": "Enter new nickname",
-  "profileNicknameDialogCancel": "Cancel",
-  "profileNicknameDialogSave": "Save",
-  "profileNicknameUpdated": "Nickname updated to \"{nickname}\"",
-  "@profileNicknameUpdated": {
-    "placeholders": { "nickname": {"type": "String"} }
-  },
-  "profileNicknameCleared": "Nickname cleared",
-  "profilePubKeyLabel": "Public Key (Ed25519)",
-  "profilePubKeyLoading": "Loading...",
-  "profileBatteryButton": "Background / Battery Optimization Settings",
-  "profileMedicalCardEdit": "Edit Medical Card",
-  "profileMedicalCardCreate": "Create Medical Card",
-  "profileTrustPhoneVerify": "Phone Verification",
-  "profileTrustNotOpen": "Not yet available",
-  "profileUpgradeSnack": "Upgraded to Phone Verified (L1) (pending backend SMS OTP integration)",
-  "profileLanguageLabel": "Language",
-
-  "mapTitle": "Offline Map",
-  "mapLayerControlTooltip": "Layer Control",
-  "mapLegendTooltip": "Legend",
-  "mapRefreshTooltip": "Refresh",
-  "mapLoading": "Loading offline map...",
-  "mapLoadingNote": "(First launch: extracting 201MB map takes a moment)",
-  "mapErrorTitle": "Offline Map Unavailable",
-  "mapErrorUnknown": "Unknown error",
-  "mapErrorAssetNote": "Please verify assets/maps/taiwan_ignirelay.mbtiles is properly bundled",
-  "mapRetryButton": "Retry",
-  "mapMbtilesNotFound": "Offline map file not found (taiwan_ignirelay.mbtiles)",
-  "mapMbtilesLoadFail": "Map loading failed: {error}",
-  "@mapMbtilesLoadFail": {
-    "placeholders": { "error": {"type": "String"} }
-  },
-  "mapHazardRoadblock": "Road Blocked",
-  "mapHazardFire": "Fire",
-  "mapHazardChemical": "Chemical/Toxic",
-  "mapHazardFlood": "Flood",
-  "mapHazardCollapse": "Building Collapse",
-  "mapHazardLandslide": "Landslide",
-  "mapEventSosRed": "SOS Emergency",
-  "mapEventSosYellow": "Help Request",
-  "mapEventSupply": "Supply",
-  "mapEventInfo": "Info",
-  "mapEventTypeSupply": "Supply Available",
-  "mapEventTypeRequest": "Supply Request",
-  "mapEventTypeUnknown": "Event (type={eventType})",
-  "@mapEventTypeUnknown": {
-    "placeholders": { "eventType": {"type": "int"} }
-  },
-  "mapPoiHospital": "Hospital",
-  "mapPoiClinic": "Clinic",
-  "mapPoiNursingHome": "Nursing Home",
-  "mapPoiPharmacy": "Pharmacy",
-  "mapPoiPolice": "Police Station",
-  "mapPoiFireStation": "Fire Station",
-  "mapPoiSchool": "School",
-  "mapPoiUniversity": "University",
-  "mapPoiSupermarket": "Supermarket",
-  "mapPoiConvenience": "Convenience Store",
-  "mapPoiMall": "Mall",
-  "mapPoiGasStation": "Gas Station",
-  "mapPoiRestaurant": "Restaurant",
-  "mapPoiCafe": "Café",
-  "mapPoiBank": "Bank",
-  "mapPoiPostOffice": "Post Office",
-  "mapPoiReligious": "Place of Worship",
-  "mapPoiParking": "Parking",
-  "mapPoiShop": "Shop",
-  "mapPoiInfoAddress": "Address",
-  "mapPoiInfoPhone": "Phone",
-  "mapPoiInfoOpen": "Open",
-  "mapPoiInfoNoDetail": "(No details available for this location)",
-  "mapDayMonday": "Monday",
-  "mapDayTuesday": "Tuesday",
-  "mapDayWednesday": "Wednesday",
-  "mapDayThursday": "Thursday",
-  "mapDayFriday": "Friday",
-  "mapDaySaturday": "Saturday",
-  "mapDaySunday": "Sunday",
-  "mapDayHoliday": "Public Holiday",
-  "mapDayClosed": "Closed",
-  "mapCredibilityConfirmed": "Confirmed",
-  "mapCredibilityCredible": "Credible",
-  "mapCredibilityEndorsed": "Endorsed",
-  "mapCredibilityUnverified": "Unverified",
-  "mapTimeAgoMinutes": "{mins} min ago",
-  "@mapTimeAgoMinutes": {
-    "placeholders": { "mins": {"type": "int"} }
-  },
-  "mapTimeAgoHours": "{hours} hr ago",
-  "@mapTimeAgoHours": {
-    "placeholders": { "hours": {"type": "int"} }
-  },
-  "mapTimeAgoDays": "{days} days ago",
-  "@mapTimeAgoDays": {
-    "placeholders": { "days": {"type": "int"} }
-  },
-  "mapMarkingNearbyExists": "Nearby report exists",
-  "mapMarkingNearbyContent": "A \"{typeLabel}\" hazard was reported {distanceMeters}m away ({confirmCount} confirmation(s)).\n\nTap 'Confirm' to increase credibility, or create a new marker.",
-  "@mapMarkingNearbyContent": {
-    "placeholders": {
-      "distanceMeters": {"type": "int"},
-      "typeLabel": {"type": "String"},
-      "confirmCount": {"type": "int"}
-    }
-  },
-  "mapMarkingCreateNew": "Create new marker",
-  "mapMarkingConfirmReport": "Confirm report",
-  "mapMarkingEditTitle": "Edit Hazard Marker",
-  "mapMarkingNewTitle": "Mark Hazard Zone",
-  "mapMarkingTapHint": "  Tap the map to move marker position",
-  "mapMarkingSeverityLabel": " Severity",
-  "mapMarkingRadiusLabel": " Radius",
-  "mapMarkingDescHint": "Describe the situation (optional)",
-  "mapMarkingUpdateButton": "Update Marker",
-  "mapMarkingPublishButton": "Publish to Mesh",
-  "mapHazardUpdatedSnack": "Hazard marker updated",
-  "mapHazardPublishedSnack": "Hazard marker published to Mesh",
-  "mapHazardDeleteTitle": "Clear Hazard Marker?",
-  "mapHazardDeleteContent": "This marker will be removed from the map.",
-  "mapHazardDeleteCancel": "Cancel",
-  "mapHazardDeleteConfirm": "Clear",
-  "mapHazardDeletedSnack": "Hazard marker cleared",
-  "mapHazardInfoSeverity": "Severity",
-  "mapHazardInfoRadius": "Affected area: {radius}m",
-  "@mapHazardInfoRadius": {
-    "placeholders": { "radius": {"type": "int"} }
-  },
-  "mapHazardInfoDesc": "Description: {desc}",
-  "@mapHazardInfoDesc": {
-    "placeholders": { "desc": {"type": "String"} }
-  },
-  "mapHazardInfoTime": "Reported: {timeAgo}",
-  "@mapHazardInfoTime": {
-    "placeholders": { "timeAgo": {"type": "String"} }
-  },
-  "mapHazardInfoMine": "Your report",
-  "mapHazardInfoEditButton": "Edit",
-  "mapHazardInfoConfirmButton": "Confirm this report",
-  "mapHazardConfirmSnack": "Confirmed \"{typeLabel}\" report ({count} people)",
-  "@mapHazardConfirmSnack": {
-    "placeholders": {
-      "typeLabel": {"type": "String"},
-      "count": {"type": "int"}
-    }
-  },
-  "mapEventInfoDistance": "Distance: {distance}",
-  "@mapEventInfoDistance": {
-    "placeholders": { "distance": {"type": "String"} }
-  },
-  "mapEventInfoTime": "Time: {timeAgo}",
-  "@mapEventInfoTime": {
-    "placeholders": { "timeAgo": {"type": "String"} }
-  },
-  "mapLongPressHint": "Long press map → Mark hazard zone",
-  "mapSosSentLabel": "SOS Sent  ✕ Cancel",
-  "mapSosButton": "SOS",
-  "mapSosHoldHint": "Hold 1.5s to send SOS",
-  "mapCancelSosTitle": "Cancel SOS",
-  "mapCancelSosContent": "Are you sure you want to cancel the SOS signal?\nOther devices will be notified.",
-  "mapCancelSosBack": "Back",
-  "mapCancelSosConfirm": "Confirm Cancel",
-  "mapSosCancelledPrefix": "[SOS Cancelled]",
-  "mapSosCancelledSnack": "SOS Cancelled",
-  "mapSosCancelFailSnack": "Cancel failed: {error}",
-  "@mapSosCancelFailSnack": {
-    "placeholders": { "error": {"type": "String"} }
-  },
-  "mapGpsNotReady": "GPS not ready. Please ensure location services are enabled",
-  "mapTriageBroadcastLabel0": "Info",
-  "mapTriageBroadcastLabel1": "Supply Request",
-  "mapTriageBroadcastLabel2": "Help (Yellow)",
-  "mapTriageBroadcastLabel3": "Emergency SOS (Red)",
-  "mapTriageBroadcastSnack": "Broadcast {label}: {desc}",
-  "@mapTriageBroadcastSnack": {
-    "placeholders": {
-      "label": {"type": "String"},
-      "desc": {"type": "String"}
-    }
-  },
-  "mapLegendTitle": "Relief Landmarks (Offline Tiles)",
-  "mapLegendZoomHint": "Zoom to street level to load POIs",
-  "mapLegendHospital": "Hospital/Clinic",
-  "mapLegendPolice": "Police/Fire Station",
-  "mapLegendSchool": "School (Shelter)",
-  "mapLegendPharmacy": "Pharmacy (Medical Supplies)",
-  "mapLegendSupermarket": "Supermarket/Convenience Store",
-  "mapLegendMeshEvents": "Mesh Events",
-  "mapPayloadQtyUnit": "{name} {qty} {unit}",
-  "@mapPayloadQtyUnit": {
-    "placeholders": {
-      "name": {"type": "String"},
-      "qty": {"type": "int"},
-      "unit": {"type": "String"}
-    }
-  },
-  "mapPayloadQtyPcs": "{name} {qty} pcs",
-  "@mapPayloadQtyPcs": {
-    "placeholders": {
-      "name": {"type": "String"},
-      "qty": {"type": "int"}
-    }
-  },
-
-  "mapLayerTitle": "Layer Control",
-  "mapLayerPoiSection": "POI Icons",
-  "mapLayerHazardSection": "Hazard Zones",
-  "mapLayerPoiHospital": "Hospital/Clinic",
-  "mapLayerPoiPharmacy": "Pharmacy",
-  "mapLayerPoiPolice": "Police/Fire Station",
-  "mapLayerPoiSchool": "School (Shelter)",
-  "mapLayerPoiSupermarket": "Supermarket/Store",
-  "mapLayerHazardShowOthers": "Show others' reports",
-  "mapLayerHazardMinCredibility": "Min. credibility",
-  "mapLayerCredAll": "Show all",
-  "mapLayerCredAllDesc": "Including unverified",
-  "mapLayerCred2": "2+ people",
-  "mapLayerCred2Desc": "Endorsed",
-  "mapLayerCred3": "3+ people",
-  "mapLayerCred3Desc": "Multiple reports",
-  "mapLayerCred5": "Confirmed (5+)",
-  "mapLayerCred5Desc": "Highly credible",
-
-  "triageTitle": "Emergency Broadcast",
-  "triageDescHint": "Describe needs or supplies (e.g., need water, have first aid kit)",
-  "triageMedicalCardToggle": "Include medical card info",
-  "triageMedicalCardOn": "Enabled",
-  "triageMedicalCardOff": "Disabled",
-  "triageSosYellowButton": "Help (SOS_YELLOW)",
-  "triageSosRedButton": "Send SOS_RED Emergency Now",
-  "triageSosRedCountdown": "Holding... {seconds}s remaining",
-  "@triageSosRedCountdown": {
-    "placeholders": { "seconds": {"type": "int"} }
-  },
-  "triageSosRedHoldHint": "Hold 3 seconds to unlock critical SOS (SOS_RED)",
-
-  "hazardDialogTitle": "Mark Hazard Zone",
-  "hazardDialogCoordinate": "Coordinates: {lat}, {lng}",
-  "@hazardDialogCoordinate": {
-    "placeholders": {
-      "lat": {"type": "String"},
-      "lng": {"type": "String"}
-    }
-  },
-  "hazardDialogTypeLabel": "Hazard Type",
-  "hazardDialogSeverityLabel": "Severity",
-  "hazardDialogSeverityMin": "Minor",
-  "hazardDialogSeverityMax": "Critical",
-  "hazardDialogRadiusLabel": "Affected Radius",
-  "hazardDialogDescHint": "Describe the situation (optional)",
-  "hazardDialogCancel": "Cancel",
-  "hazardDialogPublish": "Publish to Mesh",
-
-  "matchTitle": "Supply Matching",
-  "matchTabSupplies": "My Supplies",
-  "matchTabRequests": "My Requests",
-  "matchTabNegotiations": "Active",
-  "matchTabCommunity": "Community",
-  "matchFabRegisterSupply": "Register Supply",
-  "matchFabPublishRequest": "Publish Request",
-  "matchNegAcceptedSnack": "Negotiation accepted",
-  "matchNegDeclinedSnack": "Negotiation declined",
-  "matchNegCancelledSnack": "Negotiation cancelled",
-  "matchHandoffCompleteSnack": "Handoff complete",
-  "matchNegExpiredSnack": "Negotiation expired",
-  "matchOverQuantityWarning": "Over-quantity warning",
-  "matchLoadError": "Load error: {error}",
-  "@matchLoadError": {
-    "placeholders": { "error": {"type": "String"} }
-  },
-  "matchGpsOpenSettings": "Open Settings",
-  "matchGpsEnableLocation": "Enable Location",
-  "matchRetry": "Retry",
-  "matchUrgencyEmergency": "Emergency SOS",
-  "matchUrgencyHelp": "Help",
-  "matchUrgencySupply": "Supply",
-  "matchUrgencyInfo": "Info",
-  "matchCountdownExpired": "Expired",
-  "matchCancelSupplySnack": "Supply cancelled: {name}",
-  "@matchCancelSupplySnack": {
-    "placeholders": { "name": {"type": "String"} }
-  },
-  "matchCancelRequestSnack": "Request cancelled: {name}",
-  "@matchCancelRequestSnack": {
-    "placeholders": { "name": {"type": "String"} }
-  },
-  "matchCancelFailSnack": "Cancel failed: {error}",
-  "@matchCancelFailSnack": {
-    "placeholders": { "error": {"type": "String"} }
-  },
-  "matchAcceptSnack": "Negotiation accepted",
-  "matchAcceptFailSnack": "Accept failed: {error}",
-  "@matchAcceptFailSnack": {
-    "placeholders": { "error": {"type": "String"} }
-  },
-  "matchDeclineSnack": "Negotiation declined",
-  "matchDeclineFailSnack": "Decline failed: {error}",
-  "@matchDeclineFailSnack": {
-    "placeholders": { "error": {"type": "String"} }
-  },
-  "matchCommunityRequestSnack": "Published request for {qty} pcs \"{name}\"",
-  "@matchCommunityRequestSnack": {
-    "placeholders": {
-      "qty": {"type": "int"},
-      "name": {"type": "String"}
-    }
-  },
-  "matchCommunitySupplySnack": "Registered supply of {qty} pcs \"{name}\"",
-  "@matchCommunitySupplySnack": {
-    "placeholders": {
-      "qty": {"type": "int"},
-      "name": {"type": "String"}
-    }
-  },
-  "matchCommunityFailSnack": "Publish failed: {error}",
-  "@matchCommunityFailSnack": {
-    "placeholders": { "error": {"type": "String"} }
-  },
-  "matchCommunityNote": "Respond to community supply",
-
-  "suppliesEmptyTitle": "No supplies registered",
-  "suppliesEmptySubtitle": "Tap the button below to register supplies you can provide",
-  "suppliesStatusExhausted": "Exhausted",
-  "suppliesStatusPartial": "Partially Committed",
-  "suppliesStatusAvailable": "Available",
-  "suppliesDeliveryDeliver": "Can deliver",
-  "suppliesDeliveryPickup": "Requester picks up",
-  "suppliesQtyTotal": "Total",
-  "suppliesQtyAvailable": "Available",
-  "suppliesQtyCommitted": "Committed",
-  "suppliesCancelButton": "Cancel",
-  "suppliesCancelDialogTitle": "Cancel Supply",
-  "suppliesCancelDialogContent": "Are you sure you want to cancel \"{name}\"?\nIt will be removed from the Mesh network.",
-  "@suppliesCancelDialogContent": {
-    "placeholders": { "name": {"type": "String"} }
-  },
-  "suppliesCancelDialogBack": "Back",
-  "suppliesCancelDialogConfirm": "Confirm Cancel",
-  "suppliesNotFoundSnack": "Could not find the corresponding publish record",
-
-  "requestsEmptyTitle": "No requests published",
-  "requestsEmptySubtitle": "Tap the button below to publish supply requests",
-  "requestsStatusMatching": "Matching",
-  "requestsStatusFulfilled": "Fulfilled",
-  "requestsStatusWaiting": "Waiting",
-  "requestsQtyNeeded": "Needed",
-  "requestsQtyRemaining": "Remaining",
-  "requestsQtyFulfilled": "Fulfilled",
-  "requestsQtyUnit": "pcs",
-  "requestsProposalsTitle": "Received proposals:",
-  "requestsProposalOffer": "Offering {qty} pcs",
-  "@requestsProposalOffer": {
-    "placeholders": { "qty": {"type": "int"} }
-  },
-  "requestsProposalRemaining": "Remaining {remaining}",
-  "@requestsProposalRemaining": {
-    "placeholders": { "remaining": {"type": "String"} }
-  },
-  "requestsAcceptButton": "Accept",
-  "requestsDeclineButton": "Decline",
-  "requestsCancelButton": "Cancel",
-  "requestsCancelDialogTitle": "Cancel Request",
-  "requestsCancelDialogContent": "Are you sure you want to cancel \"{name}\"?\nIt will be removed from the Mesh network.",
-  "@requestsCancelDialogContent": {
-    "placeholders": { "name": {"type": "String"} }
-  },
-  "requestsCancelDialogBack": "Back",
-  "requestsCancelDialogConfirm": "Confirm Cancel",
-
-  "negEmptyTitle": "No active negotiations",
-  "negEmptySubtitle": "Negotiations will appear here when someone responds to your supply or request",
-  "negStatusPending": "Pending",
-  "negStatusAccepted": "Accepted",
-  "negStatusNavigating": "Navigating",
-  "negRoleRequester": "Requester",
-  "negRoleProvider": "Provider",
-  "negRoleMeProvider": "I provide",
-  "negRoleMeRequester": "I need",
-  "negScoreUnit": "pts",
-  "negStaleLabel": "Stale",
-  "negViewMapButton": "View Map",
-  "negCancelButton": "Cancel",
-  "negCancelDialogTitle": "Cancel Negotiation",
-  "negCancelDialogContent": "Are you sure you want to cancel this negotiation?",
-  "negCancelDialogBack": "Back",
-  "negCancelDialogConfirm": "Confirm Cancel",
-  "negQtyUnit": "{qty} pcs",
-  "@negQtyUnit": {
-    "placeholders": { "qty": {"type": "int"} }
-  },
-
-  "communityEmptyTitle": "No community activity",
-  "communityEmptySubtitle": "Supply and request activity from nearby users will appear here",
-  "communityTypeSupply": "Available",
-  "communityTypeRequest": "Needed",
-  "communityActionNeed": "I need this",
-  "communityActionHelp": "I can help",
-  "communityDialogConfirmNeed": "Confirm needed quantity",
-  "communityDialogConfirmSupply": "Confirm supply quantity",
-  "communityDialogSupplyInfo": "Someone can provide \"{name}\" — {qty} pcs",
-  "@communityDialogSupplyInfo": {
-    "placeholders": {
-      "name": {"type": "String"},
-      "qty": {"type": "int"}
-    }
-  },
-  "communityDialogRequestInfo": "Someone needs \"{name}\" — {qty} pcs",
-  "@communityDialogRequestInfo": {
-    "placeholders": {
-      "name": {"type": "String"},
-      "qty": {"type": "int"}
-    }
-  },
-  "communityDialogHowManyNeed": "How many do you need?",
-  "communityDialogHowManySupply": "How many can you provide?",
-  "communityDialogQtyHint": "Quantity",
-  "communityDialogQtySuffix": "pcs",
-  "communityDialogCancel": "Cancel",
-  "communityDialogConfirmNeedButton": "Confirm Request",
-  "communityDialogConfirmSupplyButton": "Confirm Supply",
-  "communityDialogQtyError": "Quantity must be greater than 0",
-
-  "supplyRegTitle": "Register Supply",
-  "supplyRegCategoryLabel": "Supply Category",
-  "supplyRegSubCategoryLabel": "→ {categoryLabel} Sub-category",
-  "@supplyRegSubCategoryLabel": {
-    "placeholders": { "categoryLabel": {"type": "String"} }
-  },
-  "supplyRegItemLabel": "Specific Item (optional)",
-  "supplyRegExpiryLabel": "Expiry Date",
-  "supplyRegExpiryHint": "Tap to select expiry date (optional)",
-  "supplyRegConditionLabel": "Item Condition",
-  "supplyRegQtyLabel": "Quantity",
-  "supplyRegQtyValidator": "Please enter a quantity",
-  "supplyRegDeliverySection": "Handoff Method (multi-select)",
-  "supplyRegDeliveryDeliver": "I'll deliver",
-  "supplyRegDeliveryDeliverDesc": "Deliver supplies to the requester's location",
-  "supplyRegDeliveryPickup": "Requester picks up",
-  "supplyRegDeliveryPickupDesc": "Requester comes to my location",
-  "supplyRegDeliveryDropoff": "Drop-off",
-  "supplyRegDeliveryDropoffDesc": "Contactless handoff — place and notify for pickup",
-  "supplyRegNoteHint": "Notes (optional)",
-  "supplyRegRange": "Coverage radius: {km} km",
-  "@supplyRegRange": {
-    "placeholders": { "km": {"type": "String"} }
-  },
-  "supplyRegRangeNote": "* Auto-suggested based on terrain; adjustable manually",
-  "supplyRegPublishing": "Publishing...",
-  "supplyRegPublishButton": "Publish to Mesh Network",
-  "supplyRegSuccessSnack": "Supply published successfully!",
-  "supplyRegFailSnack": "Publish failed: {error}",
-  "@supplyRegFailSnack": {
-    "placeholders": { "error": {"type": "String"} }
-  },
-
-  "reqSheetTitle": "Publish Supply Request",
-  "reqSheetCategoryLabel": "What supplies do you need?",
-  "reqSheetSubCategoryLabel": "→ Sub-category",
-  "reqSheetItemLabel": "Specific Item (optional)",
-  "reqSheetQtyLabel": "Quantity Needed",
-  "reqSheetMobilitySection": "Handoff Method",
-  "reqSheetMobilityPickup": "I can pick up",
-  "reqSheetMobilityPickupDesc": "I can travel to collect supplies",
-  "reqSheetMobilityDelivery": "Need delivery",
-  "reqSheetMobilityDeliveryDesc": "Unable to move; need someone to deliver",
-  "reqSheetMobilityDropoff": "Contactless handoff",
-  "reqSheetMobilityDropoffDesc": "Provider drops off supplies; I pick up later",
-  "reqSheetRange": "Search radius: {km} km",
-  "@reqSheetRange": {
-    "placeholders": { "km": {"type": "String"} }
-  },
-  "reqSheetNoteHint": "Notes (optional)",
-  "reqSheetPublishing": "Broadcasting...",
-  "reqSheetPublishButton": "Publish Request to Mesh Network",
-  "reqSheetSuccessSnack": "Request broadcast to Mesh network!",
-  "reqSheetFailSnack": "Publish failed: {error}",
-  "@reqSheetFailSnack": {
-    "placeholders": { "error": {"type": "String"} }
-  },
-
-  "navTitle": "Navigation Guide",
-  "navDirectionProviderToReq": "Provider to Requester",
-  "navDirectionReqToProvider": "Requester to Provider",
-  "navSupplyInfo": "Supply: {supplyQty} pcs ←→ Request: {requestQty} pcs (fill rate {ratio}%)",
-  "@navSupplyInfo": {
-    "placeholders": {
-      "supplyQty": {"type": "int"},
-      "requestQty": {"type": "int"},
-      "ratio": {"type": "int"}
-    }
-  },
-  "navGpsLocating": "GPS locating...",
-  "navBleDetected": "Mesh node detected",
-  "navBleSignal": "Signal {strength}",
-  "@navBleSignal": {
-    "placeholders": { "strength": {"type": "String"} }
-  },
-  "navBleSignalStrong": "Strong (very close)",
-  "navBleSignalMedium": "Medium (nearby)",
-  "navBleSignalWeak": "Weak (far away)",
-  "navBleScanning": "Scanning Bluetooth... Auto-detect when approaching the other party",
-  "navHandoffButton": "Start Handoff",
-  "navHandoffWaiting": "Waiting for Bluetooth detection...",
-  "navCancelDialogTitle": "Match Cancelled",
-  "navCancelDialogContent": "The other party has cancelled this match.",
-  "navCancelDialogBack": "Back to Home",
-  "navCompleteSnack": "Handoff complete!",
-
-  "handoffTitle": "Physical Handoff Confirmation",
-  "handoffProviderResource": "Supply: {resourceType}",
-  "@handoffProviderResource": {
-    "placeholders": { "resourceType": {"type": "String"} }
-  },
-  "handoffProviderPinLabel": "Tell the other party this PIN code",
-  "handoffProviderTimeout": "Supplies will auto-return if not completed within {timeout}",
-  "@handoffProviderTimeout": {
-    "placeholders": { "timeout": {"type": "String"} }
-  },
-  "handoffProviderWaiting": "Waiting for the other party to enter PIN via BLE to confirm receipt...",
-  "handoffProviderGattNote": "(GATT handoff broadcast active on this device)",
-  "handoffRequesterPinPrompt": "Enter the 4-digit PIN shown by the provider",
-  "handoffRequesterLockout": "Too many incorrect attempts. Please wait {seconds}s...",
-  "@handoffRequesterLockout": {
-    "placeholders": { "seconds": {"type": "int"} }
-  },
-  "handoffRequesterWrong": "Incorrect! Remaining attempts: {remaining} / 6",
-  "@handoffRequesterWrong": {
-    "placeholders": { "remaining": {"type": "int"} }
-  },
-  "handoffRequesterConfirmButton": "Confirm Receipt",
-  "handoffDropoffProviderTitle": "Contactless Handoff — Place Supplies",
-  "handoffDropoffLocationLabel": "Drop-off Location",
-  "handoffDropoffUseCurrentLocation": "Tap to use current location",
-  "handoffDropoffLocateButton": "Locate",
-  "handoffDropoffDescLabel": "Drop-off description / photo notes (optional)",
-  "handoffDropoffDescHint": "e.g., Left beside the box at the front door",
-  "handoffDropoffWaitingButton": "Placed — Waiting for pickup",
-  "handoffDropoffConfirmButton": "Confirm Drop-off",
-  "handoffDropoffRequesterTitle": "Contactless Handoff",
-  "handoffDropoffRequesterContent": "The provider has placed the supplies at the designated location.\nPlease go pick them up and confirm.",
-  "handoffDropoffRequesterConfirm": "Supplies Received",
-  "handoffSuccessTitle": "Handoff Complete!",
-  "handoffSuccessContent": "{resourceType} successfully transferred",
-  "@handoffSuccessContent": {
-    "placeholders": { "resourceType": {"type": "String"} }
-  },
-  "handoffSuccessBack": "Back",
-  "handoffCancelledTitle": "Handoff Cancelled",
-  "handoffCancelledContent": "Supplies returned to available status",
-  "handoffCancelledBack": "Back",
-  "handoffTimeout30min": "30 minutes",
-  "handoffTimeout4hr": "4 hours",
-
-  "medicalTitle": "Medical Card",
-  "medicalSosInfo": "Fields with broadcast icons will be transmitted\nvia Mesh network to nearby rescuers during SOS",
-  "medicalPresetLabel": "Quick Preset",
-  "medicalPresetMinimal": "Minimal Disclosure",
-  "medicalPresetRecommended": "Recommended",
-  "medicalPresetFull": "Share All",
-  "medicalPresetApplied": "Applied \"{presetName}\" preset",
-  "@medicalPresetApplied": {
-    "placeholders": { "presetName": {"type": "String"} }
-  },
-  "medicalSectionBasic": "Basic Physiological",
-  "medicalSectionBackground": "Medical Background",
-  "medicalSectionEmergency": "Emergency Info",
-  "medicalFieldName": "Name",
-  "medicalFieldAge": "Age",
-  "medicalFieldHeight": "Height (cm)",
-  "medicalFieldWeight": "Weight (kg)",
-  "medicalFieldBloodType": "Blood Type",
-  "medicalFieldConditions": "Medical Conditions",
-  "medicalFieldAllergies": "Allergies",
-  "medicalFieldMedications": "Current Medications",
-  "medicalFieldEmergencyContact": "Emergency Contact",
-  "medicalFieldOrganDonor": "Organ Donor",
-  "medicalFieldPrimaryLanguage": "Primary Language",
-  "medicalHintName": "Your name",
-  "medicalHintAge": "Age",
-  "medicalSuffixAge": "yrs",
-  "medicalHintHeight": "Height",
-  "medicalSuffixHeight": "cm",
-  "medicalHintWeight": "Weight",
-  "medicalSuffixWeight": "kg",
-  "medicalHintConditions": "e.g., Diabetes, Epilepsy, Asthma (comma-separated)",
-  "medicalHintMedications": "e.g., Insulin, BP medication (comma-separated)",
-  "medicalHintLanguage": "e.g., English, 繁體中文",
-  "medicalBloodTypeNone": "Not selected",
-  "medicalAllergenLabel": "Allergen",
-  "medicalAllergenHint": "Allergen",
-  "medicalReactionHint": "Reaction symptoms",
-  "medicalReactionUnknown": "Unknown reaction",
-  "medicalEcPhoneLabel": "Emergency Contact Phone",
-  "medicalEcPhoneHint": "e.g., +1-234-567-8901",
-  "medicalEcRelationLabel": "Relationship",
-  "medicalEcRelationHint": "e.g., Mother, Spouse",
-  "medicalOrganDonorLabel": "Organ Donor Status",
-  "medicalOrganDonorNone": "Not set",
-  "medicalOrganDonorYes": "Yes",
-  "medicalOrganDonorNo": "No",
-  "medicalHealthImportButton": "Import from Health Connect",
-  "medicalHealthConnectRequired": "Health Connect Required",
-  "medicalHealthConnectInstallGuide": "This feature requires Google Health Connect.\n\nPlease install \"Health Connect\" from Google Play Store.\n\nAfter installation, add your health data (height, weight, blood type) in Health Connect, then return here to import.",
-  "medicalHealthConnectDismiss": "OK",
-  "medicalHealthConnectInstall": "Install",
-  "medicalHealthConnectAuthFail": "Authorization Failed",
-  "medicalHealthConnectAuthGuide": "Health Connect read permission not granted.\n\nPlease authorize manually:\n1. Open \"Health Connect\" app\n2. Tap \"App permissions\"\n3. Find \"IgniRelay\" and allow reading height, weight, blood type",
-  "medicalHealthConnectNoData": "No health data found in Health Connect",
-  "medicalHealthConnectImported": "Imported {count} items from Health Connect",
-  "@medicalHealthConnectImported": {
-    "placeholders": { "count": {"type": "int"} }
-  },
-  "medicalHealthConnectNoNewData": "No new data imported (fields already filled or no data available)",
-  "medicalHealthConnectFailSnack": "Health Connect import failed: {error}\nPlease ensure Health Connect is installed",
-  "@medicalHealthConnectFailSnack": {
-    "placeholders": { "error": {"type": "String"} }
-  },
-  "medicalSaving": "Saving...",
-  "medicalSaveButton": "Save Medical Card",
-  "medicalSavedSnack": "Medical card saved",
-  "medicalSaveFailSnack": "Save failed: {error}",
-  "@medicalSaveFailSnack": {
-    "placeholders": { "error": {"type": "String"} }
-  },
-  "medicalSosToggleOn": "ON",
-  "medicalSosToggleOff": "OFF",
-
-  "chatListTitle": "Chat Rooms",
-  "chatListRefreshTooltip": "Refresh",
-  "chatListRoomNational": "National Announcements",
-  "chatListRoomCounty": "County Announcements",
-  "chatListRoomTownship": "Township Announcements",
-  "chatListRoomVillage": "Village Chat",
-  "chatListRoomCustom": "Custom Channel",
-  "chatListEmptyTitle": "No chat rooms joined",
-  "chatListEmptySubtitle": "Tap the + button below to join or scan",
-  "chatListAutoJoin": "Auto-join local chat room",
-  "chatListAutoJoinSuccess": "Auto-joined local village chat room",
-  "chatListAutoJoinFail": "Unable to get location. Please join manually",
-  "chatListFabTooltip": "Join Chat Room",
-  "chatListAdminBadge": "Announcement Channel",
-  "chatListLeaveTitle": "Leave Chat Room",
-  "chatListLeaveContent": "Are you sure you want to leave \"{roomName}\"? Chat history will be cleared.",
-  "@chatListLeaveContent": {
-    "placeholders": { "roomName": {"type": "String"} }
-  },
-  "chatListLeaveCancel": "Cancel",
-  "chatListLeaveConfirm": "Leave",
-
-  "chatRoomMessageCount": "{count} messages",
-  "@chatRoomMessageCount": {
-    "placeholders": { "count": {"type": "int"} }
-  },
-  "chatRoomEmpty": "No messages yet",
-  "chatRoomReply": "Reply",
-  "chatRoomAdminLock": "Announcement channel — Only admins (L3) can post",
-  "chatRoomInputHint": "Type a message...",
-  "chatRoomSendCooldown": "Send failed. Please wait {seconds}s before retrying",
-  "@chatRoomSendCooldown": {
-    "placeholders": { "seconds": {"type": "int"} }
-  },
-  "chatRoomAnonymous": "Anonymous",
-
-  "chatJoinTitle": "Join Chat Room",
-  "chatJoinAutoSection": "Auto Join",
-  "chatJoinAutoDesc": "Auto-join local village chat and district announcement channels based on GPS location",
-  "chatJoinGpsLocating": "Getting GPS location...",
-  "chatJoinGpsWaiting": "Waiting for GPS fix... ({seconds}s)",
-  "@chatJoinGpsWaiting": {
-    "placeholders": { "seconds": {"type": "int"} }
-  },
-  "chatJoinGpsQuerying": "Querying current district...",
-  "chatJoinGpsFail": "GPS fix failed. Please ensure GPS is enabled, or use manual setup below",
-  "chatJoinAutoSuccess": "Joined local village chat and announcement channels",
-  "chatJoinAutoFailRegion": "Unable to identify current district. Please use manual setup",
-  "chatJoinAutoButton": "Detect & Join Village Chat",
-  "chatJoinManualSection": "Manual Area Selection",
-  "chatJoinManualDesc": "Search by county, township, or village name, then select to join the corresponding chat room",
-  "chatJoinSearchHint": "e.g., Xinxing Dist., Ankang Village, Kaohsiung",
-  "chatJoinSearchButton": "Search",
-  "chatJoinSearchResults": "Results ({count})",
-  "@chatJoinSearchResults": {
-    "placeholders": { "count": {"type": "int"} }
-  },
-  "chatJoinSearchVillcode": "Code: {villcode}",
-  "@chatJoinSearchVillcode": {
-    "placeholders": { "villcode": {"type": "String"} }
-  },
-  "chatJoinSearchNoResults": "No matching villages found. Try different keywords",
-  "chatJoinSuccess": "Joined {fullName} chat and announcement channels",
-  "@chatJoinSuccess": {
-    "placeholders": { "fullName": {"type": "String"} }
-  },
-  "chatJoinFail": "Join failed: {error}",
-  "@chatJoinFail": {
-    "placeholders": { "error": {"type": "String"} }
-  },
-  "chatJoinInviteSection": "Enter Invite Code",
-  "chatJoinInviteDesc": "Enter a chat room ID or invite code to join a custom channel",
-  "chatJoinInviteHint": "Chat room ID or ID:password",
-  "chatJoinInviteButton": "Join",
-  "chatJoinInviteSuccess": "Joined chat room",
-  "chatJoinInfoSection": "Chat Room Info",
-  "chatJoinInfoVillage": "- Village chat: everyone can post, once every 3 minutes",
-  "chatJoinInfoAdmin": "- Township/County/National: only admins (L3) can broadcast",
-  "chatJoinInfoCustom": "- Custom channels: join via QR code or invite code",
-  "chatJoinInfoMesh": "- All messages propagate via BLE Mesh, auto-deleted after 48 hours",
-  "chatJoinInfoSwitch": "- Switching areas removes the old area's chat rooms",
-
-  "survivalListening": "Listening for nearby SOS and supply signals...",
-  "survivalBattery": "Battery: {level}%",
-  "@survivalBattery": {
-    "placeholders": { "level": {"type": "int"} }
-  },
-  "survivalDataMuleDisable": "Disable Data Mule",
-  "survivalDataMuleEnable": "Enable Data Mule",
-  "survivalBlePause": "Pause BLE",
-  "survivalBleResume": "Resume BLE",
-  "survivalStatsLocalEvents": "Local Events",
-  "survivalStatsBleConnections": "BLE Connections",
-  "survivalRecentEvents": "Recent Mesh Events",
-  "survivalDataMuleFailSnack": "Data Mule service failed to start\nBLE Mesh layer continues operating",
-  "survivalBleFailSnack": "BLE failed to start: {error}\nPlease ensure Bluetooth is enabled and permissions granted",
-  "@survivalBleFailSnack": {
-    "placeholders": { "error": {"type": "String"} }
-  },
-  "survivalDataMuleDialogTitle": "What is Data Mule?",
-  "survivalDataMuleDialogDismiss": "OK",
-  "survivalExportButton": "Export Full Log",
-  "survivalExportSuccess": "Log saved to Downloads: {filename}",
-  "@survivalExportSuccess": {
-    "placeholders": { "filename": {"type": "String"} }
-  },
-  "survivalExportFail": "Export failed: {error}",
-  "@survivalExportFail": {
-    "placeholders": { "error": {"type": "String"} }
-  },
-  "survivalMeshReceived": "[Mesh] received {bytes} bytes",
-  "@survivalMeshReceived": {
-    "placeholders": { "bytes": {"type": "int"} }
-  },
-  "survivalDataMuleDialogContent": "Data Mule is an offline relay mode:\n\n• Your phone continuously receives SOS and supply signals from nearby devices\n• As you move to different areas, stored data is automatically forwarded to newly encountered devices\n• Ideal for volunteers or rescue workers moving through disaster zones to help messages cross offline areas\n\nOnce enabled, runs as an Android foreground service — won't be killed even when the screen is off.\n\nPower usage: Moderate (continuous BLE scan+broadcast)",
-
-  "stationTitle": "Station Supply Management",
-  "stationAuthRequired": "Requires L2+ identity level",
-  "stationAuthCurrentLevel": "Current level: L{level}",
-  "@stationAuthCurrentLevel": {
-    "placeholders": { "level": {"type": "int"} }
-  },
-  "stationAuthDesc": "Station supply management is only available to verified users.\nPlease upgrade your identity level through physical cross-verification.",
-  "stationTabAdd": "Add Station Supply",
-  "stationTabManage": "Manage Registered",
-  "stationCategoryLabel": "Supply Category",
-  "stationSubCategoryLabel": "→ Sub-category",
-  "stationItemLabel": "Specific Item (optional)",
-  "stationQtyLabel": "Stock Quantity",
-  "stationTotalQtyLabel": "Total Stock Quantity",
-  "stationQuotaSection": "Per-person Quota Settings",
-  "stationQuotaCategoryLimit": "Per-person per-category limit",
-  "stationQuotaTotalLimit": "Per-person total limit",
-  "stationResetCycleLabel": "Quota Reset Cycle",
-  "stationResetChip6h": "6 hours",
-  "stationResetChip12h": "12 hours",
-  "stationResetChip24h": "24 hours",
-  "stationResetChip48h": "48 hours",
-  "stationResetChip72h": "72 hours",
-  "stationResetChipNone": "No reset",
-  "stationResetNoteInterval": "Quota auto-resets every {hours} hours",
-  "@stationResetNoteInterval": {
-    "placeholders": { "hours": {"type": "int"} }
-  },
-  "stationResetNoteNone": "Quota is one-time only; no auto-reset",
-  "stationVisibilityLabel": "Supply Visibility",
-  "stationVisibilityVillage": "Specific villages",
-  "stationVisibilityVillageDesc": "Select multiple nearby villages",
-  "stationVisibilityTownship": "Entire township",
-  "stationVisibilityTownshipDesc": "Visible to the entire district",
-  "stationVisibilityNoVillages": "Unable to get nearby village info",
-  "stationVisibilityVillageNote": "* Nearby villages listed based on current location; multiple selectable",
-  "stationVisibilityTownNotLocated": "Not yet located",
-  "stationVisibilityTownNote": "* Uses current township as visibility scope",
-  "stationQtyValidator": "Please enter a valid quantity",
-  "stationFieldRequired": "Required",
-  "stationPublishing": "Publishing...",
-  "stationPublishButton": "Publish Station Supply",
-  "stationPublishSuccess": "Station supply published successfully!",
-  "stationManageEmptyTitle": "No station supplies",
-  "stationManageEmptySubtitle": "Switch to the \"Add Station Supply\" tab to get started",
-  "stationStatusSufficient": "Sufficient",
-  "stationStatusLow": "Low Stock",
-  "stationStatusCritical": "Critical",
-  "stationStatusDepleted": "Depleted",
-  "stationInfoTotalQty": "Total Stock",
-  "stationInfoUsed": "Distributed",
-  "stationInfoRemaining": "Remaining",
-  "stationInfoUsers": "Recipients",
-  "stationInfoQtyUnit": "{qty} pcs",
-  "@stationInfoQtyUnit": {
-    "placeholders": { "qty": {"type": "int"} }
-  },
-  "stationInfoUsersUnit": "{count} people",
-  "@stationInfoUsersUnit": {
-    "placeholders": { "count": {"type": "int"} }
-  },
-  "stationQuotaRulesLabel": "Quota Rules",
-  "stationQuotaCategoryLimitInfo": "Per-person per-category limit",
-  "stationQuotaTotalLimitInfo": "Per-person total limit",
-  "stationQuotaResetCycleInfo": "Reset cycle",
-  "stationQuotaResetHours": "{hours} hours",
-  "@stationQuotaResetHours": {
-    "placeholders": { "hours": {"type": "int"} }
-  },
-  "stationQuotaResetNone": "No reset",
-  "stationVisibleZones": "Visible zones",
-  "stationVisibleZonesCount": "{count} villages",
-  "@stationVisibleZonesCount": {
-    "placeholders": { "count": {"type": "int"} }
-  },
-  "stationVisibleTownship": "Township {township}",
-  "@stationVisibleTownship": {
-    "placeholders": { "township": {"type": "String"} }
-  },
-  "stationQuotaDetailButton": "Quota Details",
-  "stationQuotaResetButton": "Reset Quota",
-  "stationRemoveButton": "Remove",
-  "stationQuotaDetailEmpty": "No distribution records",
-  "stationQuotaDetailTitle": "Quota Details — {name}",
-  "@stationQuotaDetailTitle": {
-    "placeholders": { "name": {"type": "String"} }
-  },
-  "stationQuotaUserLabel": "User {keyHex}...",
-  "@stationQuotaUserLabel": {
-    "placeholders": { "keyHex": {"type": "String"} }
-  },
-  "stationQuotaUsedTotal": "Period used: {used} / Total: {total}",
-  "@stationQuotaUsedTotal": {
-    "placeholders": {
-      "used": {"type": "int"},
-      "total": {"type": "int"}
-    }
-  },
-  "stationQuotaLastReset": "Last reset: {date}",
-  "@stationQuotaLastReset": {
-    "placeholders": { "date": {"type": "String"} }
-  },
-  "stationResetAllDialogTitle": "Reset All Quotas",
-  "stationResetAllDialogContent": "Are you sure you want to reset all user quotas for this supply?\nAll distributed amounts will be reset to zero.",
-  "stationResetAllDialogCancel": "Cancel",
-  "stationResetAllDialogConfirm": "Confirm Reset",
-  "stationResetSuccessSnack": "Quotas reset",
-  "stationResetFailSnack": "Reset failed: {error}",
-  "@stationResetFailSnack": {
-    "placeholders": { "error": {"type": "String"} }
-  },
-  "stationRemoveDialogTitle": "Remove Station Supply",
-  "stationRemoveDialogContent": "Are you sure you want to remove \"{name}\"?\nThis will mark the supply as consumed.",
-  "@stationRemoveDialogContent": {
-    "placeholders": { "name": {"type": "String"} }
-  },
-  "stationRemoveDialogCancel": "Cancel",
-  "stationRemoveDialogConfirm": "Confirm Remove",
-  "stationRemoveSuccessSnack": "Supply removed",
-  "stationRemoveFailSnack": "Remove failed: {error}",
-  "@stationRemoveFailSnack": {
-    "placeholders": { "error": {"type": "String"} }
-  },
-
-  "batteryAndroidOnly": "This feature is only available on Android devices",
-  "batteryIntroTitle": "Important! Mesh network needs to run in the background",
-  "batteryIntroAppName": "IgniRelay",
-  "batteryIntroConsequence1": "Cannot receive nearby SOS signals",
-  "batteryIntroConsequence2": "Cannot serve as Data Mule relay node",
-  "batteryIntroConsequence3": "Cannot auto-sync supply matching info",
-  "batteryIntroGuide": "The following 1-2 steps will ensure the Mesh network stays active.",
-  "batteryStep1Label": "Step 1/2",
-  "batteryStep1Title": "System Battery Optimization Exemption",
-  "batteryStep1Button": "Enable Battery Exemption",
-  "batteryStep1Done": "Done",
-  "batteryStep1Success": "Battery optimization exemption granted",
-  "batteryLaterButton": "Later",
-  "batteryStartButton": "Start Setup",
-  "batterySkipButton": "Skip",
-  "batteryNextButton": "Next",
-  "batteryFinishButton": "Finish",
-  "batteryDoneTitle": "Setup Complete!",
-  "batteryDoneContent": "Background settings configured!",
-  "batteryDoneNote": "Foreground service notification will appear when Mesh Guard starts",
-  "batteryGuideTitle": "Background Execution Settings",
-  "batteryIntroBody": "IgniRelay relies on Bluetooth Mesh to continuously broadcast and relay rescue information in the background.\n\nIf Android kills the app, your device will:",
-  "batteryStep1Desc": "Tap the button below. A system dialog will appear.\nSelect 'Allow' to exempt IgniRelay from Doze battery restrictions.",
-  "batteryStep2Label": "Step 2/2",
-  "batteryStep2Title": "{manufacturer} Background Settings",
-  "@batteryStep2Title": {
-    "placeholders": { "manufacturer": {"type": "String"} }
-  },
-  "batteryGoSettings": "Open Settings",
-  "batteryOpenedSettings": "Settings Opened",
-  "batteryReturnNote": "Complete the steps in settings, then return here",
-  "batteryManufacturerXiaomi": "Xiaomi / Redmi",
-  "batteryManufacturerHuawei": "Huawei",
-  "batteryManufacturerHonor": "Honor",
-  "batteryManufacturerOppo": "OPPO",
-  "batteryManufacturerRealme": "realme",
-  "batteryManufacturerVivo": "vivo",
-  "batteryManufacturerSamsung": "Samsung",
-  "batteryManufacturerAsus": "ASUS",
-  "batteryInstructionXiaomi": "In 'Autostart Management', find IgniRelay → Enable autostart\nAlso in 'Battery Saver' → Select 'No restrictions'",
-  "batteryInstructionHuawei": "In 'App Launch', find IgniRelay\n→ Disable 'Manage automatically' → Enable all toggles manually\nAlso in 'Lock screen cleanup', don't clean this app",
-  "batteryInstructionHonor": "In 'App Launch', find IgniRelay\n→ Disable 'Manage automatically' → Enable all toggles manually",
-  "batteryInstructionOppo": "In 'Auto-start Management', allow IgniRelay to autostart\nAlso in 'Battery' → 'App Battery Management' → Select 'Don't optimize'",
-  "batteryInstructionRealme": "In 'Auto-start Management', allow IgniRelay to autostart\nAlso in 'Battery' → 'App Battery Management' → Select 'Don't optimize'",
-  "batteryInstructionVivo": "In 'Background App Manage', allow IgniRelay high power usage\nAlso in 'Autostart', enable this app",
-  "batteryInstructionSamsung": "In 'Battery' → 'Background usage limits'\n→ Remove IgniRelay from 'Sleeping apps'\nOr add to 'Never sleeping apps'",
-  "batteryInstructionAsus": "In 'Auto-start Manager', allow IgniRelay\nAlso in 'Battery', select 'Unrestricted'",
-  "batteryInstructionDefault": "Go to phone 'Settings' → 'Battery' → 'Background Activity Management'\nAllow IgniRelay to run in the background.",
-  "batteryDoneBody": "IgniRelay can now run Mesh networking in the background,\nreceiving and relaying rescue information even when the screen is off.",
-
-  "locationGpsDisabled": "GPS is disabled. Please enable location services in system settings",
-  "locationGpsDeniedForever": "GPS permission permanently denied. Please go to Settings → Apps → Grant location permission",
-  "locationGpsDenied": "Please grant GPS permission for more accurate matching results",
-  "locationGpsTimeout": "GPS timed out. Please ensure location is enabled or move to an open area",
-  "locationGpsFail": "GPS failed: {error}",
-  "@locationGpsFail": {
-    "placeholders": { "error": {"type": "String"} }
-  },
-  "locationInitFail": "Location service init failed: {error}",
-  "@locationInitFail": {
-    "placeholders": { "error": {"type": "String"} }
-  },
-  "locationDirectionN": "North",
-  "locationDirectionNE": "Northeast",
-  "locationDirectionE": "East",
-  "locationDirectionSE": "Southeast",
-  "locationDirectionS": "South",
-  "locationDirectionSW": "Southwest",
-  "locationDirectionW": "West",
-  "locationDirectionNW": "Northwest",
-
-  "supplyCategory_WATER": "Drinking Water",
-  "supplyCategory_FOOD": "Food",
-  "supplyCategory_MEDICAL": "Medical/First Aid",
-  "supplyCategory_HYGIENE": "Hygiene/Sanitary",
-  "supplyCategory_PROTECTION": "Protective Gear",
-  "supplyCategory_SHELTER": "Shelter/Housing",
-  "supplyCategory_TOOL": "Tools/Equipment",
-  "supplyCategory_PETS": "Pet Supplies",
-  "supplyCategory_SKILL": "Skills/Services",
-
-  "supplySubCategory_WATER_BOTTLE": "Bottled Water",
-  "supplySubCategory_WATER_PURIFY": "Water Purification",
-  "supplySubCategory_WATER_CONTAINER": "Water Storage",
-  "supplySubCategory_FOOD_READY": "Ready-to-Eat",
-  "supplySubCategory_FOOD_STAPLE": "Staple Foods/Dry Goods",
-  "supplySubCategory_FOOD_BABY": "Baby Food",
-  "supplySubCategory_FOOD_SUPPLEMENT": "Nutritional Supplements",
-  "supplySubCategory_FOOD_COOKING": "Cooking Equipment",
-  "supplySubCategory_MED_PAIN": "Pain/Fever Relief",
-  "supplySubCategory_MED_WOUND": "Wound Care",
-  "supplySubCategory_MED_CHRONIC": "Chronic Medication",
-  "supplySubCategory_MED_RESPIRATORY": "Respiratory",
-  "supplySubCategory_MED_GI": "Gastrointestinal",
-  "supplySubCategory_MED_FIRSTAID_KIT": "First Aid Kits",
-  "supplySubCategory_HYG_FEMININE": "Feminine Hygiene",
-  "supplySubCategory_HYG_BABY": "Baby Hygiene",
-  "supplySubCategory_HYG_PERSONAL": "Personal Care",
-  "supplySubCategory_HYG_SANITATION": "Environmental Sanitation",
-  "supplySubCategory_PROT_RESPIRATORY": "Respiratory Protection",
-  "supplySubCategory_PROT_BODY": "Body Protection",
-  "supplySubCategory_PROT_LIGHT": "Lighting/Energy",
-  "supplySubCategory_SHELTER_TEMP": "Temporary Shelter",
-  "supplySubCategory_SHELTER_BEDDING": "Bedding/Warmth",
-  "supplySubCategory_SHELTER_CLOTHING": "Clothing",
-  "supplySubCategory_TOOL_COMM": "Communication Tools",
-  "supplySubCategory_TOOL_RESCUE": "Rescue Tools",
-  "supplySubCategory_TOOL_POWER": "Power Equipment",
-  "supplySubCategory_TOOL_TRANSPORT": "Transport Equipment",
-  "supplySubCategory_PET_FOOD": "Pet Food",
-  "supplySubCategory_PET_CARE": "Pet Housing & Care",
-  "supplySubCategory_SKILL_MEDICAL": "Medical",
-  "supplySubCategory_SKILL_RESCUE": "Search & Rescue",
-  "supplySubCategory_SKILL_LANG": "Translation/Language",
-  "supplySubCategory_SKILL_PSYCH": "Psychological Counseling",
-  "supplySubCategory_SKILL_CARE": "Care Services",
-  "supplySubCategory_SKILL_TECH": "Technical",
-  "supplySubCategory_SKILL_LOGISTICS": "Logistics/Driving",
-
-  "profileSubtitle": "Identity · Settings · Medical",
-  "profileQuickActionMedicalCardCreate": "Create medical card",
-  "profileQuickActionMedicalCard": "Medical card",
-  "profileSectionMesh": "Mesh status",
-  "profileSectionTrust": "Trust level",
-  "profileSectionSettings": "Settings",
-  "profilePubKeyCopied": "Public key copied",
-  "profileSettingsAppearance": "Appearance",
-  "profileSettingsTextScale": "Text size",
-  "profileSettingsLanguage": "Language",
-  "profileSettingsBattery": "Background / Battery",
-  "profileSettingsPrivacy": "Privacy & data",
-  "profileThemeDark": "Dark",
-  "profileThemeLight": "Light",
-  "profileTextScaleStandard": "Standard",
-  "profileTextScaleLarge": "Large",
-  "profileTextScaleXLarge": "X-Large",
-  "profileTextScaleHuge": "Huge",
-  "profileMeshBatteryLabel": "Battery",
-  "profileMeshAdvancedLabel": "Advanced",
-  "profileFooterVersion": "IgniRelay v{version} · BUILD {build}",
-  "@profileFooterVersion": {
-    "placeholders": {
-      "version": {"type": "String"},
-      "build": {"type": "String"}
-    }
-  },
-  "profileFooterTagline": "OFFLINE · MESH · PRIVATE",
-  "matchHeaderItemsSubtitle": "{count} community items",
-  "@matchHeaderItemsSubtitle": {
-    "placeholders": { "count": {"type": "int"} }
-  },
-  "mapAttributionLabel": "© OpenStreetMap contributors",
-
-  "supplyItem_WATER_BOTTLE_500": "Bottled Water 500ml",
-  "supplyItem_WATER_BOTTLE_1500": "Bottled Water 1.5L",
-  "supplyItem_WATER_BOTTLE_5000": "Bulk Water 5L+",
-  "supplyItem_WATER_PURIFY_TABLET": "Water Purification Tablets",
-  "supplyItem_WATER_PURIFY_STRAW": "Portable Water Filter",
-  "supplyItem_WATER_PURIFY_PUMP": "Hand Pump Water Purifier",
-  "supplyItem_WATER_CONTAINER_FOLD": "Collapsible Water Bag (5-20L)",
-  "supplyItem_WATER_CONTAINER_JERRY": "Jerry Can (20L)",
-  "supplyItem_FOOD_READY_CRACKER": "Crackers/Energy Bars",
-  "supplyItem_FOOD_READY_CAN": "Canned Food (meat/beans)",
-  "supplyItem_FOOD_READY_RETORT": "Retort Pouch (heat-and-eat)",
-  "supplyItem_FOOD_READY_MRE": "MRE (Meal Ready-to-Eat)",
-  "supplyItem_FOOD_STAPLE_RICE": "Rice",
-  "supplyItem_FOOD_STAPLE_NOODLE": "Instant Noodles",
-  "supplyItem_FOOD_STAPLE_OATS": "Oats/Grain Powder",
-  "supplyItem_FOOD_BABY_FORMULA": "Baby Formula",
-  "supplyItem_FOOD_BABY_PUREE": "Baby Purée",
-  "supplyItem_FOOD_BABY_BOTTLE": "Baby Bottle/Cup (with sterilizer)",
-  "supplyItem_FOOD_SUPP_ELECTROLYTE": "Electrolyte Powder/ORS",
-  "supplyItem_FOOD_SUPP_VITAMIN": "Multivitamins",
-  "supplyItem_FOOD_SUPP_PROTEIN": "Protein Drink",
-  "supplyItem_FOOD_COOK_STOVE": "Portable Stove",
-  "supplyItem_FOOD_COOK_FUEL": "Butane Canister/Fuel",
-  "supplyItem_FOOD_COOK_UTENSIL": "Disposable Utensils / Foldable Cookware",
-  "supplyItem_MED_PAIN_ACETAMINOPHEN": "Acetaminophen (Tylenol)",
-  "supplyItem_MED_PAIN_IBUPROFEN": "Ibuprofen",
-  "supplyItem_MED_PAIN_PATCH": "Pain Relief Patches/Ointment",
-  "supplyItem_MED_WOUND_BANDAGE": "Gauze/Elastic Bandage",
-  "supplyItem_MED_WOUND_GAUZE": "Sterile Gauze Pads (4×4)",
-  "supplyItem_MED_WOUND_ANTISEPTIC": "Iodine/Saline Solution",
-  "supplyItem_MED_WOUND_TAPE": "Medical Tape",
-  "supplyItem_MED_WOUND_TOURNIQUET": "Tourniquet (CAT)",
-  "supplyItem_MED_CHRONIC_BP": "Blood Pressure Medication (as prescribed)",
-  "supplyItem_MED_CHRONIC_DIABETES": "Insulin/Diabetes Medication",
-  "supplyItem_MED_CHRONIC_HEART": "Cardiac Medication (Nitroglycerin, etc.)",
-  "supplyItem_MED_CHRONIC_EPILEPSY": "Anti-epileptic Medication",
-  "supplyItem_MED_RESP_INHALER": "Asthma Inhaler",
-  "supplyItem_MED_RESP_MASK_O2": "Oxygen Mask/Portable Oxygen",
-  "supplyItem_MED_GI_ORS": "Oral Rehydration Salts (ORS)",
-  "supplyItem_MED_GI_ANTACID": "Antacid",
-  "supplyItem_MED_GI_CHARCOAL": "Activated Charcoal (poisoning emergency)",
-  "supplyItem_MED_KIT_BASIC": "Basic First Aid Kit",
-  "supplyItem_MED_KIT_SPLINT": "Splint/Triangular Bandage",
-  "supplyItem_MED_KIT_AED": "AED (Automated External Defibrillator)",
-  "supplyItem_HYG_FEM_PAD": "Sanitary Pads",
-  "supplyItem_HYG_FEM_TAMPON": "Tampons",
-  "supplyItem_HYG_FEM_CUP": "Menstrual Cup (reusable)",
-  "supplyItem_HYG_BABY_DIAPER": "Diapers (S/M/L/XL)",
-  "supplyItem_HYG_BABY_WIPE": "Baby Wipes (thick)",
-  "supplyItem_HYG_BABY_CREAM": "Diaper Cream",
-  "supplyItem_HYG_PERS_SOAP": "Soap/Hand Wash",
-  "supplyItem_HYG_PERS_TOOTH": "Toothbrush & Toothpaste Set",
-  "supplyItem_HYG_PERS_TISSUE": "Toilet Paper/Tissues",
-  "supplyItem_HYG_PERS_TOWEL": "Quick-dry Towel",
-  "supplyItem_HYG_SAN_BLEACH": "Bleach (disinfection)",
-  "supplyItem_HYG_SAN_TRASH": "Heavy-duty Garbage Bags",
-  "supplyItem_HYG_SAN_GLOVE": "Disposable Gloves",
-  "supplyItem_HYG_SAN_BUCKET": "Collapsible Bucket (cleaning)",
-  "supplyItem_PROT_RESP_N95": "N95 Mask",
-  "supplyItem_PROT_RESP_SURGICAL": "Surgical Mask",
-  "supplyItem_PROT_RESP_GAS": "Gas Mask/Filter Cartridge",
-  "supplyItem_PROT_BODY_GLOVES": "Work Gloves (cut/slip resistant)",
-  "supplyItem_PROT_BODY_HELMET": "Hard Hat/Safety Helmet",
-  "supplyItem_PROT_BODY_BOOTS": "Safety Boots/Rain Boots",
-  "supplyItem_PROT_BODY_GOGGLES": "Safety Goggles",
-  "supplyItem_PROT_BODY_VEST": "Reflective Vest",
-  "supplyItem_PROT_LIGHT_FLASHLIGHT": "Flashlight/Headlamp",
-  "supplyItem_PROT_LIGHT_LANTERN": "Lantern/LED Light",
-  "supplyItem_PROT_LIGHT_BATTERY": "Batteries (AA/AAA/D)",
-  "supplyItem_PROT_LIGHT_CANDLE": "Candles/Windproof Lighter",
-  "supplyItem_SHELTER_TEMP_TENT": "Tent/Tarp Shelter",
-  "supplyItem_SHELTER_TEMP_TARP": "Waterproof Tarpaulin/Ground Sheet",
-  "supplyItem_SHELTER_TEMP_ROPE": "Guy Rope/Tie-down Straps",
-  "supplyItem_SHELTER_BED_BAG": "Sleeping Bag",
-  "supplyItem_SHELTER_BED_MAT": "Inflatable Pad/Yoga Mat",
-  "supplyItem_SHELTER_BED_BLANKET": "Blanket/Emergency Blanket",
-  "supplyItem_SHELTER_CLOTH_RAIN": "Raincoat/Waterproof Jacket",
-  "supplyItem_SHELTER_CLOTH_WARM": "Thermal Underwear/Fleece Jacket",
-  "supplyItem_SHELTER_CLOTH_CHANGE": "Change of Clothes Set",
-  "supplyItem_TOOL_COMM_RADIO": "Two-way Radio (UHF/VHF)",
-  "supplyItem_TOOL_COMM_CHARGER": "Hand-crank/Solar Charger",
-  "supplyItem_TOOL_COMM_POWERBANK": "Power Bank (10000mAh+)",
-  "supplyItem_TOOL_COMM_WHISTLE": "Emergency Whistle",
-  "supplyItem_TOOL_RESCUE_CROWBAR": "Crowbar/Bolt Cutters",
-  "supplyItem_TOOL_RESCUE_SHOVEL": "Folding Shovel",
-  "supplyItem_TOOL_RESCUE_SAW": "Folding Hand Saw",
-  "supplyItem_TOOL_RESCUE_MULTI": "Multi-tool Pliers",
-  "supplyItem_TOOL_POWER_GENERATOR": "Generator (small gas/propane)",
-  "supplyItem_TOOL_POWER_SOLAR": "Solar Panel (foldable 50W+)",
-  "supplyItem_TOOL_POWER_INVERTER": "Inverter (12V→110V)",
-  "supplyItem_TOOL_POWER_EXT": "Extension Cord/Cable Reel",
-  "supplyItem_TOOL_TRANS_CART": "Folding Cart/Hand Truck",
-  "supplyItem_TOOL_TRANS_STRETCHER": "Simple Stretcher",
-  "supplyItem_PET_FOOD_DOG_DRY": "Dry Dog Food",
-  "supplyItem_PET_FOOD_DOG_CAN": "Canned Dog Food",
-  "supplyItem_PET_FOOD_CAT_DRY": "Dry Cat Food",
-  "supplyItem_PET_FOOD_CAT_CAN": "Canned Cat Food",
-  "supplyItem_PET_FOOD_BOWL": "Pet Water/Food Bowl (collapsible)",
-  "supplyItem_PET_CARE_CRATE": "Pet Carrier/Crate",
-  "supplyItem_PET_CARE_LEASH": "Leash/Harness",
-  "supplyItem_PET_CARE_PAD": "Pet Pee Pads",
-  "supplyItem_PET_CARE_MED": "Basic Pet Medication (deworming/skin)",
-  "supplyItem_PET_CARE_TAG": "Pet ID Tag/Microchip Sticker",
-  "supplyItem_SKILL_MEDICAL_DOCTOR": "Doctor",
-  "supplyItem_SKILL_MEDICAL_NURSE": "Nurse",
-  "supplyItem_SKILL_MEDICAL_EMT": "EMT (Emergency Medical Technician)",
-  "supplyItem_SKILL_MEDICAL_FIRSTAID": "First Aid Certified",
-  "supplyItem_SKILL_MEDICAL_PHARMACIST": "Pharmacist",
-  "supplyItem_SKILL_RESCUE_FIREFIGHTER": "Firefighter/Rescue Specialist",
-  "supplyItem_SKILL_RESCUE_DIVER": "Dive Rescue",
-  "supplyItem_SKILL_RESCUE_K9": "K9 Search & Rescue Handler",
-  "supplyItem_SKILL_RESCUE_MOUNTAIN": "Mountain Rescue/Guide",
-  "supplyItem_SKILL_LANG_EN": "English Translator",
-  "supplyItem_SKILL_LANG_JP": "Japanese Translator",
-  "supplyItem_SKILL_LANG_SEA": "Southeast Asian Language Translator",
-  "supplyItem_SKILL_LANG_SIGN": "Sign Language Interpreter",
-  "supplyItem_SKILL_PSYCH_COUNSELOR": "Psychological Counselor",
-  "supplyItem_SKILL_PSYCH_SOCIAL": "Social Worker",
-  "supplyItem_SKILL_CARE_BABY": "Infant/Toddler Care",
-  "supplyItem_SKILL_CARE_ELDER": "Elderly Care",
-  "supplyItem_SKILL_CARE_DISABLED": "Mobility-impaired Care",
-  "supplyItem_SKILL_CARE_SPECIAL": "Special Needs Companion (dementia/disability)",
-  "supplyItem_SKILL_TECH_ELECTRIC": "Electrician/Power Restoration",
-  "supplyItem_SKILL_TECH_PLUMB": "Plumber/Water Supply Repair",
-  "supplyItem_SKILL_TECH_STRUCT": "Structural Safety Assessment",
-  "supplyItem_SKILL_TECH_COMM": "Communications/Network Setup",
-  "supplyItem_SKILL_TECH_LABOR": "Manual Labor",
-  "supplyItem_SKILL_LOG_TRUCK": "Truck Driver",
-  "supplyItem_SKILL_LOG_4WD": "4WD/Off-road Driver",
-  "supplyItem_SKILL_LOG_MOTO": "Motorcycle Courier (damaged roads)",
-  "supplyItem_SKILL_LOG_FORKLIFT": "Forklift Operator",
-  "supplyItem_SKILL_LOG_HEAVYOP": "Heavy Equipment Operator (excavator/crane)",
-  "supplyItem_SKILL_LOG_MANAGE": "Logistics/Warehouse Coordination",
-
-  "itemConditionNew": "Brand New (sealed)",
-  "itemConditionOpenedUnused": "Opened but Unused",
-  "itemConditionUsedFunctional": "Used but Functional",
-
   "commonCancel": "Cancel",
-  "commonBack": "Back",
-  "commonConfirm": "Confirm",
-  "commonRetry": "Retry",
-  "commonLoading": "Loading...",
-  "commonQtyUnit": "pcs",
-
   "tierLabel1Standard": "Standard Mode (Tier 1)",
   "tierLabel1Force": "Full Speed Mode (Tier 1)",
   "tierLabel2EcoRelay": "Eco Relay Mode (Tier 2)",
   "tierLabel3UltraEco": "Ultra Eco Mode (Tier 3)",
-
-  "supplyCategory_MEDICINE": "Medical/First Aid",
-  "supplyCategory_PPE": "Protective Gear",
-
-  "supplySubCategory_WATER_TANK": "Water Storage Containers",
-  "supplySubCategory_FOOD_DRY": "Dry Goods",
-  "supplySubCategory_FOOD_SPECIAL": "Special Dietary Needs",
-  "supplySubCategory_FOOD_DRINK": "Beverages/Electrolytes",
-  "supplySubCategory_MED_ANTIBIOTIC": "Antibiotics/Anti-infection",
-  "supplySubCategory_MED_KIT": "First Aid Kits & Equipment",
-  "supplySubCategory_MED_OTHER": "Other Medications",
-  "supplySubCategory_HYG_DIAPER": "Diapers/Waste Management",
-  "supplySubCategory_HYG_CLEAN": "Cleaning & Hygiene",
-  "supplySubCategory_HYG_PEST": "Mosquito/Pest Control",
-  "supplySubCategory_HYG_DISINFECT": "Environmental Disinfection",
-  "supplySubCategory_PPE_HEAD": "Head Protection",
-  "supplySubCategory_PPE_RESP": "Respiratory Protection",
-  "supplySubCategory_PPE_HAND": "Hand Protection",
-  "supplySubCategory_PPE_BODY": "Body Protection",
-  "supplySubCategory_PPE_WEATHER": "Weather Protection/Clothing",
-  "supplySubCategory_SHELTER_TENT": "Tents/Tarps",
-  "supplySubCategory_SHELTER_SLEEP": "Sleeping/Bedding",
-  "supplySubCategory_SHELTER_THERMAL": "Emergency Warmth",
-  "supplySubCategory_SHELTER_SPACE": "Space Provision",
-  "supplySubCategory_SHELTER_SUPPLY": "Shelter Supplies",
-  "supplySubCategory_TOOL_LIGHT": "Lighting",
-  "supplySubCategory_TOOL_BATTERY": "Batteries (Cylindrical)",
-  "supplySubCategory_TOOL_BATTERY_COIN": "Button/Coin Batteries",
-  "supplySubCategory_TOOL_HAND": "Hand Tools",
-  "supplySubCategory_TOOL_REPAIR": "Repair Supplies",
-  "supplySubCategory_TOOL_HEAVY": "Heavy Equipment",
-  "supplySubCategory_TOOL_DEMOLITION": "Demolition Tools",
-  "supplySubCategory_TOOL_CLEANING": "Cleaning Equipment",
-  "supplySubCategory_TOOL_SIGNAL": "Distress Signals",
-
-  "supplyItem_WATER_BOTTLE_20L": "20L Large Barrel (Family/Shelter)",
-  "supplyItem_WATER_PURIFY_FILTER": "Portable Water Filter",
-  "supplyItem_WATER_TANK_BARREL": "Water Storage Barrel",
-  "supplyItem_WATER_TANK_BAG": "Collapsible Water Bag",
-
-  "supplyItem_FOOD_READY_NOODLE": "Instant Noodles/Cup Noodles",
-  "supplyItem_FOOD_READY_BAR": "Energy Bar/Crackers",
-  "supplyItem_FOOD_DRY_RICE": "Dry Rice/Grain",
-  "supplyItem_FOOD_DRY_BREAD": "Bread/Toast",
-  "supplyItem_FOOD_DRY_NUTS": "Nuts/Dried Fruit",
-  "supplyItem_FOOD_SPECIAL_HALAL": "Halal Food",
-  "supplyItem_FOOD_SPECIAL_VEGAN": "Vegetarian/Vegan Food",
-  "supplyItem_FOOD_SPECIAL_GLUTEN": "Gluten-Free Food",
-  "supplyItem_FOOD_SPECIAL_DIABETIC": "Low-Sugar/Diabetic-Friendly Food",
-  "supplyItem_FOOD_COOK_GAS": "Camping Gas Cartridge",
-  "supplyItem_FOOD_COOK_SOLID": "Solid Alcohol/Fuel Gel",
-  "supplyItem_FOOD_COOK_LIGHTER": "Windproof Lighter/Waterproof Matches",
-  "supplyItem_FOOD_COOK_POT": "Camp Cookset/Steel Cup",
-  "supplyItem_FOOD_DRINK_ELECTRO": "Sports Drink/Electrolyte Powder",
-  "supplyItem_FOOD_DRINK_COFFEE": "Instant Coffee/Tea Bags",
-  "supplyItem_FOOD_DRINK_JUICE": "UHT Milk/Juice",
-
-  "supplyItem_MED_PAIN_ASPIRIN": "Aspirin",
-  "supplyItem_MED_ANTIBIOTIC_AMOX": "Amoxicillin",
-  "supplyItem_MED_ANTIBIOTIC_AZITHRO": "Azithromycin (Z-Pak)",
-  "supplyItem_MED_ANTIBIOTIC_OINTMENT": "Antibiotic Ointment",
-  "supplyItem_MED_CHRONIC_INSULIN": "Insulin",
-  "supplyItem_MED_CHRONIC_ASTHMA": "Asthma Inhaler",
-  "supplyItem_MED_CHRONIC_THYROID": "Thyroid Medication",
-  "supplyItem_MED_WOUND_DISINFECT": "Disinfectant/Iodine",
-  "supplyItem_MED_WOUND_SUTURE": "Steri-Strips/Closure Tape",
-  "supplyItem_MED_WOUND_SALINE": "Saline Solution (wound irrigation)",
-  "supplyItem_MED_WOUND_BURN": "Burn Ointment/Dressing",
-  "supplyItem_MED_WOUND_SPLINT": "Splint (temporary fracture immobilization)",
-  "supplyItem_MED_KIT_BASIC": "Basic First Aid Kit",
-  "supplyItem_MED_KIT_TRAUMA": "Trauma First Aid Kit",
-  "supplyItem_MED_KIT_STRETCHER": "Folding/Flexible Stretcher",
-  "supplyItem_MED_OTHER_ANTIDIARRHEAL": "Anti-diarrheal Medication",
-  "supplyItem_MED_OTHER_ANTIHISTAMINE": "Antihistamine (allergy)",
-  "supplyItem_MED_OTHER_REHYDRATION": "Oral Rehydration Salts",
-  "supplyItem_MED_OTHER_EYEDROP": "Eye Drops/Artificial Tears",
-  "supplyItem_MED_OTHER_INSECT_BITE": "Insect Bite Cream",
-
-  "supplyItem_HYG_FEM_PAD_DAY": "Day Pads",
-  "supplyItem_HYG_FEM_PAD_NIGHT": "Night Pads",
-  "supplyItem_HYG_FEM_LINER": "Panty Liners",
-  "supplyItem_HYG_DIAPER_BABY_S": "Baby Diapers S (3-6kg)",
-  "supplyItem_HYG_DIAPER_BABY_M": "Baby Diapers M (6-11kg)",
-  "supplyItem_HYG_DIAPER_BABY_L": "Baby Diapers L (9-14kg)",
-  "supplyItem_HYG_DIAPER_BABY_XL": "Baby Diapers XL (12-17kg)",
-  "supplyItem_HYG_DIAPER_ADULT": "Adult Diapers",
-  "supplyItem_HYG_DIAPER_PORTABLE_TOILET": "Portable Toilet",
-  "supplyItem_HYG_DIAPER_SOLIDIFIER": "Waste Solidifier",
-  "supplyItem_HYG_DIAPER_TRASH_BAG": "Large Black Garbage Bags",
-  "supplyItem_HYG_CLEAN_WET_WIPE": "Antibacterial Wet Wipes",
-  "supplyItem_HYG_CLEAN_HAND_GEL": "Hand Sanitizer Gel",
-  "supplyItem_HYG_CLEAN_SOAP": "Bar Soap",
-  "supplyItem_HYG_CLEAN_TOOTH": "Toothbrush & Toothpaste Set",
-  "supplyItem_HYG_CLEAN_SHAMPOO": "Dry Shampoo/Shampoo",
-  "supplyItem_HYG_CLEAN_TOWEL": "Quick-Dry Towel",
-  "supplyItem_HYG_PEST_REPELLENT": "Insect Repellent (DEET/Picaridin)",
-  "supplyItem_HYG_PEST_COIL": "Mosquito Coil/Electric Repellent",
-  "supplyItem_HYG_PEST_NET": "Mosquito Net",
-  "supplyItem_HYG_PEST_ROACH": "Insecticide (cockroach/fly)",
-  "supplyItem_HYG_DISINFECT_BLEACH": "Bleach/Sodium Hypochlorite",
-  "supplyItem_HYG_DISINFECT_ALCOHOL": "75% Alcohol (disinfecting)",
-  "supplyItem_HYG_DISINFECT_SPRAY": "Environmental Disinfectant Spray",
-
-  "supplyItem_PPE_HEAD_HELMET": "Hard Hat/Safety Helmet",
-  "supplyItem_PPE_HEAD_GOGGLES": "Safety Goggles/Dust Glasses",
-  "supplyItem_PPE_RESP_N95": "N95 Respirator Mask",
-  "supplyItem_PPE_RESP_DUST": "Standard Dust Mask",
-  "supplyItem_PPE_RESP_GAS": "Gas Mask (chemical/fire)",
-  "supplyItem_PPE_HAND_CUT": "Cut-Resistant Work Gloves",
-  "supplyItem_PPE_HAND_RUBBER": "Rubber Gloves (cleaning/disinfecting)",
-  "supplyItem_PPE_HAND_LATEX": "Medical Latex Gloves",
-  "supplyItem_PPE_BODY_VEST": "Reflective Safety Vest",
-  "supplyItem_PPE_BODY_COVERALL": "Full-Body Protective Suit",
-  "supplyItem_PPE_BODY_BOOTS": "Safety Boots/Steel-Toe Rain Boots",
-  "supplyItem_PPE_WEATHER_PONCHO": "Disposable Rain Poncho",
-  "supplyItem_PPE_WEATHER_RAINSUIT": "Two-Piece Rain Suit",
-  "supplyItem_PPE_WEATHER_RAINBOOT": "Rain Boots/Waterproof Boots",
-  "supplyItem_PPE_WEATHER_WARM": "Thermal Clothing/Heat Undershirt",
-  "supplyItem_PPE_WEATHER_JACKET": "Waterproof Jacket/Windbreaker",
-  "supplyItem_PPE_WEATHER_HAT": "Warm Hat/Sun Hat",
-
-  "supplyItem_SHELTER_TENT_2P": "2-Person Tent",
-  "supplyItem_SHELTER_TENT_4P": "4-Person Tent",
-  "supplyItem_SHELTER_TENT_TARP": "Waterproof Tarp",
-  "supplyItem_SHELTER_TENT_PLASTIC": "Waterproof Canvas/Plastic Sheet",
-  "supplyItem_SHELTER_SLEEP_BAG": "Sleeping Bag",
-  "supplyItem_SHELTER_SLEEP_BLANKET": "Warm Blanket",
-  "supplyItem_SHELTER_SLEEP_MAT": "Sleeping Pad",
-  "supplyItem_SHELTER_SLEEP_AIR": "Inflatable Air Mattress",
-  "supplyItem_SHELTER_THERM_SPACE": "Emergency Space Blanket (foil)",
-  "supplyItem_SHELTER_THERM_HANDWARMER": "Hand Warmers",
-  "supplyItem_SHELTER_THERM_COAT": "Warm Jacket/Used Clothing",
-  "supplyItem_SHELTER_SPACE_ROOM": "Room Available",
-  "supplyItem_SHELTER_SPACE_GARAGE": "Garage/Warehouse Available",
-  "supplyItem_SHELTER_SPACE_LAND": "Open Land Available (tent/parking)",
-  "supplyItem_SHELTER_SUPPLY_TABLE": "Folding Tables & Chairs",
-  "supplyItem_SHELTER_SUPPLY_PARTITION": "Privacy Screen/Curtain Divider",
-  "supplyItem_SHELTER_SUPPLY_FAN": "Portable Fan/USB Fan",
-
-  "supplyItem_TOOL_LIGHT_FLASH": "Flashlight",
-  "supplyItem_TOOL_LIGHT_LANTERN": "Camping Lantern",
-  "supplyItem_TOOL_LIGHT_HEADLAMP": "Headlamp",
-  "supplyItem_TOOL_LIGHT_GLOWSTICK": "Glow Stick (no power needed)",
-  "supplyItem_TOOL_POWER_BANK": "Power Bank",
-  "supplyItem_TOOL_POWER_SOLAR": "Solar Charging Panel",
-  "supplyItem_TOOL_POWER_GENERATOR": "Generator",
-  "supplyItem_TOOL_POWER_EXTENSION": "Extension Cord/Power Strip",
-  "supplyItem_TOOL_BAT_AA": "AA Batteries (1.5V)",
-  "supplyItem_TOOL_BAT_AAA": "AAA Batteries (1.5V)",
-  "supplyItem_TOOL_BAT_C": "C Batteries (1.5V)",
-  "supplyItem_TOOL_BAT_D": "D Batteries (1.5V)",
-  "supplyItem_TOOL_BAT_9V": "9V Block Batteries",
-  "supplyItem_TOOL_BAT_18650": "18650 Li-ion Batteries (3.7V)",
-  "supplyItem_TOOL_COIN_CR2032": "CR2032 (3V, most common)",
-  "supplyItem_TOOL_COIN_CR2025": "CR2025 (3V)",
-  "supplyItem_TOOL_COIN_CR2016": "CR2016 (3V)",
-  "supplyItem_TOOL_COIN_LR44": "LR44 / AG13 (1.5V)",
-  "supplyItem_TOOL_COIN_SR626": "SR626SW (watch battery 1.55V)",
-  "supplyItem_TOOL_COMM_WALKIE": "Walkie-Talkie",
-  "supplyItem_TOOL_COMM_SAT": "Satellite Communicator",
-  "supplyItem_TOOL_RESCUE_ROPE": "Rope",
-  "supplyItem_TOOL_RESCUE_AXE": "Axe/Crowbar",
-  "supplyItem_TOOL_RESCUE_PARACORD": "Paracord",
-  "supplyItem_TOOL_RESCUE_SPRAYPAINT": "Spray Paint (search/rescue marking)",
-  "supplyItem_TOOL_HAND_SCREWDRIVER_PH": "Phillips Screwdriver",
-  "supplyItem_TOOL_HAND_SCREWDRIVER_FLAT": "Flathead Screwdriver",
-  "supplyItem_TOOL_HAND_WRENCH": "Adjustable Wrench",
-  "supplyItem_TOOL_HAND_HAMMER": "Hammer",
-  "supplyItem_TOOL_HAND_SHOVEL": "Shovel/Spade",
-  "supplyItem_TOOL_HAND_MULTITOOL": "Multi-tool/Swiss Army Knife",
-  "supplyItem_TOOL_HAND_PLIER": "Pliers/Locking Pliers",
-  "supplyItem_TOOL_REPAIR_DUCT": "Duct Tape",
-  "supplyItem_TOOL_REPAIR_ZIPTIE": "Zip Ties/Cable Ties",
-  "supplyItem_TOOL_REPAIR_WIRE": "Metal Wire/Binding Wire",
-  "supplyItem_TOOL_REPAIR_SEALANT": "Waterproof Adhesive/Silicone Sealant",
-  "supplyItem_TOOL_REPAIR_TARP_TAPE": "Canvas Repair Tape",
-  "supplyItem_TOOL_TRANSPORT_CAR": "Vehicle (motorized)",
-  "supplyItem_TOOL_TRANSPORT_BIKE": "Bicycle",
-  "supplyItem_TOOL_TRANSPORT_CART": "Push Cart/Hand Truck",
-  "supplyItem_TOOL_TRANSPORT_WHEELBARROW": "Wheelbarrow (rubble transport)",
-  "supplyItem_TOOL_HEAVY_EXCAVATOR_MINI": "Mini Excavator (narrow access)",
-  "supplyItem_TOOL_HEAVY_EXCAVATOR_STD": "Standard Excavator",
-  "supplyItem_TOOL_HEAVY_BOBCAT_MINI": "Mini Skid Steer (narrow access)",
-  "supplyItem_TOOL_HEAVY_BOBCAT_STD": "Standard Skid Steer",
-  "supplyItem_TOOL_HEAVY_CRANE": "Crane/Hoist",
-  "supplyItem_TOOL_HEAVY_LOADER": "Bulldozer/Loader",
-  "supplyItem_TOOL_DEMO_JACKHAMMER": "Electric/Pneumatic Jackhammer",
-  "supplyItem_TOOL_DEMO_CONCRETE_SAW": "Concrete Saw/Angle Grinder",
-  "supplyItem_TOOL_DEMO_HYDRAULIC": "Hydraulic Spreader/Cutter (heavy rescue)",
-  "supplyItem_TOOL_DEMO_CHAINSAW": "Chainsaw (tree/brush clearing)",
-  "supplyItem_TOOL_CLEANING_WASHER": "Pressure Washer",
-  "supplyItem_TOOL_CLEANING_PUMP_CLEAN": "Engine Water Pump (clean water)",
-  "supplyItem_TOOL_CLEANING_PUMP_SLUDGE": "Sludge Pump (wastewater/debris)",
-  "supplyItem_TOOL_CLEANING_BLOWER": "Industrial Blower (ventilation)",
-  "supplyItem_TOOL_SIGNAL_FLARE": "Signal Flare",
-  "supplyItem_TOOL_SIGNAL_MIRROR": "Signal Mirror",
-  "supplyItem_TOOL_SIGNAL_FLAG": "Distress Flag/Banner",
-  "supplyItem_TOOL_SIGNAL_STROBE": "Strobe Emergency Light",
-
   "shellTabSafety": "Safety",
   "shellTabPosition": "Location",
   "shellTabEvents": "Events",
   "shellTabAssist": "Assist",
   "shellTabMine": "Me",
-
   "noFieldTitle": "IgniRelay",
   "noFieldSubtitle": "Join or create a field to become visible, call for help, and leave a last known trail.",
   "noFieldJoin": "Join field",
   "noFieldCreate": "Create field",
   "noFieldPreview": "Guided preview",
-
   "myTitle": "Me",
   "mySubtitle": "Field, identity & settings",
   "myFieldSection": "Field",
   "myFieldManage": "Manage field",
   "myCurrentField": "Current field: {name}",
   "@myCurrentField": {
-    "placeholders": { "name": {"type": "String"} }
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   },
   "myFieldUnnamed": "(unnamed)",
   "myFieldJoinedCount": "Joined {count}",
   "@myFieldJoinedCount": {
-    "placeholders": { "count": {"type": "int"} }
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "myNoField": "No field joined yet.",
   "myRoleSection": "Identity & role",
@@ -1460,7 +61,6 @@
   "myPermissionSection": "Permission status",
   "myComingSoon": "Coming soon",
   "myDeveloperDiagnostics": "Developer diagnostics",
-
   "settingsSection": "Settings",
   "settingsLanguage": "Language",
   "settingsTextSize": "Text size",
@@ -1468,7 +68,6 @@
   "settingsTextSizeLarge": "Large",
   "settingsTextSizeXLarge": "X-Large",
   "settingsTextSizeHuge": "Huge",
-
   "fieldTitle": "Field",
   "fieldSubtitle": "Join a field to send and receive events",
   "fieldNoneTitle": "Not in any field yet",
@@ -1480,13 +79,21 @@
   "fieldCreateNew": "Create field",
   "fieldJoinedHeader": "Joined fields ({count})",
   "@fieldJoinedHeader": {
-    "placeholders": { "count": {"type": "int"} }
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "fieldShowQr": "Show QR",
   "fieldLeave": "Leave field",
   "fieldCreateFailed": "Couldn't create field: {error}",
   "@fieldCreateFailed": {
-    "placeholders": { "error": {"type": "String"} }
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   },
   "fieldSecretNotFound": "This field's key wasn't found, so the QR can't be shown",
   "fieldCodeTitle": "Enter field code",
@@ -1498,26 +105,46 @@
   "fieldCodeUnrecognized": "Unrecognized code: it must be an IGNI1 code or 64 hex characters",
   "fieldDefaultNamePrefix": "Field-{prefix}",
   "@fieldDefaultNamePrefix": {
-    "placeholders": { "prefix": {"type": "String"} }
+    "placeholders": {
+      "prefix": {
+        "type": "String"
+      }
+    }
   },
   "fieldJoinedSnack": "Joined field {id}…",
   "@fieldJoinedSnack": {
-    "placeholders": { "id": {"type": "String"} }
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
   },
   "fieldJoinFailed": "Couldn't join field: {error}",
   "@fieldJoinFailed": {
-    "placeholders": { "error": {"type": "String"} }
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   },
   "fieldLeaveTitle": "Leave field?",
   "fieldLeaveBody": "About to leave \"{name}\". This can't be undone — the field's key is removed from this device, and you'll need to scan or enter the code again to rejoin.",
   "@fieldLeaveBody": {
-    "placeholders": { "name": {"type": "String"} }
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   },
   "fieldLeaveConfirm": "Leave",
   "fieldLeftSnack": "Left the field",
   "fieldLeaveFailed": "Couldn't leave field: {error}",
   "@fieldLeaveFailed": {
-    "placeholders": { "error": {"type": "String"} }
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   },
   "fieldCreateTitle": "Create field",
   "fieldNameLabel": "Field name",
@@ -1531,19 +158,16 @@
   "fieldErrBadCloudUrl": "The code's cloud URL is invalid (https:// only)",
   "fieldErrStaffWithoutCloud": "Malformed code: it has a staff token but no cloud URL",
   "fieldErrMalformed": "The code is corrupted and can't be parsed",
-
   "fieldScanBack": "Back",
   "fieldScanTitle": "Scan field QR",
   "fieldScanHint": "Point at the host's field QR to join automatically",
   "fieldScanReject": "That's not an IgniRelay field QR — try another",
   "fieldScanNoCameraTitle": "Can't open the camera",
   "fieldScanNoCameraBody": "Check that camera permission is granted, or use \"Enter code\" to join a field instead.",
-
   "fieldQrTitle": "Field QR",
   "fieldQrSubtitle": "Have others scan this to join the same field",
   "fieldQrDebugWarning": "(debug) This code contains the field key — don't share it:",
   "fieldQrDone": "Done",
-
   "previewModeSubtitle": "Demo mode · nothing is sent",
   "previewBadge": "Demo data",
   "previewBack": "Back",
@@ -1561,7 +185,11 @@
   "previewPositionIntro": "See nearby members' last trusted position and relative bearing. The radar is fixed north-up; closer to the center means closer to you. (This shows demo data.)",
   "previewFootprintLine": "Last trusted position · {ago}",
   "@previewFootprintLine": {
-    "placeholders": { "ago": {"type": "String"} }
+    "placeholders": {
+      "ago": {
+        "type": "String"
+      }
+    }
   },
   "previewEventsTitle": "Events: hazards / broadcasts / check-ins",
   "previewEventsIntro": "Important messages collect under Events: hazard alerts, admin broadcasts, and safety check-ins, so you can size up the situation fast.",
@@ -1576,11 +204,14 @@
   "previewToneInfo": "Broadcast",
   "previewToneOk": "Safe",
   "previewToneNeutral": "Event",
-
   "previewFieldLabel": "Demo field · DEMO-FIELD",
   "previewAlias": "Alias {alias}",
   "@previewAlias": {
-    "placeholders": { "alias": {"type": "String"} }
+    "placeholders": {
+      "alias": {
+        "type": "String"
+      }
+    }
   },
   "previewFpAgo1": "1 min ago",
   "previewFpAgo4": "4 min ago",

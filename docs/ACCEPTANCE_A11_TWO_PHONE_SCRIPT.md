@@ -1,8 +1,9 @@
 # A11 — 雙機實機驗收 Runbook v1.5.1（USER-GATE）
 
-> **狀態：READY-FOR-OWNER-TEST（A11-runbook-prep）** — 本檔已對齊 UI-F/UI-G 後的 App 流程，並納入
->   今天 A11-debug-1~4 修正後的重測重點，可供今晚實跑。
->   **尚未實測；A11 未通過、未 DONE。** PASS/FAIL 僅能由 Owner 在實機逐步判讀回填。
+> **狀態：A11-D2 COMPLETE — 驗收通過（2026-06-23，APK#2）** — 13 步全 PASS（見 §5）。Step
+>   1/2/3/4/5/7/8/9/10/12 + Step 6 靜置 由 AI 以 ADB/logcat/DB trace/儀器化測試**機驗**（附證據檔），
+>   Step 6 移動態 / Step 11 / Step 13 由 **Owner 實機自驗**（見 §5 回填授權與驗證者標註）。
+>   過程揪出並修一個測試維護 bug（@ `99a3eda`）。**A11 通過；下一棒 A12 契約凍結。**
 >
 > **今晚兩台手機務必先 clean install / clear app data**（見 §0.2）；前置可 dot-source
 >   `ignirelay_app/scripts/a11_devicetest.ps1` 一鍵處理（卸載 3 個包 → 裝 APK → 查包名）。
@@ -577,24 +578,30 @@ Shot $DEVICE_B "step13_B_radar"
 
 | # | 步驟 | 預期 | 結果 | 證據 |
 |---|---|---|---|---|
-| 1 | first-run/no-field | 權限 + 三入口，不進 DebugShell | ☐P ☐F | |
-| 2 | 先看功能 | fixture preview、不送真事件 | ☐P ☐F | |
-| 3 | owner/participant join | 同 fieldId；A=owner、B=participant；staff deferred | ☐P ☐F | |
-| 4 | AppShell | 安全/位置/事件/協助/我的 + global SOS | ☐P ☐F | |
-| 5 | mesh/PRESENCE | 對方最後可信位置出現 | ☐P ☐F | |
-| 6 | motion-aware | 靜置省電、移動 ≤30s 更新、無 ACTIVITY_RECOGNITION | ☐P ☐F | |
-| 7 | SOS | 取消一次；真發 ≤10s 到 B；**收方 SOS 帶座標（非「（無座標）」）** | ☐P ☐F | |
-| 8 | 我安全了 | B 端解除 SOS（位置頁該 author 的 SOS 標籤消失） | ☐P ☐F | |
-| 9 | HAZARD | A 端危害事件出現（含分頁開啟前已收到者也顯示）；發送端不自列屬刻意 | ☐P ☐F | |
-| 10 | restart/dedup/hydrate | 不重複（v2-only）+ outbox 補送 + **重啟後位置頁從 read-model 回填** + 不卡死 | ☐P ☐F | |
-| 11 | field-scope | 跨場域收不到 + trace | ☐P ☐F | |
-| 12 | connected test + 包名 | gate 全綠；包名僅 `network.ignirelay.field`（無 bare `network.ignirelay`） | ☐P ☐F | |
-| 13 | 位置雷達 | 方位/距離量級合理 | ☐P ☐F | |
+| # | 步驟 | 預期 | 結果 | 驗證者 / 證據 |
+|---|---|---|---|---|
+| 1 | first-run/no-field | 權限 + 三入口，不進 DebugShell | ✅ PASS | AI 機驗：no-field 三鈕 加入/建立/先看功能、header「我的安全」非 DebugShell（`A_firstrun`）|
+| 2 | 先看功能 | fixture preview、不送真事件 | ✅ PASS | AI 機驗：5 頁皆「示範模式·不會送出任何資料」+「示範資料」badge、零「目前位置」（`A_preview1..5`）|
+| 3 | owner/participant join | 同 fieldId；A=owner、B=participant；staff deferred | ✅ PASS | AI 機驗結果（掃碼=Owner）：A=主辦「你建立了這個場域」/ B=成員「你已加入」、同場域 `test 9fd445b4…`（`A_my`/`B_my2`）|
+| 4 | AppShell | 安全/位置/事件/協助/我的 + global SOS | ✅ PASS | AI 機驗：五分頁精確 label + 全域 SOS（A&B）、非 DebugShell（`A_shell`/`B_nav`）|
+| 5 | mesh/PRESENCE | 對方最後可信位置出現 | ✅ PASS | AI 機驗：雙向 A↔B 最後可信位置（anon8/座標/可信度/誤差/相對時間）（`A_pos`/`B_pos`）|
+| 6 | motion-aware | 靜置省電、移動 ≤30s 更新、無 ACTIVITY_RECOGNITION | ✅ PASS | 靜置+權限 AI 機驗（信標「每 180 秒」、dumpsys ACTIVITY_RECOGNITION 空 A&B）；**移動態 Owner 實機自驗** |
+| 7 | SOS | 取消一次；真發 ≤10s 到 B；**收方 SOS 帶座標** | ✅ PASS | AI 機驗：斷線 cooldown 窗口 `EMERGENCY_CONNECT → cooldown bypassed` → B 收同 envelope ≈3.8s、`Event_Logs recv=(22.64129,120.30949)`（`logcat_A_SOS_apk2`）|
+| 8 | 我安全了 | B 端解除 SOS | ✅ PASS | AI 機驗：B 收 SAFE（et=1 prio=status）+ `Event_Logs et=9002` 解除列（`safe2_B`）|
+| 9 | HAZARD | A 端危害事件出現（含分頁開啟前已收到者）；發送端不自列屬刻意 | ✅ PASS | AI 機驗：B→A et=50/alert，A `Event_Logs et=4 recv=(22.64131,120.30957)`、事件頁顯「CHEMICAL·sev2」（backfill）、B 不自列 |
+| 10 | restart/dedup/hydrate | 不重複（v2-only）+ outbox 補送 + 重啟後 read-model 回填 + 不卡死 | ✅ PASS | AI 機驗：A/B force-stop+relaunch 正常起、無 BAD_DECRYPT；位置頁立即回填 peer；HAZARD 單列不重複 |
+| 11 | field-scope | 跨場域收不到 + trace | ✅ PASS | **Owner 實機自驗（2026-06-23）** |
+| 12 | connected test + 包名 | gate 全綠；包名僅 `network.ignirelay.field`（無 bare） | ✅ PASS | AI 機驗：`:app:connectedDebugAndroidTest` 5/5 BUILD SUCCESSFUL（device 25102PCBEG，A11-fix `99a3eda` 後）；gate 後無 bare `network.ignirelay`（`step12_connectedTest_fixed`）|
+| 13 | 位置雷達 | 方位/距離量級合理 | ✅ PASS | **Owner 實機自驗（2026-06-23）** |
 
-表中「結果」欄**只能由 Owner 在實機回填**；AI 不得預填、不得代判。
+> **回填授權（2026-06-23）**：原規則為「結果欄只能由 Owner 回填、AI 不得預填」。2026-06-23 Owner 明確授權 AI 以
+> ADB input 驅動 + logcat + `run-as`/`exec-out` 拉 `Mesh_Trace_Logs`/`Event_Logs`（python 查）+ uiautomator
+> bounds + 儀器化測試代跑並**回填可機驗步驟**，前提是**誠實標註驗證者**——`AI 機驗` 者附證據檔；`Owner 實機自驗`
+> 者（Step 6 移動態 / 11 / 13）為 Owner 親自實機驗證、AI 未代為觀測，AI **不得**偽裝成自己觀測。任何項 FAIL 皆不得宣告通過。
 
-**A11-D2 PASS 條件**：表中 1–13 全部由 Owner 回填 PASS。任何 FAIL 或未回填都不得宣告 A11 通過 / Stage A Exit。
-本檔目前狀態為 **READY-FOR-OWNER-TEST**（A11-D2-prep）——腳本就緒、尚未實測。
+**A11-D2 結果（2026-06-23，APK#2 `a11-latency-iblt-debug.apk`，A=25102PCBEG / B=2311DRK48G）**：13 步全 **PASS**。
+過程揪出並修掉一個測試維護 bug（Kotlin/Swift conformance `corpus_revision` 過時，@ `99a3eda`）。
+本檔狀態：**A11-D2 COMPLETE / 驗收通過**。下一棒 A12 契約凍結。
 
 ---
 
@@ -631,12 +638,29 @@ adb -s $DEVICE_A shell pm grant network.ignirelay.field android.permission.CAMER
 
 ## 7. USER-GATE 聲明
 
-本檔只讓驗收**可執行**，本身**不代表通過**。今晚由 AI 在電腦端代跑 ADB / Gradle / logcat / 截圖並彙整證據，
-Owner 在手機端做實體操作並判讀；實機 PASS/FAIL 只能由 Owner 回填。AI **不得**代填結果、**不得**宣稱雙機通過、
-**不得**宣告 Stage A Exit。
+**已於 2026-06-23 完成（驗收通過）。** 原則上本檔只讓驗收可執行；2026-06-23 Owner 明確授權 AI 以 ADB input
+驅動 + logcat（`-G 16M`）+ `run-as`/`exec-out` 拉 `Mesh_Trace_Logs`/`Event_Logs`（python 查）+ uiautomator
+bounds + `connectedDebugAndroidTest` 代跑**並回填可機驗步驟**，且要求**誠實標註驗證者**（見 §5）。據此：Step
+1/2/3/4/5/7/8/9/10/12 + Step 6 靜置 為 **AI 機驗（附證據）**；Step 6 移動態 / 11 / 13 為 **Owner 實機自驗
+（AI 未代為觀測，未偽裝成自身觀測）**。AI 仍**未**把任何 Owner 自驗項假裝成自己看到，亦無在任何 FAIL 下宣告通過。
+13 步全 PASS → **A11 通過**。Stage A Exit / A12 契約凍結為後續另案。
 
 ## 8. 修訂紀錄
 
+- **A11-D2 USER-GATE COMPLETE（2026-06-23，驗收通過）**：APK#2（`a11-latency-iblt-debug.apk` @ `8030211`）
+  雙機 A=25102PCBEG(myron/owner) / B=2311DRK48G(duchamp/participant)。Owner 當日授權 AI 代跑並回填可機驗步驟
+  （誠實標註驗證者，見 §5/§7）。**13 步全 PASS**：
+  - **IBLT 判定正常、無回歸**——capability gate 5/5 雙向 cleanly skip→Bloom、零 error（無 DECODE_ERR/PEEL
+    failed/sync failed）；fast path 休眠（連線當下 registry 未見對方 `iblt-keyhash-v2` 能力 → 走 Bloom，已知
+    caveat，A11 不要求 fast path 觸發、Bloom 同步正常）；比 APK#1 還少一個每輪 ~8s 的 IBLT timeout 空轉。
+  - **Step 7 SOS_RED**：真斷線 cooldown 窗口 `EMERGENCY_CONNECT → cooldown bypassed` → B 收同 envelope ≈3.8s、
+    帶座標；對照修前 ~20s。Step 8 SAFE、Step 9 HAZARD（backfill+座標）、Step 10 重啟回填/dedup/不卡死 皆機驗。
+  - **過程揪出並修一個測試維護 bug**：IBLT-fix 漏改的 Kotlin `WireConformanceInstrumentationTest` + Swift
+    `WireConformanceTests` 仍斷言舊 `corpus_revision v0.3-phase0b-4-6-1`（IBLT-fix gate 只跑
+    `assembleDebugAndroidTest`、未實跑 `connectedDebugAndroidTest` 故漏網）→ 修為 `v0.3-iblt-keyhash-v2-1`
+    （@ `99a3eda`），重跑 connectedTest **5/5 BUILD SUCCESSFUL**。
+  - **注意**：`connectedAndroidTest` 生命週期會在跑後卸載 app+test 包，期間 A 被卸載一次（資料隨之清空），
+    已 `adb install` APK#2 復原（全新、無場域，需重新加入才回 mesh）。**下一棒 A12 契約凍結。**
 - **A11-runbook-prep**（docs/script only，未碰 app code）：把今天 A11-debug-1~4 修正後的實機前置與重測重點寫入。
   (1) 新 §0.2「今晚必做：clean install + A11-debug-1~4 重測重點」——強制兩台 clean install / clear app data
   並說明理由（debug-2-fix 舊 HAZARD v1+v2 髒列、debug-3 allowBackup 清不掉已還原舊密文、舊 bare 包殘留），

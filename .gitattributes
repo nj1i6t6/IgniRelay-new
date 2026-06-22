@@ -9,3 +9,6 @@ docs/specs/wire_conformance_v1.json text eol=lf
 gradlew text eol=lf
 *.bat text eol=crlf
 gradle-wrapper.jar binary
+
+# Git hooks are POSIX sh scripts: must stay LF (CRLF breaks them in sh.exe).
+tool/hooks/pre-commit text eol=lf

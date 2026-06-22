@@ -104,8 +104,34 @@ void main() {
       final z = a.subtract(a);
       expect(z.toBytes(), List.filled(IBLT.totalBytes, 0));
     });
+
+    test('peel golden vector matches live Dart peel (iblt-keyhash-v2)', () {
+      final cases = (fixture['cases'] as List).cast<Map<String, dynamic>>();
+      final peel =
+          cases.firstWhere((c) => c['name'] == 'peel_symmetric_diff_3');
+      final a = IBLT();
+      final b = IBLT();
+      for (final id in (peel['a_insert'] as List).cast<String>()) {
+        a.insert(id);
+      }
+      for (final id in (peel['b_insert'] as List).cast<String>()) {
+        b.insert(id);
+      }
+      final result = a.subtract(b).peel();
+      expect(result, isNotNull,
+          reason: 'iblt-keyhash-v2: a small symmetric diff must peel');
+      expect(_sortedHex32(result!.onlyInA),
+          (peel['expected_only_in_a_key_hashes_hex'] as List).cast<String>());
+      expect(_sortedHex32(result.onlyInB),
+          (peel['expected_only_in_b_key_hashes_hex'] as List).cast<String>());
+    });
   });
 }
 
 String _hex(List<int> bytes) =>
     bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+
+List<String> _sortedHex32(Set<int> hashes) {
+  final list = hashes.toList()..sort();
+  return list.map((h) => h.toRadixString(16).padLeft(8, '0')).toList();
+}

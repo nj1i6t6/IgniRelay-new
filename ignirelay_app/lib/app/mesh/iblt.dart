@@ -4,11 +4,38 @@ import 'dart:typed_data';
 /// 56 buckets × 9 bytes = 504 bytes (fits in 1 MTU of 517)
 /// Bucket: count(1B signed) + keySum(4B CRC32) + hashSum(4B checksum)
 /// Tolerates ~38 item differences (56 / 1.5 safety factor)
+///
+/// Contract `iblt-keyhash-v2` (IBLT-fix): EVERYTHING `peel()` needs is
+/// reconstructable from a pure cell's `keySum` (= CRC32(eventId)), because peel
+/// no longer has the original event id. Both the bucket indices and the
+/// checksum are therefore derived from `keyHash`, NOT from the raw event id:
+///
+///   keyHash  = CRC32(eventId)
+///   keyBytes = uint32_le(keyHash)            // 4 little-endian bytes
+///   checkHash= FNV1a(keyBytes)               // hashSum
+///   indices  = MurmurHash(keyBytes, seed 0/1/2) % 56
+///
+/// This replaces the pre-`v2` quirk where `insert` indexed by
+/// `MurmurHash(eventId.codeUnits)` and `hashSum = FNV1a(eventId)`, while `peel`
+/// re-derived indices by CRC bit-extraction and `verifyChecksum` used
+/// `FNV1a(uint32_le(keySum))` — two mismatched derivations that made peel fail
+/// on almost every real difference, forcing the Bloom slow path. The external
+/// shape (504 bytes, keySum=CRC32 XOR, peel result = uint32 CRC32 hashes) is
+/// unchanged; only the internal index/checksum derivation changed, so the wire
+/// bucket bytes differ from `v1` and the parity fixture + conformance corpus
+/// were regenerated. Must stay bit-identical with IBLT.kt / IBLT.swift.
 class IBLT {
   static const int bucketCount = 56;
   static const int bucketSize = 9; // 1 + 4 + 4
   static const int totalBytes = bucketCount * bucketSize; // 504
   static const int hashFunctions = 3;
+
+  /// Capability string advertised in PROTOCOL_HELLO (`capabilities`) by peers
+  /// that speak this peel contract. A node attempts the IBLT fast path only
+  /// when the peer advertises this; otherwise it uses the Bloom slow path
+  /// (mixed old/new builds stay correct via Bloom, never via a peel that would
+  /// silently mis-reconcile across the two contracts).
+  static const String keyHashContractV2 = 'iblt-keyhash-v2';
 
   final List<IBLTBucket> buckets;
 
@@ -19,8 +46,8 @@ class IBLT {
   /// Insert an event ID into the IBLT
   void insert(String eventId) {
     final keyHash = _crc32(eventId);
-    final checkHash = _fnv1a(eventId);
-    final indices = _getIndices(eventId);
+    final checkHash = _checksumFromKeyHash(keyHash);
+    final indices = _indicesFromKeyHash(keyHash);
     for (final idx in indices) {
       buckets[idx].count += 1;
       buckets[idx].keySum ^= keyHash;
@@ -31,8 +58,8 @@ class IBLT {
   /// Remove an event ID from the IBLT
   void remove(String eventId) {
     final keyHash = _crc32(eventId);
-    final checkHash = _fnv1a(eventId);
-    final indices = _getIndices(eventId);
+    final checkHash = _checksumFromKeyHash(keyHash);
+    final indices = _indicesFromKeyHash(keyHash);
     for (final idx in indices) {
       buckets[idx].count -= 1;
       buckets[idx].keySum ^= keyHash;
@@ -78,7 +105,7 @@ class IBLT {
           if (_verifyChecksum(key, check)) {
             onlyInA.add(key);
             // Remove from all buckets that contain this key
-            final indices = _getIndicesFromHash(key);
+            final indices = _indicesFromKeyHash(key);
             for (final idx in indices) {
               work[idx].count -= 1;
               work[idx].keySum ^= key;
@@ -92,7 +119,7 @@ class IBLT {
           final check = work[i].hashSum;
           if (_verifyChecksum(key, check)) {
             onlyInB.add(key);
-            final indices = _getIndicesFromHash(key);
+            final indices = _indicesFromKeyHash(key);
             for (final idx in indices) {
               work[idx].count += 1;
               work[idx].keySum ^= key;
@@ -141,36 +168,41 @@ class IBLT {
     return IBLT._(buckets);
   }
 
-  /// Get bucket indices for an event ID
-  List<int> _getIndices(String eventId) {
-    final bytes = eventId.codeUnits;
+  /// The IBLT key hash for an event id: `CRC32(eventId)`. This is exactly what
+  /// `peel()` returns in its onlyInA/onlyInB sets, so tests and the parity
+  /// fixture/corpus generators use it to compute expected hashes. Mirrors the
+  /// public `crc32` on the Kotlin/Swift siblings.
+  static int keyHashOf(String eventId) => _crc32(eventId);
+
+  /// The 4 little-endian bytes of a CRC32 `keyHash`. This is the SOLE input to
+  /// both the checksum and the bucket indices under `iblt-keyhash-v2`, so peel
+  /// (which only has `keySum`) reconstructs them identically to insert.
+  static List<int> _keyBytes(int keyHash) => [
+        keyHash & 0xFF,
+        (keyHash >> 8) & 0xFF,
+        (keyHash >> 16) & 0xFF,
+        (keyHash >> 24) & 0xFF,
+      ];
+
+  /// Checksum (`hashSum`) for a `keyHash` — FNV-1a over its 4 LE bytes.
+  /// Reconstructable during peel from `keySum` alone.
+  static int _checksumFromKeyHash(int keyHash) => _fnv1aBytes(_keyBytes(keyHash));
+
+  /// Bucket indices for a `keyHash` — MurmurHash over its 4 LE bytes with
+  /// seeds 0/1/2. Used by BOTH insert/remove and peel, so the index space is
+  /// identical (the `iblt-keyhash-v2` fix to the pre-v2 mismatch).
+  List<int> _indicesFromKeyHash(int keyHash) {
+    final kb = _keyBytes(keyHash);
     return [
-      _murmurHash(bytes, 0) % bucketCount,
-      _murmurHash(bytes, 1) % bucketCount,
-      _murmurHash(bytes, 2) % bucketCount,
+      _murmurHash(kb, 0) % bucketCount,
+      _murmurHash(kb, 1) % bucketCount,
+      _murmurHash(kb, 2) % bucketCount,
     ];
   }
 
-  /// Get bucket indices from a key hash
-  List<int> _getIndicesFromHash(int keyHash) {
-    return [
-      ((keyHash) & 0xFFFF) % bucketCount,
-      ((keyHash >> 8) & 0xFFFF) % bucketCount,
-      ((keyHash >> 16) & 0xFFFF) % bucketCount,
-    ];
-  }
-
-  /// Verify that keySum and hashSum match
-  bool _verifyChecksum(int keySum, int hashSum) {
-    // FNV-1a of the key bytes should match hashSum
-    final keyBytes = ByteData(4)..setUint32(0, keySum, Endian.little);
-    int h = 0x811c9dc5;
-    for (int i = 0; i < 4; i++) {
-      h ^= keyBytes.getUint8(i);
-      h = (h * 0x01000193) & 0xFFFFFFFF;
-    }
-    return h == hashSum;
-  }
+  /// Verify a pure cell: FNV-1a of the keySum's 4 LE bytes must equal hashSum.
+  bool _verifyChecksum(int keySum, int hashSum) =>
+      _checksumFromKeyHash(keySum) == hashSum;
 
   // ── Hash Functions ──
 
@@ -186,11 +218,12 @@ class IBLT {
     return crc ^ 0xFFFFFFFF;
   }
 
-  /// FNV-1a for hashSum (checksum)
-  static int _fnv1a(String s) {
+  /// FNV-1a over raw bytes (the `iblt-keyhash-v2` checksum input is the keyHash
+  /// LE bytes, not the event-id string).
+  static int _fnv1aBytes(List<int> bytes) {
     int h = 0x811c9dc5;
-    for (final b in s.codeUnits) {
-      h ^= b;
+    for (final b in bytes) {
+      h ^= b & 0xFF;
       h = (h * 0x01000193) & 0xFFFFFFFF;
     }
     return h;

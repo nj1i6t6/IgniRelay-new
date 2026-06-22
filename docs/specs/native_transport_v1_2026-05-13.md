@@ -723,7 +723,7 @@ When battery saver is enabled, the OS may further restrict BLE operations. The f
 
 `docs/specs/wire_conformance_v1.json` — the same single JSON file co-owned with 0a (envelope slice in 0a §17). The transport slice is 0b's responsibility.
 
-The corpus is **deterministic** (no live timestamp) and carries a `corpus_revision` string + `spec_date`; the current revision is `v0.3-phase0b-4-3-1`. A `notes` object documents corpus-wide conventions (`bloom_hash_ascii_only`, `payload_generator_lcg_byte_pattern_v1`, `event_id_generator_ascii_seq_v1`, `iblt_peel_quirk`). Re-generating MUST produce a byte-identical file; the Dart `tool/generate_wire_conformance_v1.dart --check` mode enforces this.
+The corpus is **deterministic** (no live timestamp) and carries a `corpus_revision` string + `spec_date`; the current revision is `v0.3-iblt-keyhash-v2-1` (IBLT-fix bumped it from `v0.3-phase0b-4-6-1` when the IBLT peel contract changed to `iblt-keyhash-v2` — every non-empty IBLT bucket-byte sample changed; no envelope/canonical/proto change). A `notes` object documents corpus-wide conventions (`bloom_hash_ascii_only`, `payload_generator_lcg_byte_pattern_v1`, `event_id_generator_ascii_seq_v1`, `iblt_peel_contract_v2`). Re-generating MUST produce a byte-identical file; the Dart `tool/generate_wire_conformance_v1.dart --check` mode enforces this.
 
 #### 11.1.1 Size discipline (Stage 0c wave 3D decision)
 
@@ -789,12 +789,12 @@ Coverage:
 - Empty IBLT (0 inserts).
 - Single insert.
 - 30 inserts (mid-load).
-- 50 inserts (near 56-bucket capacity, but see peel quirk below).
+- 50 inserts (near 56-bucket capacity).
 - 100 inserts (overflow).
 - Subtraction tests: A and B both built from operations, with the expected `subtract(A, B)` bytes.
 - Inserts + removes within a single sample (verifies `count` going back to 0 and `keySum/hashSum` XOR-ing back out).
 
-**Peel coverage — DEFERRED.** `IBLT.peel()` results are NOT in the v3D corpus because of a pre-existing implementation quirk documented in `notes.iblt_peel_quirk`: Dart/Kotlin/Swift `peel()` uses a CRC-derived index lookup while `insert/remove` use MurmurHash-derived indices. The wire-level contract (bucket bytes, subtract bytes) IS covered byte-identically and is sufficient for cross-platform sync because peel is a receiver-local recovery operation that doesn't go on the wire. Adding peel coverage requires first fixing the index-space mismatch; tracked as a future protocol cleanup, NOT a 3D scope item.
+**Peel coverage — IBLT-fix (`iblt-keyhash-v2`).** The pre-v2 index-space mismatch (`peel()` derived bucket indices by CRC bit-extraction while `insert/remove` used MurmurHash-derived indices, so peel failed on almost every real difference and forced the Bloom slow path) is FIXED: under `iblt-keyhash-v2`, both sides derive the bucket indices (MurmurHash) and the checksum (FNV-1a) from the SAME input — the 4 little-endian bytes of `keyHash = CRC32(eventId)` — so a pure cell reconstructs them from `keySum` alone and peel succeeds. The wire-level bucket/subtract bytes remain the cross-platform contract (covered byte-identically by this slice); a peel golden vector (`peel_symmetric_diff_3`, expected uint32 CRC32 key hashes) now lives in `test/fixtures/iblt_swift_parity_vectors.json` and is asserted by the Dart and Swift parity tests. Compatibility: peers gate the IBLT fast path on the `iblt-keyhash-v2` HELLO `capabilities` entry; a peer that does not advertise it uses the Bloom slow path, so mixed old/new builds never attempt a cross-contract peel.
 
 The Dart IBLT (`resqmesh_app/lib/app/mesh/iblt.dart`) uses CRC32 + FNV-1a + MurmurHash3. The Kotlin and Swift implementations MUST produce bit-identical bucket bytes for every input set. The corpus is the verifier.
 

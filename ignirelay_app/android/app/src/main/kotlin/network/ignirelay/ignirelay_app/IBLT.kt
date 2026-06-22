@@ -52,11 +52,19 @@ class IBLT private constructor(val buckets: Array<IBLTBucket>) {
             return (crc xor 0xFFFFFFFFL) and 0xFFFFFFFFL
         }
 
-        /** FNV-1a for hashSum — identical to Dart _fnv1a. */
-        fun fnv1a(s: String): Long {
+        /** Contract name advertised in PROTOCOL_HELLO `capabilities`. */
+        const val KEY_HASH_CONTRACT_V2 = "iblt-keyhash-v2"
+
+        /** Key hash for an event id: CRC32(eventId) — what peel() returns. */
+        fun keyHashOf(eventId: String): Long = crc32(eventId)
+
+        /** FNV-1a over raw bytes — identical to Dart _fnv1aBytes. The
+         *  `iblt-keyhash-v2` checksum input is the keyHash LE bytes, not the
+         *  event-id string. */
+        fun fnv1aBytes(bytes: List<Int>): Long {
             var h = 0x811c9dc5L
-            for (b in s.toCharArray()) {
-                h = h xor (b.code.toLong() and 0xFFL)
+            for (b in bytes) {
+                h = h xor (b.toLong() and 0xFFL)
                 h = (h * 0x01000193L) and 0xFFFFFFFFL
             }
             return h
@@ -92,8 +100,8 @@ class IBLT private constructor(val buckets: Array<IBLTBucket>) {
     /** Insert an event ID into the IBLT. */
     fun insert(eventId: String) {
         val keyHash = crc32(eventId)
-        val checkHash = fnv1a(eventId)
-        val indices = getIndices(eventId)
+        val checkHash = checksumFromKeyHash(keyHash)
+        val indices = indicesFromKeyHash(keyHash)
         for (idx in indices) {
             buckets[idx].count += 1
             buckets[idx].keySum = buckets[idx].keySum xor keyHash
@@ -104,8 +112,8 @@ class IBLT private constructor(val buckets: Array<IBLTBucket>) {
     /** Remove an event ID from the IBLT. */
     fun remove(eventId: String) {
         val keyHash = crc32(eventId)
-        val checkHash = fnv1a(eventId)
-        val indices = getIndices(eventId)
+        val checkHash = checksumFromKeyHash(keyHash)
+        val indices = indicesFromKeyHash(keyHash)
         for (idx in indices) {
             buckets[idx].count -= 1
             buckets[idx].keySum = buckets[idx].keySum xor keyHash
@@ -155,7 +163,7 @@ class IBLT private constructor(val buckets: Array<IBLTBucket>) {
                     val check = work[i].hashSum
                     if (verifyChecksum(key, check)) {
                         onlyInA.add(key)
-                        val indices = getIndicesFromHash(key)
+                        val indices = indicesFromKeyHash(key)
                         for (idx in indices) {
                             work[idx].count -= 1
                             work[idx].keySum = work[idx].keySum xor key
@@ -169,7 +177,7 @@ class IBLT private constructor(val buckets: Array<IBLTBucket>) {
                     val check = work[i].hashSum
                     if (verifyChecksum(key, check)) {
                         onlyInB.add(key)
-                        val indices = getIndicesFromHash(key)
+                        val indices = indicesFromKeyHash(key)
                         for (idx in indices) {
                             work[idx].count += 1
                             work[idx].keySum = work[idx].keySum xor key
@@ -203,42 +211,41 @@ class IBLT private constructor(val buckets: Array<IBLTBucket>) {
 
     // ── Private helpers ──
 
-    /** Get bucket indices for an event ID (MurmurHash3 with k=3 seeds). */
-    private fun getIndices(eventId: String): List<Int> {
-        val codeUnits = eventId.map { it.code }
+    /**
+     * The 4 little-endian bytes of a CRC32 keyHash — the SOLE input to both the
+     * checksum and the bucket indices under `iblt-keyhash-v2`, so peel (which
+     * only has keySum) reconstructs them identically to insert. Matches Dart
+     * _keyBytes.
+     */
+    private fun keyBytes(keyHash: Long): List<Int> {
         return listOf(
-            (murmurHash(codeUnits, 0) % BUCKET_COUNT).toInt(),
-            (murmurHash(codeUnits, 1) % BUCKET_COUNT).toInt(),
-            (murmurHash(codeUnits, 2) % BUCKET_COUNT).toInt(),
+            (keyHash and 0xFFL).toInt(),
+            ((keyHash ushr 8) and 0xFFL).toInt(),
+            ((keyHash ushr 16) and 0xFFL).toInt(),
+            ((keyHash ushr 24) and 0xFFL).toInt(),
         )
     }
 
+    /** Checksum (hashSum) for a keyHash — FNV-1a over its 4 LE bytes. */
+    private fun checksumFromKeyHash(keyHash: Long): Long = fnv1aBytes(keyBytes(keyHash))
+
     /**
-     * Get bucket indices from a key hash (used during peeling).
-     * Matches Dart _getIndicesFromHash exactly.
+     * Bucket indices for a keyHash — MurmurHash over its 4 LE bytes with seeds
+     * 0/1/2. Used by BOTH insert/remove and peel (the `iblt-keyhash-v2` fix).
+     * Matches Dart _indicesFromKeyHash.
      */
-    private fun getIndicesFromHash(keyHash: Long): List<Int> {
+    private fun indicesFromKeyHash(keyHash: Long): List<Int> {
+        val kb = keyBytes(keyHash)
         return listOf(
-            ((keyHash) and 0xFFFFL).toInt() % BUCKET_COUNT,
-            ((keyHash ushr 8) and 0xFFFFL).toInt() % BUCKET_COUNT,
-            ((keyHash ushr 16) and 0xFFFFL).toInt() % BUCKET_COUNT,
+            (murmurHash(kb, 0) % BUCKET_COUNT).toInt(),
+            (murmurHash(kb, 1) % BUCKET_COUNT).toInt(),
+            (murmurHash(kb, 2) % BUCKET_COUNT).toInt(),
         )
     }
 
-    /**
-     * Verify that keySum and hashSum match.
-     * FNV-1a of the keySum's 4 LE bytes should equal hashSum.
-     */
-    private fun verifyChecksum(keySum: Long, hashSum: Long): Boolean {
-        val keyBytes = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN)
-            .putInt(keySum.toInt()).array()
-        var h = 0x811c9dc5L
-        for (i in 0 until 4) {
-            h = h xor (keyBytes[i].toLong() and 0xFFL)
-            h = (h * 0x01000193L) and 0xFFFFFFFFL
-        }
-        return h == hashSum
-    }
+    /** Verify a pure cell: FNV-1a of keySum's 4 LE bytes must equal hashSum. */
+    private fun verifyChecksum(keySum: Long, hashSum: Long): Boolean =
+        checksumFromKeyHash(keySum) == hashSum
 }
 
 /** Single IBLT bucket: count (signed byte range) + keySum (uint32) + hashSum (uint32). */

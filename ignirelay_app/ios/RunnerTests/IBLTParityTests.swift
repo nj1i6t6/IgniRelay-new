@@ -119,6 +119,33 @@ final class IBLTParityTests: XCTestCase {
         }
     }
 
+    /// iblt-keyhash-v2 (IBLT-fix): a small symmetric difference now peels, and
+    /// the result is the CRC32 key hashes of the differing event ids. Mirrors
+    /// the Dart test in test/mesh/iblt_swift_parity_test.dart against the same
+    /// fixture golden vector. (Run on macOS/CI; not executed locally — no Mac.)
+    func testPeelGoldenVectorMatchesFixture() throws {
+        let fixture = try loadFixture()
+        guard let cases = fixture["cases"] as? [[String: Any]],
+              let peel = cases.first(where: { ($0["name"] as? String) == "peel_symmetric_diff_3" })
+        else {
+            XCTFail("peel golden vector missing from fixture"); return
+        }
+        let aInsert = peel["a_insert"] as? [String] ?? []
+        let bInsert = peel["b_insert"] as? [String] ?? []
+        let expectedA = (peel["expected_only_in_a_key_hashes_hex"] as? [String]) ?? []
+        let expectedB = (peel["expected_only_in_b_key_hashes_hex"] as? [String]) ?? []
+
+        let a = IBLT()
+        let b = IBLT()
+        for id in aInsert { a.insert(id) }
+        for id in bInsert { b.insert(id) }
+        guard let result = a.subtract(b).peel() else {
+            XCTFail("iblt-keyhash-v2: small symmetric diff must peel"); return
+        }
+        XCTAssertEqual(sortedHex32(result.onlyInA), expectedA, "onlyInA diverged")
+        XCTAssertEqual(sortedHex32(result.onlyInB), expectedB, "onlyInB diverged")
+    }
+
     // MARK: - Bloom helpers parity
 
     func testBloomMagicDetection() {
@@ -156,5 +183,11 @@ final class IBLTParityTests: XCTestCase {
 
     private func toHex(_ bytes: Data) -> String {
         return bytes.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Sorted uint32 hashes as zero-padded 8-char hex — matches the Dart
+    /// generator's _sortedHex32 so the golden vector compares element-wise.
+    private func sortedHex32(_ hashes: Set<UInt32>) -> [String] {
+        return hashes.sorted().map { String(format: "%08x", $0) }
     }
 }

@@ -49,8 +49,8 @@ final class IBLT {
     /// Insert an event ID into the IBLT.
     func insert(_ eventId: String) {
         let keyHash = IBLT.crc32(eventId)
-        let checkHash = IBLT.fnv1a(eventId)
-        let indices = getIndices(eventId)
+        let checkHash = IBLT.checksumFromKeyHash(keyHash)
+        let indices = IBLT.indicesFromKeyHash(keyHash)
         for idx in indices {
             buckets[idx].count &+= 1
             buckets[idx].keySum ^= keyHash
@@ -61,8 +61,8 @@ final class IBLT {
     /// Remove an event ID from the IBLT.
     func remove(_ eventId: String) {
         let keyHash = IBLT.crc32(eventId)
-        let checkHash = IBLT.fnv1a(eventId)
-        let indices = getIndices(eventId)
+        let checkHash = IBLT.checksumFromKeyHash(keyHash)
+        let indices = IBLT.indicesFromKeyHash(keyHash)
         for idx in indices {
             buckets[idx].count &-= 1
             buckets[idx].keySum ^= keyHash
@@ -104,7 +104,7 @@ final class IBLT {
                     let check = work[i].hashSum
                     if IBLT.verifyChecksum(keySum: key, hashSum: check) {
                         onlyInA.insert(key)
-                        let indices = IBLT.getIndicesFromHash(key)
+                        let indices = IBLT.indicesFromKeyHash(key)
                         for idx in indices {
                             work[idx].count &-= 1
                             work[idx].keySum ^= key
@@ -117,7 +117,7 @@ final class IBLT {
                     let check = work[i].hashSum
                     if IBLT.verifyChecksum(keySum: key, hashSum: check) {
                         onlyInB.insert(key)
-                        let indices = IBLT.getIndicesFromHash(key)
+                        let indices = IBLT.indicesFromKeyHash(key)
                         for idx in indices {
                             work[idx].count &+= 1
                             work[idx].keySum ^= key
@@ -190,13 +190,19 @@ final class IBLT {
         return crc ^ 0xFFFFFFFF
     }
 
-    /// FNV-1a 32-bit (init 0x811c9dc5, prime 0x01000193).
-    /// Same code-unit truncation as `crc32`.
-    static func fnv1a(_ s: String) -> UInt32 {
+    /// Contract name advertised in PROTOCOL_HELLO `capabilities`.
+    static let keyHashContractV2 = "iblt-keyhash-v2"
+
+    /// Key hash for an event id: CRC32(eventId) — what peel() returns.
+    static func keyHashOf(_ eventId: String) -> UInt32 { crc32(eventId) }
+
+    /// FNV-1a 32-bit over raw bytes (init 0x811c9dc5, prime 0x01000193). The
+    /// `iblt-keyhash-v2` checksum input is the keyHash LE bytes, not the
+    /// event-id string. Matches Dart fnv1aBytes / Kotlin fnv1aBytes.
+    static func fnv1aBytes(_ bytes: [UInt8]) -> UInt32 {
         var h: UInt32 = 0x811c9dc5
-        for codeUnit in s.utf16 {
-            let b = UInt32(codeUnit & 0xFF)
-            h ^= b
+        for b in bytes {
+            h ^= UInt32(b)
             h = h &* 0x01000193
         }
         return h
@@ -227,46 +233,40 @@ final class IBLT {
 
     // MARK: - Private helpers (match Kotlin)
 
-    private func getIndices(_ eventId: String) -> [Int] {
-        let bytes = eventId.utf16.map { UInt8($0 & 0xFF) }
-        let m0 = IBLT.murmurHash(bytes, seed: 0)
-        let m1 = IBLT.murmurHash(bytes, seed: 1)
-        let m2 = IBLT.murmurHash(bytes, seed: 2)
-        let bc = UInt32(IBLT.bucketCount)
+    /// The 4 little-endian bytes of a CRC32 keyHash — the SOLE input to both
+    /// the checksum and the bucket indices under `iblt-keyhash-v2`, so peel
+    /// (which only has keySum) reconstructs them identically to insert.
+    /// Matches Dart _keyBytes / Kotlin keyBytes.
+    static func keyBytes(_ keyHash: UInt32) -> [UInt8] {
         return [
-            Int(m0 % bc),
-            Int(m1 % bc),
-            Int(m2 % bc),
+            UInt8(keyHash         & 0xFF),
+            UInt8((keyHash >> 8)  & 0xFF),
+            UInt8((keyHash >> 16) & 0xFF),
+            UInt8((keyHash >> 24) & 0xFF),
         ]
     }
 
-    /// Derives bucket indices from the CRC keySum during `peel()`. Matches
-    /// Kotlin `getIndicesFromHash` byte-for-byte. NOTE: these indices use a
-    /// DIFFERENT derivation than `getIndices(_:)` above — this is a
-    /// pre-existing design choice mirrored from the Dart/Kotlin oracles,
-    /// not a bug introduced here.
-    static func getIndicesFromHash(_ keyHash: UInt32) -> [Int] {
+    /// Checksum (hashSum) for a keyHash — FNV-1a over its 4 LE bytes.
+    static func checksumFromKeyHash(_ keyHash: UInt32) -> UInt32 {
+        return fnv1aBytes(keyBytes(keyHash))
+    }
+
+    /// Bucket indices for a keyHash — MurmurHash over its 4 LE bytes with seeds
+    /// 0/1/2. Used by BOTH insert/remove and peel (the `iblt-keyhash-v2` fix).
+    /// Matches Dart _indicesFromKeyHash / Kotlin indicesFromKeyHash.
+    static func indicesFromKeyHash(_ keyHash: UInt32) -> [Int] {
+        let kb = keyBytes(keyHash)
         let bc = UInt32(bucketCount)
         return [
-            Int(((keyHash)        & 0xFFFF) % bc),
-            Int(((keyHash >> 8)   & 0xFFFF) % bc),
-            Int(((keyHash >> 16)  & 0xFFFF) % bc),
+            Int(murmurHash(kb, seed: 0) % bc),
+            Int(murmurHash(kb, seed: 1) % bc),
+            Int(murmurHash(kb, seed: 2) % bc),
         ]
     }
 
-    /// FNV-1a of the 4 little-endian bytes of `keySum` should equal `hashSum`.
+    /// Verify a pure cell: FNV-1a of keySum's 4 LE bytes must equal hashSum.
     static func verifyChecksum(keySum: UInt32, hashSum: UInt32) -> Bool {
-        var keyBytes = [UInt8](repeating: 0, count: 4)
-        keyBytes[0] = UInt8(keySum         & 0xFF)
-        keyBytes[1] = UInt8((keySum >> 8)  & 0xFF)
-        keyBytes[2] = UInt8((keySum >> 16) & 0xFF)
-        keyBytes[3] = UInt8((keySum >> 24) & 0xFF)
-        var h: UInt32 = 0x811c9dc5
-        for i in 0..<4 {
-            h ^= UInt32(keyBytes[i])
-            h = h &* 0x01000193
-        }
-        return h == hashSum
+        return checksumFromKeyHash(keySum) == hashSum
     }
 
     // MARK: - Byte-level LE helpers

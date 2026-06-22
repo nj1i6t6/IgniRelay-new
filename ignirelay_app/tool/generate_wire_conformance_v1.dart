@@ -51,7 +51,11 @@ const String _outputPath = '../docs/specs/wire_conformance_v1.json';
 // #4-6 adds typed-payload samples: StatusUpdateData with LocationEvidence
 // (field 3; bearing absent + bearing=north-0) and a typed HazardMarkerData
 // (#4-5 follow-up) — payload bytes change → revision bump.
-const String _corpusRevision = 'v0.3-phase0b-4-6-1';
+// IBLT-fix bumped the rev: the IBLT peel contract changed to `iblt-keyhash-v2`
+// (insert + peel now derive bucket indices + checksum from the CRC32 keyHash's
+// LE bytes), so every non-empty IBLT bucket-byte sample changed. No envelope /
+// canonical / proto change — only the IBLT sample bytes + the peel note.
+const String _corpusRevision = 'v0.3-iblt-keyhash-v2-1';
 const String _specDate = '2026-05-13';
 
 // Phase 0b #4-3: one corpus-wide test field. All envelope samples ride this
@@ -179,12 +183,18 @@ Future<Map<String, dynamic>> buildCorpus() async {
               'Example {prefix:"evt-", start:0, count:2, width:8} -> '
               '["evt-00000000", "evt-00000001"]. Bloom and IBLT samples use '
               'this so the corpus does not store hundreds of full ID strings.',
-      'iblt_peel_quirk':
-          'Dart/Kotlin/Swift IBLT.peel uses CRC-derived index lookup while '
-              'insert/remove use MurmurHash-derived indices. The two spaces are '
-              'not equivalent, so peel succeeds only on inputs that happen to '
-              'align. Pre-existing quirk; NOT covered by this corpus. The wire '
-              'contract that matters is toBytes()/subtract(), which IS covered.',
+      'iblt_peel_contract_v2':
+          'IBLT contract `iblt-keyhash-v2`: insert/remove AND peel derive '
+              'bucket indices (MurmurHash) and checksum (FNV-1a) from the SAME '
+              'input — the 4 little-endian bytes of keyHash = CRC32(eventId) — '
+              'so a pure cell reconstructs them from keySum alone and peel '
+              'succeeds on real differences (the pre-v2 quirk, where peel used '
+              'CRC-bit-extracted indices that diverged from the MurmurHash '
+              'insert indices and forced the Bloom slow path, is fixed). These '
+              'IBLT bucket-byte samples cover toBytes()/subtract(); a peel '
+              'golden vector lives in test/fixtures/iblt_swift_parity_vectors.'
+              'json. Peers gate the IBLT fast path on the `iblt-keyhash-v2` '
+              'HELLO capability; mixed old/new builds fall back to Bloom.',
     },
     'envelope_samples': <Map<String, dynamic>>[],
     'chunking_samples': <Map<String, dynamic>>[],

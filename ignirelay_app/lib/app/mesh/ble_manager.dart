@@ -62,6 +62,16 @@ class BleManager {
     return until != null && DateTime.now().isBefore(until);
   }
 
+  /// IBLT-fix capability gate. Returns true iff the peer advertised the
+  /// `iblt-keyhash-v2` HELLO capability (wired in main.dart to consult the
+  /// PeerCapabilityRegistry). When set and it returns false — incl. a peer
+  /// whose HELLO/capability is not yet recorded — the IBLT fast path is
+  /// skipped and the Bloom slow path is used instead, so a new build never
+  /// attempts a v2 peel against an old (v1-contract) peer. When unset (tests /
+  /// not wired) the gate is inert and IBLT is attempted as before (still
+  /// Bloom-safe: a cross-contract peel just fails and falls back).
+  bool Function(String deviceId)? ibltContractCheck;
+
   // 待連線設備佇列（序列化處理，避免 Android BLE 並行 GATT 衝突）
   // 存 String (deviceAddress)，統一走 NativeBridge
   final List<dynamic> _pendingDevices = [];
@@ -340,6 +350,20 @@ class BleManager {
   /// 7. 失敗 → 回傳 false，由呼叫端 fallback 到 Bloom-based Slow Path
   Future<bool> _tryIBLTSync(String deviceId) async {
     try {
+      // ── 0. Capability gate (IBLT-fix, iblt-keyhash-v2) ──
+      // Only attempt the IBLT fast path when the peer advertised the
+      // `iblt-keyhash-v2` capability in its PROTOCOL_HELLO. Otherwise (incl. a
+      // peer whose HELLO has not been recorded yet) skip straight to the Bloom
+      // slow path: a v2 peel against an old (v1-contract) peer would just fail
+      // and fall back anyway, and gating avoids the wasted round-trip + any
+      // chance of mis-reconciliation. The gate is inert (IBLT attempted) when
+      // no check is wired (unit contexts) — still Bloom-safe.
+      final probe = ibltContractCheck;
+      if (probe != null && !probe(deviceId)) {
+        _dlog('IBLT skip $deviceId: no ${IBLT.keyHashContractV2} capability → Bloom');
+        return false;
+      }
+
       // ── 1. 建構本機 IBLT ──
       final handler = MeshEventHandler();
       final localEventIds = await handler.getLocalEventIds();

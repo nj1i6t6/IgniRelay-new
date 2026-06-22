@@ -104,15 +104,21 @@ void main() {
     'diff_bytes_hex': subtractCase.diffHex,
   });
 
-  // NOTE: We intentionally do NOT pin a peel() golden vector. The existing
-  // Dart/Kotlin IBLT uses `getIndicesFromHash` (CRC-bit-derived) for the
-  // peel-side index lookup while `getIndices` (MurmurHash-derived) drives
-  // insert — these two derivations are NOT equivalent, so peel succeeds
-  // only on inputs that happen to align across the two index spaces. This
-  // is a structural quirk of the existing implementation, not introduced
-  // by Wave 3C. Swift IBLT.peel mirrors the same quirk byte-for-byte. The
-  // wire contract that matters across platforms is toBytes()/subtract(),
-  // which the fixture covers exhaustively.
+  // Peel golden vector (iblt-keyhash-v2, IBLT-fix). Under the v2 contract,
+  // insert and peel derive bucket indices + checksum from the SAME keyHash, so
+  // a small symmetric difference now peels deterministically to the CRC32 key
+  // hashes of the differing event ids. We pin the peel result (sorted uint32
+  // hashes, hex) so Swift/Kotlin parity tests can prove their peel() agrees
+  // with the Dart oracle — the pre-v2 quirk (peel ≈ always-null → Bloom) is
+  // gone. toBytes()/subtract() byte parity is still pinned above.
+  final peelCase = _buildPeelCase();
+  entries.add({
+    'name': peelCase.name,
+    'a_insert': peelCase.aInsert,
+    'b_insert': peelCase.bInsert,
+    'expected_only_in_a_key_hashes_hex': peelCase.onlyInAHex,
+    'expected_only_in_b_key_hashes_hex': peelCase.onlyInBHex,
+  });
 
   final fixture = {
     'version': 1,
@@ -182,6 +188,64 @@ _SubtractCase _buildSubtractCase() {
     bHex: _hex(b.toBytes()),
     diffHex: _hex(diff.toBytes()),
   );
+}
+
+class _PeelCase {
+  final String name;
+  final List<String> aInsert;
+  final List<String> bInsert;
+  final List<String> onlyInAHex;
+  final List<String> onlyInBHex;
+  _PeelCase({
+    required this.name,
+    required this.aInsert,
+    required this.bInsert,
+    required this.onlyInAHex,
+    required this.onlyInBHex,
+  });
+}
+
+_PeelCase _buildPeelCase() {
+  final a = IBLT();
+  final b = IBLT();
+  const shared = ['shared-1', 'shared-2', 'shared-3'];
+  const aOnly = ['a-only-1', 'a-only-2'];
+  const bOnly = ['b-only-1'];
+  for (final id in [...shared, ...aOnly]) {
+    a.insert(id);
+  }
+  for (final id in [...shared, ...bOnly]) {
+    b.insert(id);
+  }
+  final result = a.subtract(b).peel();
+  if (result == null) {
+    throw StateError(
+        'peel golden vector failed to peel — iblt-keyhash-v2 contract broken');
+  }
+  // Cross-check the peel result against the CRC32 hashes of the differing ids
+  // so a bad oracle can't silently emit a self-consistent-but-wrong fixture.
+  final expectedA = aOnly.map(IBLT.keyHashOf).toSet();
+  final expectedB = bOnly.map(IBLT.keyHashOf).toSet();
+  if (!_setEq(result.onlyInA, expectedA) ||
+      !_setEq(result.onlyInB, expectedB)) {
+    throw StateError('peel golden vector diverged from CRC32(eventId) hashes');
+  }
+  return _PeelCase(
+    name: 'peel_symmetric_diff_3',
+    aInsert: [...shared, ...aOnly],
+    bInsert: [...shared, ...bOnly],
+    onlyInAHex: _sortedHex32(result.onlyInA),
+    onlyInBHex: _sortedHex32(result.onlyInB),
+  );
+}
+
+bool _setEq(Set<int> a, Set<int> b) =>
+    a.length == b.length && a.containsAll(b);
+
+/// Sorted uint32 hashes as zero-padded 8-char hex (deterministic order).
+List<String> _sortedHex32(Set<int> hashes) {
+  final list = hashes.toList()..sort();
+  return list.map((h) => h.toRadixString(16).padLeft(8, '0')).toList();
 }
 
 String _hex(List<int> bytes) =>

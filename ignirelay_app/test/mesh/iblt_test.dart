@@ -91,6 +91,69 @@ void main() {
       // Too many differences → peel fails
       expect(result, isNull);
     });
+
+    // ── iblt-keyhash-v2 (IBLT-fix): peel of a REAL small difference must now
+    // succeed and return the CRC32 key hashes of the differing event ids. The
+    // pre-v2 implementation returned null here (insert vs peel used mismatched
+    // index spaces), so these are the tests that would have caught the bug.
+    test('small symmetric difference peels to the expected CRC32 key hashes',
+        () {
+      final a = IBLT();
+      final b = IBLT();
+      for (final id in const ['shared-1', 'shared-2', 'shared-3']) {
+        a.insert(id);
+        b.insert(id);
+      }
+      a.insert('a-only-1');
+      a.insert('a-only-2');
+      b.insert('b-only-1');
+
+      final result = a.subtract(b).peel();
+      expect(result, isNotNull);
+      expect(
+        result!.onlyInA,
+        {IBLT.keyHashOf('a-only-1'), IBLT.keyHashOf('a-only-2')},
+        reason: 'onlyInA = CRC32 key hashes of the ids only in A',
+      );
+      expect(
+        result.onlyInB,
+        {IBLT.keyHashOf('b-only-1')},
+        reason: 'onlyInB = CRC32 key hashes of the ids only in B',
+      );
+    });
+
+    test('toBytes/fromBytes/subtract/peel round-trip preserves a successful peel',
+        () {
+      final a = IBLT();
+      final b = IBLT();
+      for (final id in const ['s1', 's2']) {
+        a.insert(id);
+        b.insert(id);
+      }
+      a.insert('only-a');
+      b.insert('only-b');
+
+      // Round-trip both sides through the wire form before differencing.
+      final a2 = IBLT.fromBytes(a.toBytes());
+      final b2 = IBLT.fromBytes(b.toBytes());
+      final result = a2.subtract(b2).peel();
+
+      expect(result, isNotNull);
+      expect(result!.onlyInA, {IBLT.keyHashOf('only-a')});
+      expect(result.onlyInB, {IBLT.keyHashOf('only-b')});
+    });
+
+    test('peel of an all-shared set is empty (no false differences)', () {
+      final a = IBLT();
+      final b = IBLT();
+      for (var i = 0; i < 20; i++) {
+        a.insert('evt-$i');
+        b.insert('evt-$i');
+      }
+      final result = a.subtract(b).peel();
+      expect(result, isNotNull);
+      expect(result!.isEmpty, isTrue);
+    });
   });
 
   group('IBLT — Error Handling', () {

@@ -16,7 +16,10 @@ import 'package:ignirelay_app/ui/shell/debug_shell.dart';
 import 'package:ignirelay_app/app/db/database_helper.dart';
 import 'package:ignirelay_app/app/crypto/identity_manager.dart';
 import 'package:ignirelay_app/app/mesh/ble_emergency_mesh_delivery.dart';
+import 'package:ignirelay_app/app/mesh/ble_manager.dart';
 import 'package:ignirelay_app/app/mesh/event_manager.dart';
+import 'package:ignirelay_app/app/mesh/iblt.dart';
+import 'package:ignirelay_app/app/mesh/iblt_capability_gate.dart';
 import 'package:ignirelay_app/app/mesh/mesh_constants.dart';
 import 'package:ignirelay_app/app/geo/village_geofence.dart';
 import 'package:ignirelay_app/platform/mesh_transport.dart';
@@ -251,6 +254,9 @@ Future<void> _startV2Bridge() async {
         // the HELLO field declares the COMMITMENT, not the live value.
         minNegotiatedMtu: 185,
         bgState: BgState.foreground,
+        // IBLT-fix — advertise the iblt-keyhash-v2 peel contract so peers gate
+        // their IBLT fast path on it (mixed old/new builds fall back to Bloom).
+        capabilities: const [IBLT.keyHashContractV2],
       ),
       nativeEventStream: NativeBridge.nativeEventStream,
       writeEventToPeer: NativeBridge.nordicWriteEvent,
@@ -310,6 +316,14 @@ Future<void> _startV2Bridge() async {
     // cooldown) instead of waiting for the next cycle. Backed by the same
     // BleManager singleton the transport scans/connects with.
     _eventPublisherV2.attachEmergencyDelivery(BleEmergencyMeshDelivery());
+
+    // IBLT-fix — gate the legacy BleManager IBLT fast path on the peer's
+    // iblt-keyhash-v2 HELLO capability, read from the SAME registry the v2
+    // HELLO handshake populates. A peer that hasn't advertised it (incl. one
+    // whose HELLO is not yet recorded) → Bloom slow path, so a v2 build never
+    // attempts a v2 peel against an old v1-contract peer.
+    BleManager().ibltContractCheck =
+        (deviceId) => peerSupportsIbltKeyHashV2(_peerCapabilityRegistry, deviceId);
 
     debugPrint('[main] v2 bridge started');
   } catch (e, st) {

@@ -31,6 +31,13 @@ class FieldAuthV2 {
   /// Dart/Kotlin/Swift/MCU or the derived MAC keys diverge.
   static const String hkdfInfo = 'ignirelay/field-mac/v3';
 
+  /// HKDF domain-separation label for the LoRa link MAC key
+  /// (`lora_wire_v1.md` §6 / MASTER §6 B1). Derived from the SAME
+  /// `field_join_secret` but a DIFFERENT `info` than [hkdfInfo], so the BLE
+  /// field-membership key and the LoRa link key are cryptographically
+  /// independent (domain separation). MUST match across Dart/Python/MCU.
+  static const String loraMacHkdfInfo = 'ignirelay/lora-mac/v1';
+
   static const int fieldIdBytes = 16;
   static const int fieldMacBytes = 16;
 
@@ -49,6 +56,21 @@ class FieldAuthV2 {
       secretKey: SecretKey(fieldJoinSecret),
       nonce: const <int>[], // salt = empty
       info: utf8.encode(hkdfInfo),
+    );
+    return Uint8List.fromList(await secretKey.extractBytes());
+  }
+
+  /// `lora_mac_key = HKDF-SHA256(ikm=secret, salt=empty, info=loraMacHkdfInfo,
+  /// L=32)`. Same construction as [deriveFieldMacKey] but a different `info`
+  /// label → a different key (domain separation; `lora_wire_v1.md` §6). The
+  /// author Ed25519 signature does NOT ride LoRa (OD-2); LoRa authenticity is
+  /// this field-scoped HMAC plus the originating node's identity.
+  static Future<Uint8List> deriveLoraMacKey(List<int> fieldJoinSecret) async {
+    final hkdf = Hkdf(hmac: Hmac.sha256(), outputLength: 32);
+    final secretKey = await hkdf.deriveKey(
+      secretKey: SecretKey(fieldJoinSecret),
+      nonce: const <int>[], // salt = empty
+      info: utf8.encode(loraMacHkdfInfo),
     );
     return Uint8List.fromList(await secretKey.extractBytes());
   }

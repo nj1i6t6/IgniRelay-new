@@ -31,6 +31,29 @@ void main() {
       expect(k1, k2);
     });
 
+    test('lora_mac_key is 32 bytes and deterministic', () async {
+      final k1 = await FieldAuthV2.deriveLoraMacKey(secret);
+      final k2 = await FieldAuthV2.deriveLoraMacKey(secret);
+      expect(k1.length, 32);
+      expect(k1, k2);
+    });
+
+    test('lora_mac_key != field_mac_key from the SAME secret '
+        '(domain separation — B1)', () async {
+      final loraKey = await FieldAuthV2.deriveLoraMacKey(secret);
+      final fieldKey = await FieldAuthV2.deriveFieldMacKey(secret);
+      expect(loraKey, isNot(fieldKey),
+          reason: 'different HKDF info labels MUST yield different keys');
+      expect(FieldAuthV2.loraMacHkdfInfo, isNot(FieldAuthV2.hkdfInfo));
+    });
+
+    test('different secrets yield different lora_mac_keys', () async {
+      final a = await FieldAuthV2.deriveLoraMacKey(secret);
+      final b = await FieldAuthV2.deriveLoraMacKey(
+          Uint8List.fromList(List.generate(24, (i) => i + 5)));
+      expect(a, isNot(b));
+    });
+
     test('field_mac round-trips: compute → verify true', () async {
       final key = await FieldAuthV2.deriveFieldMacKey(secret);
       final mac = await FieldAuthV2.computeFieldMac(key, canonical);

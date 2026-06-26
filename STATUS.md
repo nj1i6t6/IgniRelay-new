@@ -1885,3 +1885,31 @@ STAGE-A-EXIT: PASS
   4. 凍結契約（附錄 B）就位且版本一致（corpus_revision `v0.3-a12-node-gatt-1` 跨 Dart/Kotlin/Swift 斷言一致）✅
 - caveat（誠實，不影響具名 gate）：A12 `connectedDebugAndroidTest` on-device 本回未跑（無裝置；非 §5.13 具名 gate，GATE-KOTLIN-BUILD=assemble 已綠）；Swift XCTest 未跑（no macOS）。建議裝置可用時補跑一次 connectedTest 作為 Stage B 前的最終確認。
 - **Stage A（App 完成）= EXIT PASS。** next: Stage B —— B1 契約包 v1 凍結（LORA-WIRE + provisioning，前置 A12）。
+
+---
+
+## [2026-06-26] B1 — 契約包 v1：LORA-WIRE + node provisioning 凍結 DONE（待 Owner 簽核）
+
+- repo/commit: IgniRelay @ `f207194`（本 STATUS 為其 `docs:` commit）
+- 執行者: Claude（主理 AI；B1 屬 §0.4 主理 AI 職權）；Owner 2026-06-26 授權執行 Stage B / B1
+- 任務: MASTER §6 B1（交付 Stage B 模擬器的鑰匙）。**全 additive，未碰 A12 凍結契約**（envelope / NODE_RECEIPT(105) / GATT UUID / `wire_conformance_v1.json` 位元組全未動 → generator `--check` 證明 corpus 不變）。
+- 交付物:
+  - `docs/specs/lora_wire_v1.md`（normative，無未定項）: 11B header + EVENT/ACK body 位元組精確、flags、ptype、§5 緊湊 payload 翻譯表（PRESENCE 10 / SOS 22 / CHECKPOINT 10 / HEARTBEAT 8 / HAZARD ≤40，共用 loc13）、§6 `lora_mac_key`（HKDF info `ignirelay/lora-mac/v1` domain-separated）+ `mac8`(HMAC-SHA256[0..7]) + CRC-16/CCITT-FALSE、§7 去重環≥512/HLC 48h 窗/TTL、§8 固定接收順序 + drop_reason 詞彙、§9 尺寸預算（SOS 70B>64B 偏差原文聲明、128B 審查線）、OD-2 信任模型原文。電波參數＝§13 附章 draft（Phase D 凍結，非本檔項，非未定訊框）。
+  - `docs/specs/node_provisioning_v1.md`（normative，無未定項）: node_id u16 場域唯一、field_join_secret、**獨立** node Ed25519 seed（金鑰分離）、USB 一次性 JSON schema `ignirelay/node-provisioning/v1` + 冪等 ACK、lab/dev TEST-ONLY fixture（沿用 corpus secret）、遺失即場域 re-key（單場域爆炸半徑）、§7 G14 紅線。
+  - `tool/generate_lora_wire_vectors.dart`（單一來源 generator，G7）: `--check` + 內建 self-check（encode→decode→re-encode 位元組一致、正樣本皆 verify、負樣本以宣告 reason 拒絕、CRC 標準值 0x29B1）。**測試金鑰沿用** corpus `wire_conformance_v1.json#test_field` 既有 TEST-ONLY secret（同鑰可交叉驗）。內含參考 LoRa codec（encode/decode/verify、CRC、HMAC[0..7]）。
+  - `docs/specs/lora_wire_v1_vectors.json`: 正樣本 **51**（≥40）+ 負樣本 **11**（≥10），deterministic。
+  - `lib/app/crypto/field_auth_v2.dart`: 加 `deriveLoraMacKey` + `loraMacHkdfInfo`（additive、僅新 HKDF info；與 `deriveFieldMacKey` domain-separated）。
+  - 測試: `test/conformance/lora_wire_vectors_test.dart`（determinism / CRC 0x29B1 / key 派生+domain separation / 每正樣本 verify+round-trip / 每負樣本拒絕 / specs 無 TBD·TODO_CONTRACT·PLACEHOLDER）；`test/crypto/field_auth_v2_test.dart` +3（lora_mac_key 32B·≠field_mac_key·不同 secret 不同 key）。
+- DoD: D1 兩 spec 無未定項 ✅ / D2 vectors generator self-check PASS ✅（≥40 正 + ≥10 負）/ D3 Owner 簽核 ❌ 待辦（記於下方）
+- 負樣本覆蓋（§6 B1 步驟 3 全清單）: bad mac / bad crc / ttl=0 / replay 同 event_id / hlc 窗外 / truncated / 未知 ptype / 未知 ver + payload-too-long + length-mismatch + body-corrupt-by-crc。
+- gates:
+  - `dart run tool/check_layers.dart --strict` → ok — no boundary violations
+  - `flutter analyze --no-fatal-infos --no-fatal-warnings` → No issues found（exit 0）
+  - `flutter test --exclude-tags golden` → 778 passed / ~3 skipped（+11；exit 0）
+  - `dart run tool/generate_lora_wire_vectors.dart --check` → OK（vectors deterministic + self-check passed）
+  - `dart run tool/generate_wire_conformance_v1.dart --check` → OK（**A12 corpus 位元組不變**）
+  - `flutter test test/conformance/wire_conformance_corpus_test.dart` → +21 全綠（A12 corpus 未動）
+  - `cd android; .\gradlew.bat :app:assembleDebugAndroidTest` → BUILD SUCCESSFUL
+- deviations: none。（SOS 70B>64B 為設計既知偏差，spec §9 原文聲明、128B 審查線內，非 gate 失敗。）
+- D3 待辦: **Owner 契約簽核**（`B1 contract sign-off: <date>`）→ 簽核後 `lora_wire_v1.md` + `lora_wire_v1_vectors.json` + generator + `node_provisioning_v1.md` 進附錄 B 凍結集（G6）。
+- next: B1 簽核後 → **B2 Python 參考實作**（lab repo；envelope_v3.py + lora_v1.py 吃本 vectors）。⚠ 只記 B1 DONE，**不得**宣稱 STAGE-B-EXIT。

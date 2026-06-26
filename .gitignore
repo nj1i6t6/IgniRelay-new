@@ -1,5 +1,7 @@
 # Claude Code local working dir & per-machine settings — never track
 /.claude/
+/tmp/
+/docs/_local_archive/
 
 # OS / editor cruft
 .DS_Store

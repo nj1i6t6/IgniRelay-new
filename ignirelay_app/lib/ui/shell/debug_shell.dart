@@ -8,6 +8,7 @@ import 'package:ignirelay_app/app/controllers/event_stream.dart';
 import 'package:ignirelay_app/app/controllers/mesh_runtime_controller.dart';
 import 'package:ignirelay_app/app/controllers/presence_beacon_controller.dart';
 import 'package:ignirelay_app/app/controllers/presence_controller.dart';
+import 'package:ignirelay_app/app/services/event_decoder.dart';
 import 'package:ignirelay_app/app/services/event_store.dart';
 import 'package:ignirelay_app/ui/shell/admin_broadcast_banner.dart';
 import 'package:ignirelay_app/ui/shell/checkpoint_card.dart';
@@ -42,9 +43,11 @@ class _DebugShellState extends State<DebugShell> {
   StreamSubscription<EventLogChanged>? _logSub;
   StreamSubscription<TransportState>? _stateSub;
   StreamSubscription<PresenceUpdate>? _presenceSub;
+  StreamSubscription<NodeReceipt>? _receiptSub;
 
   List<Map<String, dynamic>> _recent = const [];
   final List<PresenceUpdate> _presences = <PresenceUpdate>[];
+  final List<NodeReceipt> _receipts = <NodeReceipt>[];
   TransportState? _state;
   bool _busy = false;
 
@@ -76,6 +79,16 @@ class _DebugShellState extends State<DebugShell> {
         if (_presences.length > 20) _presences.removeRange(20, _presences.length);
       });
     });
+    // A12 — App↔Node first-hop receipts (NODE_RECEIPT 105). Newest first; same
+    // ref_envelope_id collapses to the latest receipt for that sent envelope.
+    _receiptSub = _events.nodeReceipts.listen((r) {
+      if (!mounted) return;
+      setState(() {
+        _receipts.removeWhere((e) => e.refEnvelopeIdHex == r.refEnvelopeIdHex);
+        _receipts.insert(0, r);
+        if (_receipts.length > 20) _receipts.removeRange(20, _receipts.length);
+      });
+    });
     _refresh();
   }
 
@@ -84,6 +97,7 @@ class _DebugShellState extends State<DebugShell> {
     _logSub?.cancel();
     _stateSub?.cancel();
     _presenceSub?.cancel();
+    _receiptSub?.cancel();
     super.dispose();
   }
 
@@ -167,6 +181,8 @@ class _DebugShellState extends State<DebugShell> {
           _actionsCard(),
           const SizedBox(height: 12),
           _positionCard(),
+          const SizedBox(height: 12),
+          _nodeReceiptCard(),
           const SizedBox(height: 12),
           const CheckpointCard(),
           const SizedBox(height: 12),
@@ -407,6 +423,69 @@ class _DebugShellState extends State<DebugShell> {
       default:
         return '—';
     }
+  }
+
+  // ── A12: App↔Node first-hop receipts (NODE_RECEIPT 105) ─────────────────
+  //
+  // NODE_RECEIPT is a transport-layer ack from a Field Node, NOT a field event
+  // (it is never projected into Event_Logs). The sender (Node/simulator) is a
+  // Stage B component, so in this build this list stays empty until a Node is
+  // present. Keyed by ref_envelope_id ↔ the sent envelope_id.
+  Widget _nodeReceiptCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Node 收據（已送達節點）',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            const Text(
+              'App↔Node 第一跳收據（NODE_RECEIPT 105）。對應送出的 envelope_id；'
+              '節點端為 Stage B 元件，未接前此清單為空。',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 8),
+            if (_receipts.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Text('（尚無 Node 收據）', style: TextStyle(color: Colors.grey)),
+              )
+            else
+              ..._receipts.map(_receiptRow),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _receiptRow(NodeReceipt r) {
+    final when = r.receivedAt.toIso8601String().substring(11, 19);
+    final ref =
+        r.refEnvelopeIdHex.length <= 8 ? r.refEnvelopeIdHex : r.refEnvelopeIdHex.substring(0, 8);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(children: [
+        SizedBox(
+          width: 70,
+          child: Text(ref.isEmpty ? '—' : ref,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+            child: Text('${_receiptLabel(r)} · queue=${r.queueDepth}',
+                style: const TextStyle(fontSize: 12))),
+        Text(when, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+      ]),
+    );
+  }
+
+  static String _receiptLabel(NodeReceipt r) {
+    if (r.isAcceptedStored) return '已送達節點';
+    if (r.isDuplicate) return '節點：重複';
+    if (r.isRejected) return '節點：拒收';
+    return '節點：回報（未知狀態）';
   }
 
   Widget _eventsCard() {

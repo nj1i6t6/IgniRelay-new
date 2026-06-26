@@ -1,5 +1,5 @@
 {
-  "corpus_revision": "v0.3-iblt-keyhash-v2-1",
+  "corpus_revision": "v0.3-a12-node-gatt-1",
   "spec_date": "2026-05-13",
   "spec_envelope": "docs/specs/envelope_v2_spec_2026-05-13.md",
   "spec_transport": "docs/specs/native_transport_v1_2026-05-13.md",
@@ -13,7 +13,8 @@
     "bloom_hash_ascii_only": "Bloom vectors intentionally use ASCII event IDs only. Kotlin and Swift Bloom MurmurHash currently diverge on non-ASCII code units (Kotlin: c.code unmasked; Swift: codeUnit & 0xFF). v0.3 envelope IDs are UUIDv7 ASCII so this is not runtime-impacting. The generator asserts every Bloom event_id is ASCII before emitting; the Dart inline Bloom builder follows Kotlin (oracle).",
     "payload_generator_lcg_byte_pattern_v1": "Deterministic byte generator. state := seed (uint32); for i in [0, size): state := (state * 1664525 + 1013904223) mod 2^32; out[i] := state & 0xFF. Used to avoid bloating the corpus with large raw payload_hex blobs. Cross-platform consumers MUST reproduce identical bytes given the same (seed, size).",
     "event_id_generator_ascii_seq_v1": "Deterministic ASCII event ID generator. for i in [start, start+count): yield prefix + decimal(i) zero-padded to width digits. Example {prefix:\"evt-\", start:0, count:2, width:8} -> [\"evt-00000000\", \"evt-00000001\"]. Bloom and IBLT samples use this so the corpus does not store hundreds of full ID strings.",
-    "iblt_peel_contract_v2": "IBLT contract `iblt-keyhash-v2`: insert/remove AND peel derive bucket indices (MurmurHash) and checksum (FNV-1a) from the SAME input — the 4 little-endian bytes of keyHash = CRC32(eventId) — so a pure cell reconstructs them from keySum alone and peel succeeds on real differences (the pre-v2 quirk, where peel used CRC-bit-extracted indices that diverged from the MurmurHash insert indices and forced the Bloom slow path, is fixed). These IBLT bucket-byte samples cover toBytes()/subtract(); a peel golden vector lives in test/fixtures/iblt_swift_parity_vectors.json. Peers gate the IBLT fast path on the `iblt-keyhash-v2` HELLO capability; mixed old/new builds fall back to Bloom."
+    "iblt_peel_contract_v2": "IBLT contract `iblt-keyhash-v2`: insert/remove AND peel derive bucket indices (MurmurHash) and checksum (FNV-1a) from the SAME input — the 4 little-endian bytes of keyHash = CRC32(eventId) — so a pure cell reconstructs them from keySum alone and peel succeeds on real differences (the pre-v2 quirk, where peel used CRC-bit-extracted indices that diverged from the MurmurHash insert indices and forced the Bloom slow path, is fixed). These IBLT bucket-byte samples cover toBytes()/subtract(); a peel golden vector lives in test/fixtures/iblt_swift_parity_vectors.json. Peers gate the IBLT fast path on the `iblt-keyhash-v2` HELLO capability; mixed old/new builds fall back to Bloom.",
+    "node_receipt_contract": "A12 — App↔Node first-hop receipt (docs/specs/app_node_gatt_v1.md). EventType NODE_RECEIPT=105 is a CONTROL frame (§21.7): all-zero field_id, no field_mac, maxHops 0 (link-local, never relayed), priority NORMAL only. payload = NodeReceiptData {1 ref_envelope_id bytes16, 2 status u8 (0=ACCEPTED_STORED,1=DUPLICATE,2=REJECTED), 3 queue_depth u32}. The phone only receives it (never sends), does NOT project it into Event_Logs, and surfaces it on EventStream.nodeReceipts keyed by ref_envelope_id. Sample: envelope_samples[name=node_receipt_duplicate]."
   },
   "envelope_samples": [
     {
@@ -3461,6 +3462,38 @@
       "expected_signature_hex": "fe315e9c10609c9bfd6d43befa9968072b4987293781004ec98d18e8189b8ec82c6d0ceed58b216f4e5dc4ece6aa8f14df35a4ce2805f4ee54457859c03af207",
       "derived_author_key_hex": "e83ad950188597d403ad3bbc1e08051b691e287ada3707b0d4f641bfde3a35dd",
       "test_only_private_key_hex": "434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162"
+    },
+    {
+      "kind": "envelope",
+      "name": "node_receipt_duplicate",
+      "description": "Procedural envelope sample (case_seed=6004).",
+      "envelope_struct": {
+        "protocol_version": 3,
+        "envelope_id_hex": "01900000000076758493a2b1c0cfdeed",
+        "field_id_hex": "00000000000000000000000000000000",
+        "field_mac_hex": "",
+        "event_type": 105,
+        "priority": 6,
+        "created_at_hlc": {
+          "ms_since_epoch": 1747356004000,
+          "counter": 0
+        },
+        "expires_at_hlc": {
+          "ms_since_epoch": 1747442404000,
+          "counter": 0
+        },
+        "max_hops": 0,
+        "author_key_hex": "cab51b8c445efc2f359a19e981834bc7960da70af7f01aed2c0ad96cfb225a88",
+        "sig_algo": 1,
+        "is_experimental": false,
+        "payload_hex": "0a10a0a1a2a3a4a5a6a7a8a9aaabacadaeaf10011803"
+      },
+      "payload_sha256_hex": "eaded7de3be608db4837b32e75b1d703dc37a93a5cdedc546a2ebefc0f5e1247",
+      "expected_canonical_sig_input_hex": "030000001001900000000076758493a2b1c0cfdeed10000000000000000000000000000000006900000006000000a0ae88d69601000000000000a00aafdb96010000000000000000000020cab51b8c445efc2f359a19e981834bc7960da70af7f01aed2c0ad96cfb225a880120eaded7de3be608db4837b32e75b1d703dc37a93a5cdedc546a2ebefc0f5e1247",
+      "expected_canonical_sig_input_bytes": 141,
+      "expected_signature_hex": "321193cfaadf8a246e8892582303b5684dcfdc1f5595f7ac0f8752177f93042ab39355a75de896675b9b9b67a45f16327e9479e9e4e0242c5906796eeda4dd0c",
+      "derived_author_key_hex": "cab51b8c445efc2f359a19e981834bc7960da70af7f01aed2c0ad96cfb225a88",
+      "test_only_private_key_hex": "3435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f50515253"
     }
   ],
   "chunking_samples": [

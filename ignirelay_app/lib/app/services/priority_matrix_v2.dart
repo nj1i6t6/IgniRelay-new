@@ -218,6 +218,9 @@ class PriorityMatrixV2 {
       case EventTypeV2.heartbeat:
       case EventTypeV2.tracePing:
       case EventTypeV2.traceAck:
+      case EventTypeV2.nodeReceipt:
+        // A12 — NODE_RECEIPT is a link-local control frame; NORMAL only,
+        // anything else is a masquerade attempt → drop (same as HELLO/trace).
         return _allowedOrDrop(
           priority,
           allowed: const {PriorityV2.normal},

@@ -96,6 +96,24 @@ void main() {
       );
     });
 
+    test('NODE_RECEIPT (105) only accepts NORMAL — A12', () {
+      expect(
+        PriorityMatrixV2.check(EventTypeV2.nodeReceipt, PriorityV2.normal)
+            .outcome,
+        MatrixOutcome.accept,
+      );
+      expect(
+        PriorityMatrixV2.check(EventTypeV2.nodeReceipt, PriorityV2.sosRed)
+            .outcome,
+        MatrixOutcome.drop,
+      );
+      expect(
+        PriorityMatrixV2.check(EventTypeV2.nodeReceipt, PriorityV2.alert)
+            .outcome,
+        MatrixOutcome.drop,
+      );
+    });
+
     test('PROTOCOL_NOTICE only accepts ALERT', () {
       expect(
         PriorityMatrixV2.check(EventTypeV2.protocolNotice, PriorityV2.alert).outcome,

@@ -55,7 +55,7 @@ const String _outputPath = '../docs/specs/wire_conformance_v1.json';
 // (insert + peel now derive bucket indices + checksum from the CRC32 keyHash's
 // LE bytes), so every non-empty IBLT bucket-byte sample changed. No envelope /
 // canonical / proto change — only the IBLT sample bytes + the peel note.
-const String _corpusRevision = 'v0.3-iblt-keyhash-v2-1';
+const String _corpusRevision = 'v0.3-a12-node-gatt-1';
 const String _specDate = '2026-05-13';
 
 // Phase 0b #4-3: one corpus-wide test field. All envelope samples ride this
@@ -195,6 +195,16 @@ Future<Map<String, dynamic>> buildCorpus() async {
               'golden vector lives in test/fixtures/iblt_swift_parity_vectors.'
               'json. Peers gate the IBLT fast path on the `iblt-keyhash-v2` '
               'HELLO capability; mixed old/new builds fall back to Bloom.',
+      'node_receipt_contract':
+          'A12 — App↔Node first-hop receipt (docs/specs/app_node_gatt_v1.md). '
+              'EventType NODE_RECEIPT=105 is a CONTROL frame (§21.7): all-zero '
+              'field_id, no field_mac, maxHops 0 (link-local, never relayed), '
+              'priority NORMAL only. payload = NodeReceiptData {1 ref_envelope_id '
+              'bytes16, 2 status u8 (0=ACCEPTED_STORED,1=DUPLICATE,2=REJECTED), '
+              '3 queue_depth u32}. The phone only receives it (never sends), does '
+              'NOT project it into Event_Logs, and surfaces it on EventStream'
+              '.nodeReceipts keyed by ref_envelope_id. Sample: '
+              'envelope_samples[name=node_receipt_duplicate].',
     },
     'envelope_samples': <Map<String, dynamic>>[],
     'chunking_samples': <Map<String, dynamic>>[],
@@ -425,6 +435,28 @@ Future<List<Map<String, dynamic>>> _buildTypedPayloadSamples() async {
     ).encode(),
   ));
 
+  // F4 — typed NODE_RECEIPT (A12, EventType 105). CONTROL frame: all-zero
+  // field_id, no field_mac (§21.7), maxHops 0 (link-local), NORMAL priority.
+  // Real NodeReceiptData (status=DUPLICATE, queue_depth=3) locks the payload +
+  // the zero-field_id control sig-input bytes for cross-platform consumers.
+  out.add(await _emitProceduralEnvelope(
+    caseSeed: 6004,
+    name: 'node_receipt_duplicate',
+    eventType: EventTypeV2.nodeReceipt, // 105
+    priority: PriorityV2.normal, // 6
+    payloadSize: 0,
+    withSignature: true,
+    isControl: true,
+    maxHopsOverride: 0,
+    explicitPayload: NodeReceiptData(
+      refEnvelopeId: Uint8List.fromList(
+        List<int>.generate(16, (i) => (0xA0 + i) & 0xFF),
+      ),
+      status: NodeReceiptStatus.duplicate, // 1
+      queueDepth: 3,
+    ).encode(),
+  ));
+
   return out;
 }
 
@@ -436,11 +468,18 @@ Future<Map<String, dynamic>> _emitProceduralEnvelope({
   required int payloadSize,
   required bool withSignature,
   Uint8List? explicitPayload,
+  // A12 — control frames (§21.7): field_id all-zero, no field_mac, and an
+  // explicit maxHops (NODE_RECEIPT is link-local, maxHops 0). Defaults keep
+  // the existing field-event behavior untouched.
+  bool isControl = false,
+  int? maxHopsOverride,
 }) async {
   final envelopeId = _proceduralEnvelopeId(caseSeed);
   final createdMs = _baseHlcMs + caseSeed * 1000;
   final expiresMs = createdMs + 86400 * 1000; // +24h
-  final maxHops = 6 + (caseSeed % 4); // 6..9
+  final maxHops = maxHopsOverride ?? (6 + (caseSeed % 4)); // default 6..9
+  // Control frames carry an all-zero field_id and no membership MAC (§21.7).
+  final effectiveFieldId = isControl ? Uint8List(16) : _corpusFieldId;
   // #4-6: typed-payload samples pass explicit bytes (a real StatusUpdateData /
   // HazardMarkerData encoding) which are NOT LCG-reproducible, so they are
   // always committed inline as `payload_hex`. Procedural samples keep the LCG
@@ -472,7 +511,7 @@ Future<Map<String, dynamic>> _emitProceduralEnvelope({
   final sigInput = CanonicalEncoderV2.buildSignatureInput(
     protocolVersion: kProtocolVersionV3,
     envelopeId: envelopeId,
-    fieldId: _corpusFieldId,
+    fieldId: effectiveFieldId,
     eventType: eventType,
     priority: priority,
     createdAtHlcMs: createdMs,
@@ -485,9 +524,11 @@ Future<Map<String, dynamic>> _emitProceduralEnvelope({
     payloadHash: payloadHash,
   );
 
-  // Field membership MAC over the SAME canonical bytes (§21.5).
-  final fieldMac =
-      await FieldAuthV2.computeFieldMac(_corpusFieldMacKey, sigInput);
+  // Field membership MAC over the SAME canonical bytes (§21.5). Control frames
+  // (§21.7) carry NO MAC.
+  final fieldMac = isControl
+      ? Uint8List(0)
+      : await FieldAuthV2.computeFieldMac(_corpusFieldMacKey, sigInput);
 
   if (withSignature) {
     final ed = Ed25519();
@@ -503,7 +544,7 @@ Future<Map<String, dynamic>> _emitProceduralEnvelope({
   final envelopeStruct = <String, dynamic>{
     'protocol_version': kProtocolVersionV3,
     'envelope_id_hex': _hex(envelopeId),
-    'field_id_hex': _hex(_corpusFieldId),
+    'field_id_hex': _hex(effectiveFieldId),
     'field_mac_hex': _hex(fieldMac),
     'event_type': eventType,
     'priority': priority,

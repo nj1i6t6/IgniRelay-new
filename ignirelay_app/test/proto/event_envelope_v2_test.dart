@@ -310,6 +310,85 @@ void main() {
       expect(out.capabilities, ['shelter_status', 'battery_share']);
       expect(out.bgState, BgState.foreground);
     });
+
+    test('tolerates a node HELLO carrying additive fields 10-13 (A12)', () {
+      // A12: a Field Node appends node_id/node_lat_1e7/node_lng_1e7/
+      // install_accuracy_m (fields 10-13). An old phone MUST decode the known
+      // 1-9 fields and silently skip the unknown trailing ones (decode uses
+      // `default: skipValue`), so this round-trips without throwing.
+      final base = ProtocolHelloData(
+        peerKind: PeerKind.bleNodeV1,
+        maxRxEnvelopeBytes: 512,
+        supportsChunking: true,
+        minNegotiatedMtu: 185,
+        capabilities: const ['iblt-keyhash-v2'],
+        bgState: BgState.foreground,
+      ).encode();
+      final nodeFields = (ProtoWriter()
+            ..writeString(10, 'node-7')
+            ..writeSint64(11, 250339805)
+            ..writeSint64(12, 1215654177)
+            ..writeUint32(13, 5))
+          .toBytes();
+      final combined = Uint8List.fromList([...base, ...nodeFields]);
+      final out = ProtocolHelloData.decode(combined);
+      expect(out.peerKind, PeerKind.bleNodeV1);
+      expect(out.maxRxEnvelopeBytes, 512);
+      expect(out.minNegotiatedMtu, 185);
+      expect(out.capabilities, ['iblt-keyhash-v2']);
+      expect(out.bgState, BgState.foreground);
+    });
+  });
+
+  group('NodeReceiptData (A12)', () {
+    test('round-trips ref_envelope_id + status + queue_depth', () {
+      final ref = Uint8List.fromList(List<int>.generate(16, (i) => 0xA0 + i));
+      final out = NodeReceiptData.decode(NodeReceiptData(
+        refEnvelopeId: ref,
+        status: NodeReceiptStatus.rejected,
+        queueDepth: 42,
+      ).encode());
+      expect(out.refEnvelopeId, ref);
+      expect(out.status, NodeReceiptStatus.rejected);
+      expect(out.queueDepth, 42);
+    });
+
+    test('ACCEPTED_STORED (0) + queue 0 omit defaults, decode restores them',
+        () {
+      final ref = Uint8List.fromList(List<int>.filled(16, 7));
+      final encoded = NodeReceiptData(refEnvelopeId: ref).encode();
+      final out = NodeReceiptData.decode(encoded);
+      expect(out.status, NodeReceiptStatus.acceptedStored);
+      expect(out.queueDepth, 0);
+      expect(out.refEnvelopeId, ref);
+    });
+
+    test('skips unknown trailing fields (additive-safe)', () {
+      final ref = Uint8List.fromList(List<int>.filled(16, 3));
+      final base = NodeReceiptData(
+        refEnvelopeId: ref,
+        status: NodeReceiptStatus.duplicate,
+        queueDepth: 1,
+      ).encode();
+      final extra = (ProtoWriter()..writeUint32(9, 999)).toBytes();
+      final out =
+          NodeReceiptData.decode(Uint8List.fromList([...base, ...extra]));
+      expect(out.status, NodeReceiptStatus.duplicate);
+      expect(out.queueDepth, 1);
+      expect(out.refEnvelopeId, ref);
+    });
+  });
+
+  group('EventTypeV2 NODE_RECEIPT (A12)', () {
+    test('constant is 105 in the control range', () {
+      expect(EventTypeV2.nodeReceipt, 105);
+    });
+    test('isKnown(105) is true', () {
+      expect(EventTypeV2.isKnown(EventTypeV2.nodeReceipt), true);
+    });
+    test('maxHopsDefault(105) is 0 — link-local, never relayed', () {
+      expect(EventTypeV2.maxHopsDefault(EventTypeV2.nodeReceipt), 0);
+    });
   });
 
   group('LocationEvidence', () {

@@ -181,13 +181,23 @@ class EventStream {
     required MeshEventHandler handler,
     required EventDecoder decoder,
     required EventStore store,
+    Stream<NodeReceipt>? nodeReceiptSource,
   })  : _handler = handler,
         _decoder = decoder,
-        _store = store;
+        _store = store,
+        _nodeReceiptSource = nodeReceiptSource;
 
   final MeshEventHandler _handler;
   final EventDecoder _decoder;
   final EventStore _store;
+
+  /// A12 — upstream NODE_RECEIPT (105) source, normally
+  /// `V2InboundProjector.nodeReceipts`. `null` in tests / pre-wiring → the
+  /// [nodeReceipts] stream simply never emits. Forwarded into a locally-owned
+  /// broadcast so this facade controls the subscriber lifecycle.
+  final Stream<NodeReceipt>? _nodeReceiptSource;
+  StreamSubscription<NodeReceipt>? _nodeReceiptSub;
+
   StreamSubscription<MeshDataReceived>? _subscription;
   final Set<String> _dispatchedEventIds = <String>{};
 
@@ -205,6 +215,8 @@ class EventStream {
       StreamController<AdminBroadcast>.broadcast();
   final StreamController<EventLogChanged> _anyEventController =
       StreamController<EventLogChanged>.broadcast();
+  final StreamController<NodeReceipt> _nodeReceiptController =
+      StreamController<NodeReceipt>.broadcast();
 
   Stream<SosAlert> get sosAlerts => _sosController.stream;
 
@@ -228,6 +240,12 @@ class EventStream {
   /// 「事件日誌有新東西」的通用通知 stream。UI 若只需要「something 變了，
   /// 請重新跑 query」的訊號，就訂閱這個 stream，不要再用 [rawEvents]。
   Stream<EventLogChanged> get anyEventChanges => _anyEventController.stream;
+
+  /// App↔Node first-hop receipts (NODE_RECEIPT = EventType 105; A12). Forwarded
+  /// from `V2InboundProjector.nodeReceipts`. A debug view matches each by
+  /// `refEnvelopeIdHex` to the sent row to show「已送達節點」. Never carries field
+  /// events — receipts are transport-layer acks, not projected to `Event_Logs`.
+  Stream<NodeReceipt> get nodeReceipts => _nodeReceiptController.stream;
 
   /// Raw stream passthrough — **debug 專用**。Production UI 一律走上面的 typed
   /// streams 或 [anyEventChanges]，由 Stage 1 acceptance gate 強制執行。
@@ -328,6 +346,11 @@ class EventStream {
   void start() {
     _subscription ??= _handler.events.listen((_) {
       unawaited(_dispatchRecentEvents());
+    });
+    // A12 — forward NODE_RECEIPT (105) from the projector into our own
+    // broadcast so subscribers see receipts via this facade.
+    _nodeReceiptSub ??= _nodeReceiptSource?.listen((r) {
+      if (!_nodeReceiptController.isClosed) _nodeReceiptController.add(r);
     });
   }
 
@@ -533,6 +556,8 @@ class EventStream {
 
   Future<void> dispose() async {
     await _subscription?.cancel();
+    await _nodeReceiptSub?.cancel();
+    await _nodeReceiptController.close();
     await _sosController.close();
     await _sosResolvedController.close();
     await _hazardController.close();

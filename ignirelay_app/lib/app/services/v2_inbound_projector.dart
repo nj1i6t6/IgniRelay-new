@@ -56,17 +56,21 @@ import 'package:ignirelay_app/app/mesh/event_types.dart';
 import 'package:ignirelay_app/app/mesh/mesh_event_handler.dart';
 import 'package:ignirelay_app/app/proto/event_envelope_v2.dart';
 import 'package:ignirelay_app/app/proto/mesh_protocol.pb.dart' as pb;
+import 'package:ignirelay_app/app/services/event_decoder.dart';
 import 'package:ignirelay_app/app/services/hazard_type_codec.dart';
 
 class V2InboundProjector {
   V2InboundProjector({
     required Stream<DispatchOutcome> outcomes,
     required MeshEventHandler handler,
+    EventDecoder? decoder,
   })  : _outcomes = outcomes,
-        _handler = handler;
+        _handler = handler,
+        _decoder = decoder ?? EventDecoder();
 
   final Stream<DispatchOutcome> _outcomes;
   final MeshEventHandler _handler;
+  final EventDecoder _decoder;
   StreamSubscription<DispatchOutcome>? _sub;
 
   /// Emits the v1 `event_id` after each successful projection. Test-only
@@ -77,6 +81,17 @@ class V2InboundProjector {
 
   @visibleForTesting
   Stream<String> get projectedEventIds => _projected.stream;
+
+  /// A12 — NODE_RECEIPT (EventType 105) typed stream. NODE_RECEIPT is NOT a
+  /// field event and is deliberately NOT projected into `Event_Logs`; it is a
+  /// transport-layer first-hop receipt surfaced here so `EventStream
+  /// .nodeReceipts` (and a debug view) can mark the matching sent row
+  /// "已送達節點". Keyed by `ref_envelope_id` ↔ the sender's pre-allocated
+  /// envelope_id.
+  final StreamController<NodeReceipt> _nodeReceipts =
+      StreamController<NodeReceipt>.broadcast();
+
+  Stream<NodeReceipt> get nodeReceipts => _nodeReceipts.stream;
 
   /// Begin consuming dispatcher outcomes. Idempotent.
   void start() {
@@ -95,6 +110,7 @@ class V2InboundProjector {
   Future<void> dispose() async {
     await stop();
     await _projected.close();
+    await _nodeReceipts.close();
   }
 
   static String eventIdOf(Uint8List envelopeId) {
@@ -127,6 +143,12 @@ class V2InboundProjector {
         case EventTypeV2.adminBroadcast:
           await _projectAdminBroadcast(accepted, eventId);
           break;
+        case EventTypeV2.nodeReceipt:
+          // A12 — first-hop receipt. Transport-layer ack, NOT a field event:
+          // decode + surface on [nodeReceipts]; deliberately NOT _ingest()ed
+          // into Event_Logs (the v1 read-model).
+          _emitNodeReceipt(env);
+          break;
         default:
           // Not a UI-surfaced type (supply / match / official / control);
           // nothing to project into the v1 read-model.
@@ -134,6 +156,16 @@ class V2InboundProjector {
       }
     } catch (e) {
       debugPrint('[V2Projector] project failed for $eventId: $e');
+    }
+  }
+
+  /// Decode NODE_RECEIPT (105) payload and surface it on [nodeReceipts]
+  /// (A12). Never touches `Event_Logs`. Fail-soft: a malformed payload yields
+  /// null from the decoder and is dropped silently.
+  void _emitNodeReceipt(EventEnvelopeV2 env) {
+    final receipt = _decoder.decodeNodeReceipt(env.payload);
+    if (receipt != null && !_nodeReceipts.isClosed) {
+      _nodeReceipts.add(receipt);
     }
   }
 

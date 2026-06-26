@@ -526,6 +526,9 @@ class _IgniRelayAppState extends State<IgniRelayApp>
             handler: MeshEventHandler(),
             decoder: context.read<EventDecoder>(),
             store: context.read<EventStore>(),
+            // A12 — forward NODE_RECEIPT (105) from the eagerly-constructed
+            // inbound projector so EventStream.nodeReceipts surfaces them.
+            nodeReceiptSource: _v2InboundProjector?.nodeReceipts,
           )..start(),
           dispose: (_, stream) => stream.dispose(),
         ),

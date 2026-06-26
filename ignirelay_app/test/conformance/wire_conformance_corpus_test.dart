@@ -53,7 +53,7 @@ void main() {
 
   group('wire conformance corpus v1 — metadata', () {
     test('has corpus_revision + spec_date and NO generated_at_iso', () {
-      expect(corpus['corpus_revision'], 'v0.3-iblt-keyhash-v2-1');
+      expect(corpus['corpus_revision'], 'v0.3-a12-node-gatt-1');
       expect(corpus['spec_date'], '2026-05-13');
       expect(corpus.containsKey('generated_at_iso'), isFalse,
           reason: 'corpus must be deterministic; no live timestamp allowed');
@@ -65,6 +65,7 @@ void main() {
       expect(notes['payload_generator_lcg_byte_pattern_v1'], isA<String>());
       expect(notes['event_id_generator_ascii_seq_v1'], isA<String>());
       expect(notes['iblt_peel_contract_v2'], isA<String>());
+      expect(notes['node_receipt_contract'], isA<String>());
     });
 
     test('spec references point at the committed spec files', () {

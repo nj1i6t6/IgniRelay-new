@@ -60,6 +60,11 @@ class EventTypeV2 {
   static const int tracePing = 103;
   static const int traceAck = 104;
 
+  /// App↔Node 第一跳收據（A12 / `app_node_gatt_v1`）。Node→手機 notify；
+  /// link-local（maxHops 0、不轉送）、priority 僅 NORMAL、payload =
+  /// [NodeReceiptData]。手機只收不送、不投影 Event_Logs（走 nodeReceipts 流）。
+  static const int nodeReceipt = 105;
+
   // 1000+ experimental — out of tree
 
   /// Per envelope_v2_spec §11.2, the maximum `max_hops` an author is
@@ -103,6 +108,8 @@ class EventTypeV2 {
         return 12; // broad reach — authority broadcast
       case protocolHello:
         return 0; // §11.4 — never relayed
+      case nodeReceipt:
+        return 0; // A12 — link-local first-hop receipt, never relayed
       case protocolNotice:
         return 12;
       case heartbeat:
@@ -139,6 +146,7 @@ class EventTypeV2 {
       case heartbeat:
       case tracePing:
       case traceAck:
+      case nodeReceipt:
         return true;
       default:
         return false;
@@ -1539,6 +1547,82 @@ class AdminBroadcastData {
       scope: scope,
       message: message,
       expiresAt: expiresAt,
+    );
+  }
+}
+
+/// NODE_RECEIPT status (A12 / `app_node_gatt_v1` §5.2 field 2). Values outside
+/// this set MUST be treated as "unknown" by the phone — never as ACCEPTED.
+class NodeReceiptStatus {
+  static const int acceptedStored = 0;
+  static const int duplicate = 1;
+  static const int rejected = 2;
+}
+
+/// NodeReceiptData — payload for EVENT_TYPE_NODE_RECEIPT (105), the App↔Node
+/// first-hop receipt (A12 / `docs/specs/app_node_gatt_v1.md` §5). Sent by a
+/// Field Node (peripheral) to the phone after it verifies + dedupes + queues a
+/// phone-originated event. The phone ONLY receives this (never sends it) and
+/// does NOT project it into `Event_Logs` — it surfaces on `EventStream
+/// .nodeReceipts`, keyed by [refEnvelopeId] to the sender's pre-allocated
+/// envelope_id. Hand-written struct, same lenient style as [CheckpointData]:
+/// unknown tags are skipped.
+class NodeReceiptData {
+  /// envelope_id (16 bytes) of the phone event being acknowledged.
+  final Uint8List refEnvelopeId;
+
+  /// [NodeReceiptStatus.*]. Default (omitted) == 0 == ACCEPTED_STORED.
+  final int status;
+
+  /// Node's current forward-queue depth (UI hint). Default (omitted) == 0.
+  final int queueDepth;
+
+  NodeReceiptData({
+    Uint8List? refEnvelopeId,
+    this.status = NodeReceiptStatus.acceptedStored,
+    this.queueDepth = 0,
+  }) : refEnvelopeId = refEnvelopeId ?? Uint8List(0);
+
+  Uint8List encode() {
+    final w = ProtoWriter();
+    // ref_envelope_id is always present for a real receipt (16 bytes); empty
+    // only for a degenerate/test value, in which case proto3 omits it.
+    w.writeBytes(1, refEnvelopeId);
+    w.writeUint32(2, status);
+    w.writeUint32(3, queueDepth);
+    return w.toBytes();
+  }
+
+  static NodeReceiptData decode(Uint8List bytes) {
+    final r = ProtoReader(bytes);
+    Uint8List ref = Uint8List(0);
+    var status = NodeReceiptStatus.acceptedStored;
+    var queueDepth = 0;
+    while (!r.isAtEnd) {
+      final tag = r.readTag();
+      final field = tagFieldNumber(tag);
+      final wire = tagWireType(tag);
+      switch (field) {
+        case 1:
+          if (wire != wireLengthDelimited) {
+            throw ProtoDecodeException('node_receipt.ref_envelope_id wire-type');
+          }
+          ref = Uint8List.fromList(r.readLengthDelimited());
+          break;
+        case 2:
+          status = r.readUint32();
+          break;
+        case 3:
+          queueDepth = r.readUint32();
+          break;
+        default:
+          r.skipValue(wire);
+      }
+    }
+    return NodeReceiptData(
+      refEnvelopeId: ref,
+      status: status,
+      queueDepth: queueDepth,
     );
   }
 }

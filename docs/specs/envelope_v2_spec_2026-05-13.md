@@ -268,7 +268,8 @@ enum EventType {
   EVENT_TYPE_HEARTBEAT            = 102;
   EVENT_TYPE_TRACE_PING           = 103;
   EVENT_TYPE_TRACE_ACK            = 104;
-  reserved 105 to 129;                    // headroom for system
+  EVENT_TYPE_NODE_RECEIPT         = 105;  // A12 App↔Node first-hop receipt; see docs/specs/app_node_gatt_v1.md
+  reserved 106 to 129;                    // headroom for system
 
   // ── 1000+: Experimental / local-only ───────────────────────────────
   //   Envelope MUST set is_experimental=true. Relays SHOULD NOT propagate.
@@ -409,6 +410,7 @@ The receiver MUST validate `(event_type, priority)` against the matrix below on 
 | `PROTOCOL_NOTICE` | ALERT | * → DROP (only vendor-signed; checked separately) |
 | `HEARTBEAT` | NORMAL | * → DROP |
 | `TRACE_PING` / `TRACE_ACK` | NORMAL | * → DROP |
+| `NODE_RECEIPT` (= 105) | NORMAL | * → DROP (A12 first-hop receipt; control frame) |
 | `CHAT_MESSAGE` (= 30) | NORMAL | SOS_* → DROP (priority abuse) |
 
 `EVENT_TYPE_CHAT_MESSAGE = 30` (locked decision; placed under the 20-49 coordination group). Legacy `CHAT_MESSAGE = 13` is permanently reserved (§4.1).
@@ -711,6 +713,7 @@ Each EventType has two complementary expiry mechanisms:
 | `PROTOCOL_NOTICE` | 12 | 7 days | Kill switch needs broad reach and persistence. |
 | `HEARTBEAT` | 2 | 5 minutes | Liveness signal; short-lived. |
 | `TRACE_PING` / `TRACE_ACK` | 6 | 5 minutes | Diagnostic. |
+| `NODE_RECEIPT` (= 105) | 0 (never relayed) | 30 seconds | A12 App↔Node first-hop receipt; link-local only. |
 | `CHAT_MESSAGE` (= 30) | 6 | 24 hours | Locked decision §20.1. |
 
 ### 11.3 Author override

@@ -586,6 +586,57 @@ void main() {
     );
   });
 
+  test('NODE_RECEIPT (105) surfaces on nodeReceipts and is NOT projected (A12)',
+      () async {
+    final h = await makeHarness();
+    final eventStream = EventStream(
+      handler: MeshEventHandler(),
+      decoder: EventDecoder(),
+      store: EventStore(databaseHelper: DatabaseHelper()),
+      nodeReceiptSource: h.projector.nodeReceipts,
+    )..start();
+    final receiptFuture = eventStream.nodeReceipts.first;
+
+    final ref = Uint8List.fromList(List<int>.generate(16, (i) => 0xA0 + i));
+    final payload = NodeReceiptData(
+      refEnvelopeId: ref,
+      status: NodeReceiptStatus.duplicate,
+      queueDepth: 3,
+    ).encode();
+
+    final published = await h.publisher.send(
+      eventType: EventTypeV2.nodeReceipt, // 105 control
+      priority: PriorityV2.normal,
+      payload: payload,
+      createdAtHlc: HlcTimestampV2(msSinceEpoch: 1000, counter: 0),
+      expiresAtHlc: HlcTimestampV2(msSinceEpoch: 2000, counter: 0),
+      maxHops: 0, // link-local control frame
+      negotiatedMtu: 247,
+      fieldId: Uint8List(16), // control → zero field_id
+    );
+
+    final outcome = await h.dispatcher
+        .onReceiveEnvelopeBytes(published.wireBytes, peerId: 'AA:BB:CC');
+    expect(outcome, isA<DispatchAccepted>());
+
+    final receipt = await receiptFuture.timeout(const Duration(seconds: 2));
+    expect(receipt.refEnvelopeIdHex, 'a0a1a2a3a4a5a6a7a8a9aaabacadaeaf');
+    expect(receipt.status, NodeReceiptStatus.duplicate);
+    expect(receipt.isDuplicate, isTrue);
+    expect(receipt.isAcceptedStored, isFalse);
+    expect(receipt.queueDepth, 3);
+
+    // A receipt is a transport-layer ack: it MUST NOT land in Event_Logs.
+    final db = await DatabaseHelper().database;
+    final logs = await db.query('Event_Logs');
+    expect(logs, isEmpty,
+        reason: 'NODE_RECEIPT must not project into the v1 read-model');
+
+    await eventStream.dispose();
+    await h.projector.dispose();
+    await h.dispatcher.dispose();
+  });
+
   test('non-SOS, non-SAFE status (UNSAFE) is not projected into the read-model',
       () async {
     // A8: SAFE now projects an SOS-resolution row (see the test above). Other
